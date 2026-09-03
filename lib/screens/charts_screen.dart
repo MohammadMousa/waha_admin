@@ -34,6 +34,7 @@ class _Group {
   _Vis vis;
   int cols;
   double heightMult;
+  bool collapsed;
   Map<String, _EpState> eps;
 
   _Group({
@@ -42,6 +43,7 @@ class _Group {
     required List<String> endpoints,
   })  : cols = 2,
         heightMult = 1.0,
+        collapsed = true,
         eps = Map.fromEntries(endpoints.map((e) => MapEntry(e, _EpState())));
 }
 
@@ -182,6 +184,7 @@ class _ChartsScreenState extends State<ChartsScreen> {
                           visOptions: const [_Vis.line, _Vis.bar],
                           endpoints: _hourlyEps,
                           epLabels: _epLabels,
+                          onToggleCollapse: () => setState(() => _hourly.collapsed = !_hourly.collapsed),
                           onPickRange: () => _pickRange(_hourly, _hourlyEps, maxDays: 1),
                           onVisChange: (v) => setState(() => _hourly.vis = v),
                           onRefreshAll: () => _refreshAll(_hourly, _hourlyEps),
@@ -197,6 +200,7 @@ class _ChartsScreenState extends State<ChartsScreen> {
                           visOptions: const [_Vis.line, _Vis.bar],
                           endpoints: _dailyEps,
                           epLabels: _epLabels,
+                          onToggleCollapse: () => setState(() => _daily.collapsed = !_daily.collapsed),
                           onPickRange: () => _pickRange(_daily, _dailyEps, maxDays: 62),
                           onVisChange: (v) => setState(() => _daily.vis = v),
                           onRefreshAll: () => _refreshAll(_daily, _dailyEps),
@@ -212,6 +216,7 @@ class _ChartsScreenState extends State<ChartsScreen> {
                           visOptions: const [_Vis.line, _Vis.bar],
                           endpoints: _monthlyEps,
                           epLabels: _epLabels,
+                          onToggleCollapse: () => setState(() => _monthly.collapsed = !_monthly.collapsed),
                           onPickRange: () => _pickRange(_monthly, _monthlyEps, maxDays: 730),
                           onVisChange: (v) => setState(() => _monthly.vis = v),
                           onRefreshAll: () => _refreshAll(_monthly, _monthlyEps),
@@ -227,6 +232,7 @@ class _ChartsScreenState extends State<ChartsScreen> {
                           visOptions: const [_Vis.bar, _Vis.pie],
                           endpoints: _entityEps,
                           epLabels: _epLabels,
+                          onToggleCollapse: () => setState(() => _entity.collapsed = !_entity.collapsed),
                           onPickRange: () => _pickRange(_entity, _entityEps),
                           onVisChange: (v) => setState(() => _entity.vis = v),
                           onRefreshAll: () => _refreshAll(_entity, _entityEps),
@@ -256,6 +262,7 @@ class _GroupSection extends StatelessWidget {
   final List<_Vis> visOptions;
   final List<String> endpoints;
   final Map<String, String> epLabels;
+  final VoidCallback onToggleCollapse;
   final VoidCallback onPickRange;
   final ValueChanged<_Vis> onVisChange;
   final VoidCallback onRefreshAll;
@@ -270,6 +277,7 @@ class _GroupSection extends StatelessWidget {
     required this.visOptions,
     required this.endpoints,
     required this.epLabels,
+    required this.onToggleCollapse,
     required this.onPickRange,
     required this.onVisChange,
     required this.onRefreshAll,
@@ -285,6 +293,7 @@ class _GroupSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final anyLoading = group.eps.values.any((s) => s.loading);
+    final collapsed = group.collapsed;
 
     return Container(
       decoration: BoxDecoration(
@@ -300,8 +309,12 @@ class _GroupSection extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 14, 12, 14),
             decoration: BoxDecoration(
               color: scheme.surfaceContainerLow,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
+              borderRadius: collapsed
+                  ? BorderRadius.circular(16)
+                  : const BorderRadius.vertical(top: Radius.circular(16)),
+              border: collapsed
+                  ? null
+                  : Border(bottom: BorderSide(color: scheme.outlineVariant)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -321,79 +334,95 @@ class _GroupSection extends StatelessWidget {
                         ],
                       ),
                     ),
-                    // Date picker
-                    GestureDetector(
-                      onTap: onPickRange,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: scheme.outline.withValues(alpha: 0.5)),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(Icons.calendar_today_outlined, size: 14, color: scheme.primary),
-                          const SizedBox(width: 6),
-                          Text(
-                            '${_fmtDate(group.range.start)}  –  ${_fmtDate(group.range.end)}',
-                            style: const TextStyle(fontSize: 12),
+                    if (!collapsed) ...[
+                      // Date picker
+                      GestureDetector(
+                        onTap: onPickRange,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: scheme.outline.withValues(alpha: 0.5)),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                        ]),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            Icon(Icons.calendar_today_outlined, size: 14, color: scheme.primary),
+                            const SizedBox(width: 6),
+                            Text(
+                              '${_fmtDate(group.range.start)}  –  ${_fmtDate(group.range.end)}',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ]),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    // Vis type picker
-                    _VisPicker(
-                      options: visOptions,
-                      selected: group.vis,
-                      onSelect: onVisChange,
-                    ),
-                    const SizedBox(width: 6),
-                    // Refresh all generated
+                      const SizedBox(width: 10),
+                      // Vis type picker
+                      _VisPicker(
+                        options: visOptions,
+                        selected: group.vis,
+                        onSelect: onVisChange,
+                      ),
+                      const SizedBox(width: 6),
+                      // Refresh all generated
+                      IconButton(
+                        icon: anyLoading
+                            ? const SizedBox(width: 16, height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2))
+                            : Icon(Icons.refresh_outlined, color: scheme.primary),
+                        tooltip: 'Refresh all generated',
+                        onPressed: anyLoading ? null : onRefreshAll,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ],
+                    // Collapse / expand toggle
                     IconButton(
-                      icon: anyLoading
-                          ? const SizedBox(width: 16, height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2))
-                          : Icon(Icons.refresh_outlined, color: scheme.primary),
-                      tooltip: 'Refresh all generated',
-                      onPressed: anyLoading ? null : onRefreshAll,
+                      icon: AnimatedRotation(
+                        turns: collapsed ? 0.0 : 0.5,
+                        duration: const Duration(milliseconds: 200),
+                        child: Icon(Icons.expand_more_rounded, color: scheme.outline),
+                      ),
+                      tooltip: collapsed ? 'Expand' : 'Collapse',
+                      onPressed: onToggleCollapse,
                       visualDensity: VisualDensity.compact,
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                // Layout controls row
-                Row(
-                  children: [
-                    Text('Columns:', style: TextStyle(fontSize: 11, color: scheme.outline)),
-                    const SizedBox(width: 6),
-                    ...[1, 2, 3].map((c) => _SmallToggleBtn(
-                          label: '$c',
-                          selected: group.cols == c,
-                          onTap: () => onColsChange(c),
-                        )),
-                    const SizedBox(width: 16),
-                    Text('Height:', style: TextStyle(fontSize: 11, color: scheme.outline)),
-                    const SizedBox(width: 6),
-                    ...const [
-                      (1.0, 'x'),
-                      (1.5, '1.5x'),
-                      (2.0, '2x'),
-                    ].map(((double, String) entry) => _SmallToggleBtn(
-                          label: entry.$2,
-                          selected: group.heightMult == entry.$1,
-                          onTap: () => onHeightChange(entry.$1),
-                        )),
-                  ],
-                ),
+                if (!collapsed) ...[
+                  const SizedBox(height: 10),
+                  // Layout controls row
+                  Row(
+                    children: [
+                      Text('Columns:', style: TextStyle(fontSize: 11, color: scheme.outline)),
+                      const SizedBox(width: 6),
+                      ...[1, 2, 3].map((c) => _SmallToggleBtn(
+                            label: '$c',
+                            selected: group.cols == c,
+                            onTap: () => onColsChange(c),
+                          )),
+                      const SizedBox(width: 16),
+                      Text('Height:', style: TextStyle(fontSize: 11, color: scheme.outline)),
+                      const SizedBox(width: 6),
+                      ...const [
+                        (1.0, 'x'),
+                        (1.5, '1.5x'),
+                        (2.0, '2x'),
+                      ].map(((double, String) entry) => _SmallToggleBtn(
+                            label: entry.$2,
+                            selected: group.heightMult == entry.$1,
+                            onTap: () => onHeightChange(entry.$1),
+                          )),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
 
-          // Chart grid
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: _buildGrid(context, scheme),
-          ),
+          // Chart grid — hidden when collapsed
+          if (!collapsed)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: _buildGrid(context, scheme),
+            ),
         ],
       ),
     );

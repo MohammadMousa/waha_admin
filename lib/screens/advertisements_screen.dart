@@ -155,12 +155,19 @@ class _AdvertisementsScreenState extends State<AdvertisementsScreen> {
     if (result != null && mounted) setState(() => _slides[i] = _slides[i].withLabel(result));
   }
 
+  // Strip origin from any absolute URL → root-relative path for portability.
+  static String _toRelativePath(String url) {
+    if (url.startsWith('/')) return url;
+    if (url.startsWith('http')) return Uri.parse(url).path;
+    return '/$url';
+  }
+
   String _buildHtml() {
-    final base = AppConfig.apiBaseUrl;
     final slideHtml = _slides.map((s) {
-      final src = s.publicUrl.isNotEmpty
-          ? (s.publicUrl.startsWith('http') ? s.publicUrl : '$base${s.publicUrl}')
-          : '$base/api/resources/${s.resourceId}';
+      // Always save as root-relative so resolveAbsolutePaths() on the kiosk
+      // rewrites to the live server origin. Handles both old (absolute) and
+      // new (relative) publicUrl values gracefully.
+      final src = _toRelativePath(s.publicUrl);
       final labelAttr = s.label.isNotEmpty ? ' data-label="${s.label}"' : '';
       return '  <div class="slide" data-rid="${s.resourceId}"$labelAttr><img src="$src" loading="eager" alt="${s.label}"></div>';
     }).join('\n');
@@ -171,7 +178,7 @@ class _AdvertisementsScreenState extends State<AdvertisementsScreen> {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
 <meta name="waha-mode" content="fullscreen">
-<title>Advertisements</title>
+<title>Preview</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;height:100%;overflow:hidden;background:#000;touch-action:none}
@@ -288,7 +295,7 @@ $slideHtml
   }
 
   Widget _buildTopBar(ColorScheme scheme) {
-    final branches = <Store?>[null, ...?_stores];
+    final branches = <Store>[...?_stores];
     final busy = _loadingSlides || _saving;
 
     return Container(
@@ -340,14 +347,14 @@ $slideHtml
               borderRadius: BorderRadius.circular(8),
             ),
             child: DropdownButtonHideUnderline(
-              child: DropdownButton<Store?>(
+              child: DropdownButton<Store>(
                 value: _selectedStore,
-                hint: Text('Global (all branches)', style: TextStyle(fontSize: 13, color: scheme.onSurface)),
+                hint: Text('Pick store', style: TextStyle(fontSize: 13, color: scheme.outline)),
                 isDense: true,
                 style: TextStyle(fontSize: 13, color: scheme.onSurface),
-                items: branches.map((s) => DropdownMenuItem<Store?>(
+                items: branches.map((s) => DropdownMenuItem<Store>(
                   value: s,
-                  child: Text(s == null ? 'Global (all branches)' : s.label()),
+                  child: Text(s.id == 1 ? 'Global (all branches)' : s.label()),
                 )).toList(),
                 onChanged: busy ? null : (s) {
                   setState(() => _selectedStore = s);

@@ -11,7 +11,6 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
-import '../widgets/product_image.dart';
 import '../widgets/resource_picker_modal.dart';
 
 class LandingEditorScreen extends StatefulWidget {
@@ -98,12 +97,18 @@ class _LandingEditorScreenState extends State<LandingEditorScreen> {
     )));
   }
 
+  static String _toRelativePath(String url) {
+    if (url.startsWith('/')) return url;
+    if (url.startsWith('http')) return Uri.parse(url).path;
+    return '/$url';
+  }
+
   String _buildHtml() {
     final mode = _fullscreen ? 'fullscreen' : 'embedded';
     final slideHtml = _slides.map((s) {
       final src = s.publicUrl.isNotEmpty
-          ? s.publicUrl
-          : '${AppConfig.apiBaseUrl}/api/resources/${s.resourceId}';
+          ? _toRelativePath(s.publicUrl)
+          : '/api/resources/${s.resourceId}';
       return '  <div class="slide" data-rid="${s.resourceId}"><img src="$src" loading="eager" alt=""></div>';
     }).join('\n');
 
@@ -113,7 +118,7 @@ class _LandingEditorScreenState extends State<LandingEditorScreen> {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
 <meta name="waha-mode" content="$mode">
-<title>$_storeSlug</title>
+<title>Preview</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;height:100%;overflow:hidden;background:#000;touch-action:none}
@@ -506,7 +511,14 @@ class _SlideRow extends StatelessWidget {
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         leading: ClipRRect(
           borderRadius: BorderRadius.circular(6),
-          child: ProductImage(imageResourceId: slide.resourceId, width: 52, height: 52),
+          child: Image.network(
+            '${AppConfig.apiBaseUrl}${slide.publicUrl}',
+            width: 52, height: 52, fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(
+              width: 52, height: 52, color: Colors.black12,
+              child: const Icon(Icons.image_outlined, size: 20),
+            ),
+          ),
         ),
         title: Text('Slide ${index + 1}',
             style: const TextStyle(fontWeight: FontWeight.w500)),
@@ -608,6 +620,7 @@ class _ScreensaverPreview extends StatefulWidget {
 class _ScreensaverPreviewState extends State<_ScreensaverPreview> {
   late final PageController _pageCtrl;
   Timer? _timer;
+  // Never wraps — always increments so PageView scrolls forward infinitely
   int _page = 0;
 
   static const _transitionMs = 700;
@@ -628,7 +641,7 @@ class _ScreensaverPreviewState extends State<_ScreensaverPreview> {
 
   void _advance() {
     if (!mounted) return;
-    _page = (_page + 1) % widget.slides.length;
+    _page++;            // always forward, never wraps back to 0
     _pageCtrl.animateToPage(_page,
         duration: const Duration(milliseconds: _transitionMs), curve: Curves.easeInOut);
     _scheduleNext();
@@ -667,12 +680,15 @@ class _ScreensaverPreviewState extends State<_ScreensaverPreview> {
                 PageView.builder(
                   controller: _pageCtrl,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: widget.slides.length,
-                  itemBuilder: (_, i) => ProductImage(
-                    imageResourceId: widget.slides[i].resourceId,
-                    width: double.infinity, height: double.infinity,
-                    fit: BoxFit.cover,
-                  ),
+                  itemCount: null, // infinite — page index keeps incrementing forward
+                  itemBuilder: (_, i) {
+                    final slide = widget.slides[i % widget.slides.length];
+                    final url = '${AppConfig.apiBaseUrl}${slide.publicUrl}';
+                    return Image.network(url,
+                      fit: BoxFit.cover, width: double.infinity, height: double.infinity,
+                      errorBuilder: (_, __, ___) => const ColoredBox(color: Colors.black26),
+                    );
+                  },
                 ),
                 Positioned(
                   bottom: 12, left: 0, right: 0,
