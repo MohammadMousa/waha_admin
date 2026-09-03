@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/organization.dart';
 import '../models/store.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
@@ -29,8 +30,8 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
   bool _active = true;
   bool _isPublic = true;
 
-  List<Store> _parentStores = [];
-  int? _parentStoreId;
+  List<Organization> _organizations = [];
+  int? _organizationId;
 
   bool _loading = true;
   bool _saving = false;
@@ -63,8 +64,8 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
     final api = ApiClient();
     try {
       if (_isCreate) {
-        final stores = await api.getAdminStores(token);
-        if (mounted) setState(() { _parentStores = stores; _loading = false; });
+        final orgs = await api.getOrganizations(token);
+        if (mounted) setState(() { _organizations = orgs; _loading = false; });
       } else {
         final details = await api.getStoreAdminDetails(widget.store!.id, token: token);
         if (mounted && details != null) {
@@ -110,7 +111,7 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
           'displayName': {'ar': _nameArCtrl.text.trim(), 'en': _nameEnCtrl.text.trim()},
           if (_currencyCtrl.text.trim().isNotEmpty)
             'currency': _currencyCtrl.text.trim().toUpperCase(),
-          if (_parentStoreId != null) 'parentStoreId': _parentStoreId,
+          if (_organizationId != null) 'organizationId': _organizationId,
         }, token: token);
         await api.patchStore(newId, {
           'active': _active,
@@ -267,25 +268,27 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
                                   ),
                                   const SizedBox(height: 20),
 
-                                  if (_isCreate && _parentStores.isNotEmpty) ...[
-                                    Text('Parent Store',
+                                  if (_isCreate && _organizations.isNotEmpty) ...[
+                                    Text('Organization',
                                         style: Theme.of(context).textTheme.titleSmall),
                                     const SizedBox(height: 4),
-                                    Text('Leave blank to create under your root store.',
+                                    Text('Which org this branch belongs to (defaults to Company).',
                                         style: TextStyle(color: scheme.outline, fontSize: 12)),
                                     const SizedBox(height: 8),
                                     DropdownButtonFormField<int?>(
-                                      value: _parentStoreId,
+                                      value: _organizationId,
                                       decoration: const InputDecoration(border: OutlineInputBorder()),
                                       items: [
                                         const DropdownMenuItem<int?>(value: null,
-                                            child: Text('— Default (admin root) —')),
-                                        ..._parentStores.map((s) => DropdownMenuItem<int?>(
-                                            value: s.id,
-                                            child: Text(s.label(),
-                                                overflow: TextOverflow.ellipsis))),
+                                            child: Text('— Company (default) —')),
+                                        ..._organizations
+                                            .where((o) => o.type == 'BRANCH_GROUP')
+                                            .map((o) => DropdownMenuItem<int?>(
+                                                value: o.id,
+                                                child: Text(o.label(),
+                                                    overflow: TextOverflow.ellipsis))),
                                       ],
-                                      onChanged: (v) => setState(() => _parentStoreId = v),
+                                      onChanged: (v) => setState(() => _organizationId = v),
                                     ),
                                     const SizedBox(height: 20),
                                   ],

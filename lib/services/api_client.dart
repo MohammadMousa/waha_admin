@@ -7,6 +7,7 @@ import '../models/category.dart';
 import '../models/payment_method.dart';
 import '../models/receipt_info.dart';
 import '../models/resource.dart';
+import '../models/organization.dart';
 import '../models/store.dart';
 
 class ApiException implements Exception {
@@ -183,6 +184,16 @@ class ApiClient {
         headers: _headers(token: token), body: jsonEncode(body));
     if (resp.statusCode == 200) {
       return ((jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>)['id'] as num).toInt();
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<List<Organization>> getOrganizations(String token) async {
+    final resp = await _http.get(_uri('/api/organizations'), headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      return (jsonDecode(utf8.decode(resp.bodyBytes)) as List)
+          .map((e) => Organization.fromJson(e as Map<String, dynamic>))
+          .toList();
     }
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
