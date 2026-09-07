@@ -41,7 +41,12 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) {
         final auth = context.read<AuthState>();
         final nav = Navigator.of(context);
-        await auth.setSession(token, username ?? _username.text.trim());
+        await auth.setSession(
+          token,
+          username ?? _username.text.trim(),
+          roleName: data['roleName'] as String?,
+          permissions: (data['permissions'] as List?)?.cast<String>().toSet() ?? const {},
+        );
         nav.pushReplacementNamed(Routes.dashboard);
       }
     } on ApiException catch (e) {

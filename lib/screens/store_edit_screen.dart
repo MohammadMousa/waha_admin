@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../models/organization.dart';
+import '../models/branch_group.dart';
 import '../models/store.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
@@ -30,8 +30,8 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
   bool _active = true;
   bool _isPublic = true;
 
-  List<Organization> _organizations = [];
-  int? _organizationId;
+  List<BranchGroup> _branchGroups = [];
+  int? _branchGroupId;
 
   bool _loading = true;
   bool _saving = false;
@@ -64,8 +64,8 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
     final api = ApiClient();
     try {
       if (_isCreate) {
-        final orgs = await api.getOrganizations(token);
-        if (mounted) setState(() { _organizations = orgs; _loading = false; });
+        final groups = await api.getBranchGroups(token);
+        if (mounted) setState(() { _branchGroups = groups; _loading = false; });
       } else {
         final details = await api.getStoreAdminDetails(widget.store!.id, token: token);
         if (mounted && details != null) {
@@ -111,7 +111,7 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
           'displayName': {'ar': _nameArCtrl.text.trim(), 'en': _nameEnCtrl.text.trim()},
           if (_currencyCtrl.text.trim().isNotEmpty)
             'currency': _currencyCtrl.text.trim().toUpperCase(),
-          if (_organizationId != null) 'organizationId': _organizationId,
+          if (_branchGroupId != null) 'branchGroupId': _branchGroupId,
         }, token: token);
         await api.patchStore(newId, {
           'active': _active,
@@ -268,27 +268,24 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
                                   ),
                                   const SizedBox(height: 20),
 
-                                  if (_isCreate && _organizations.isNotEmpty) ...[
-                                    Text('Organization',
+                                  if (_isCreate && _branchGroups.isNotEmpty) ...[
+                                    Text('Branch Group',
                                         style: Theme.of(context).textTheme.titleSmall),
                                     const SizedBox(height: 4),
-                                    Text('Which org this branch belongs to (defaults to Company).',
+                                    Text('Assign this store to a branch group (optional).',
                                         style: TextStyle(color: scheme.outline, fontSize: 12)),
                                     const SizedBox(height: 8),
                                     DropdownButtonFormField<int?>(
-                                      value: _organizationId,
+                                      value: _branchGroupId,
                                       decoration: const InputDecoration(border: OutlineInputBorder()),
                                       items: [
                                         const DropdownMenuItem<int?>(value: null,
-                                            child: Text('— Company (default) —')),
-                                        ..._organizations
-                                            .where((o) => o.type == 'BRANCH_GROUP')
-                                            .map((o) => DropdownMenuItem<int?>(
-                                                value: o.id,
-                                                child: Text(o.label(),
-                                                    overflow: TextOverflow.ellipsis))),
+                                            child: Text('— No Group —')),
+                                        ..._branchGroups.map((g) => DropdownMenuItem<int?>(
+                                            value: g.id,
+                                            child: Text(g.name, overflow: TextOverflow.ellipsis))),
                                       ],
-                                      onChanged: (v) => setState(() => _organizationId = v),
+                                      onChanged: (v) => setState(() => _branchGroupId = v),
                                     ),
                                     const SizedBox(height: 20),
                                   ],

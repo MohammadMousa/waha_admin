@@ -3,10 +3,13 @@ import 'dart:convert';
 import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 class RecentOrdersTable extends StatelessWidget {
   final List<Map<String, dynamic>> orders;
   const RecentOrdersTable({super.key, required this.orders});
+
+  static final _dateFmt = DateFormat('MMM d, h:mm a');
 
   String _branchName(Map<String, dynamic> o) {
     final raw = o['store_display_name'];
@@ -22,12 +25,30 @@ class RecentOrdersTable extends StatelessWidget {
     return (o['store_name'] ?? '—').toString();
   }
 
+  String _displayId(Map<String, dynamic> o) {
+    final displayId = o['display_id'];
+    if (displayId != null) return '#$displayId';
+    final id = (o['id'] ?? '').toString();
+    return '#${id.length > 8 ? '${id.substring(0, 8)}…' : id}';
+  }
+
+  String _date(Map<String, dynamic> o) {
+    final raw = o['created_at'];
+    if (raw == null) return '—';
+    try {
+      return _dateFmt.format(DateTime.parse(raw.toString()));
+    } catch (_) {
+      return raw.toString();
+    }
+  }
+
   void _exportCsv() {
     final lines = [
-      '#,Branch,Total,Currency,Status',
+      '#,Branch,Date,Total,Currency,Status',
       ...orders.map((o) => [
-            '#${o['id'] ?? ''}',
+            _displayId(o),
             '"${_branchName(o)}"',
+            _date(o),
             _fmt(o['total']),
             o['currency'] ?? 'SAR',
             o['status'] ?? '',
@@ -81,6 +102,7 @@ class RecentOrdersTable extends StatelessWidget {
             _buildRow(
               id: '#',
               branch: 'Branch',
+              date: 'Date',
               total: 'Total',
               status: 'Status',
               isHeader: true,
@@ -99,8 +121,9 @@ class RecentOrdersTable extends StatelessWidget {
               ...orders.map((o) => Column(
                     children: [
                       _buildRow(
-                        id: '#${(o['id'] ?? '').toString().length > 8 ? (o['id'] ?? '').toString().substring(0, 8) + '…' : o['id'] ?? ''}',
+                        id: _displayId(o),
                         branch: _branchName(o),
+                        date: _date(o),
                         total: '${_fmt(o['total'])} ${o['currency'] ?? 'SAR'}',
                         status: '${o['status'] ?? ''}',
                         isHeader: false,
@@ -119,6 +142,7 @@ class RecentOrdersTable extends StatelessWidget {
   Widget _buildRow({
     required String id,
     required String branch,
+    required String date,
     required String total,
     required String status,
     required bool isHeader,
@@ -136,22 +160,26 @@ class RecentOrdersTable extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             flex: 3,
-            child: _cell(branch, isHeader, scheme),
+            child: Center(child: _cell(branch, isHeader, scheme)),
           ),
           const SizedBox(width: 8),
           Expanded(
             flex: 3,
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: _cell(total, isHeader, scheme),
-            ),
+            child: _cell(date, isHeader, scheme),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 3,
+            child: Center(child: _cell(total, isHeader, scheme)),
           ),
           const SizedBox(width: 8),
           Expanded(
             flex: 2,
-            child: isHeader
-                ? _cell(status, true, scheme)
-                : _StatusBadge(statusValue ?? ''),
+            child: Center(
+              child: isHeader
+                  ? _cell(status, true, scheme)
+                  : _StatusBadge(statusValue ?? ''),
+            ),
           ),
         ],
       ),

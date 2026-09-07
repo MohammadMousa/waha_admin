@@ -81,8 +81,7 @@ class _SingleDatePickerDialogState extends State<_SingleDatePickerDialog> {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: WahaCalendarGrid(
                 month: _viewMonth,
-                start: _selected,
-                end: _selected,
+                selected: _selected,
                 onSelect: (d) => setState(() => _selected = d),
               ),
             ),
@@ -98,7 +97,7 @@ class _SingleDatePickerDialogState extends State<_SingleDatePickerDialog> {
   }
 }
 
-// ── Range date dialog (two months side by side) ───────────────────────────────
+// ── Range date dialog (two independent pickers) ──────────────────────────────
 
 class _RangeDatePickerDialog extends StatefulWidget {
   final DateTimeRange? initial;
@@ -112,9 +111,9 @@ class _RangeDatePickerDialog extends StatefulWidget {
 class _RangeDatePickerDialogState extends State<_RangeDatePickerDialog> {
   late DateTime _start;
   late DateTime _end;
-  bool _pickingEnd = false;
-  // Left month; right month is always leftMonth + 1
-  late DateTime _leftMonth;
+  // Each calendar navigates independently
+  late DateTime _fromMonth;
+  late DateTime _toMonth;
 
   @override
   void initState() {
@@ -122,32 +121,8 @@ class _RangeDatePickerDialogState extends State<_RangeDatePickerDialog> {
     final now = DateTime.now();
     _start     = widget.initial?.start ?? DateTime(now.year, now.month, 1);
     _end       = widget.initial?.end   ?? now;
-    // Show start month on the left, end month on the right (or prev month if same)
-    _leftMonth = DateTime(_start.year, _start.month);
-    final rightMonth = DateTime(_leftMonth.year, _leftMonth.month + 1);
-    if (_end.isAfter(rightMonth) ||
-        (_end.month != _leftMonth.month && _end.year != _leftMonth.year)) {
-      // keep left at start month — no-op, leftMonth already set
-    }
-  }
-
-  DateTime get _rightMonth => DateTime(_leftMonth.year, _leftMonth.month + 1);
-
-  void _onSelect(DateTime d) {
-    setState(() {
-      if (!_pickingEnd) {
-        _start     = d;
-        if (_end.isBefore(_start)) _end = _start;
-        _pickingEnd = true;
-      } else {
-        if (d.isBefore(_start)) {
-          _end   = _start;
-          _start = d;
-        } else {
-          _end = d;
-        }
-      }
-    });
+    _fromMonth = DateTime(_start.year, _start.month);
+    _toMonth   = DateTime(_end.year, _end.month);
   }
 
   @override
@@ -160,7 +135,7 @@ class _RangeDatePickerDialogState extends State<_RangeDatePickerDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // From / To chips
+            // From / To chips (display only)
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
               child: Row(
@@ -169,8 +144,8 @@ class _RangeDatePickerDialogState extends State<_RangeDatePickerDialog> {
                     child: WahaDateChip(
                       label: 'From',
                       date: _start,
-                      selected: !_pickingEnd,
-                      onTap: () => setState(() => _pickingEnd = false),
+                      selected: true,
+                      onTap: () {},
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -180,35 +155,35 @@ class _RangeDatePickerDialogState extends State<_RangeDatePickerDialog> {
                     child: WahaDateChip(
                       label: 'To',
                       date: _end,
-                      selected: _pickingEnd,
-                      onTap: () => setState(() => _pickingEnd = true),
+                      selected: true,
+                      onTap: () {},
                     ),
                   ),
                 ],
               ),
             ),
-            // Two calendar months side by side
+            // Two fully independent calendars
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Left month
+                // From calendar
                 Expanded(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       _MonthNav(
-                        month: _leftMonth,
-                        onPrev: () => setState(() => _leftMonth =
-                            DateTime(_leftMonth.year, _leftMonth.month - 1)),
-                        onNext: null,
+                        month: _fromMonth,
+                        onPrev: () => setState(() => _fromMonth =
+                            DateTime(_fromMonth.year, _fromMonth.month - 1)),
+                        onNext: () => setState(() => _fromMonth =
+                            DateTime(_fromMonth.year, _fromMonth.month + 1)),
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 10),
                         child: WahaCalendarGrid(
-                          month: _leftMonth,
-                          start: _start,
-                          end: _end,
-                          onSelect: _onSelect,
+                          month: _fromMonth,
+                          selected: _start,
+                          onSelect: (d) => setState(() => _start = d),
                         ),
                       ),
                     ],
@@ -217,26 +192,26 @@ class _RangeDatePickerDialogState extends State<_RangeDatePickerDialog> {
                 Container(
                   width: 1,
                   height: 300,
-                  color: Theme.of(context).colorScheme.outlineVariant,
+                  color: scheme.outlineVariant,
                 ),
-                // Right month
+                // To calendar
                 Expanded(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       _MonthNav(
-                        month: _rightMonth,
-                        onPrev: null,
-                        onNext: () => setState(() => _leftMonth =
-                            DateTime(_leftMonth.year, _leftMonth.month + 1)),
+                        month: _toMonth,
+                        onPrev: () => setState(() => _toMonth =
+                            DateTime(_toMonth.year, _toMonth.month - 1)),
+                        onNext: () => setState(() => _toMonth =
+                            DateTime(_toMonth.year, _toMonth.month + 1)),
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 10),
                         child: WahaCalendarGrid(
-                          month: _rightMonth,
-                          start: _start,
-                          end: _end,
-                          onSelect: _onSelect,
+                          month: _toMonth,
+                          selected: _end,
+                          onSelect: (d) => setState(() => _end = d),
                         ),
                       ),
                     ],
@@ -248,7 +223,10 @@ class _RangeDatePickerDialogState extends State<_RangeDatePickerDialog> {
             _Actions(
               onCancel: () => Navigator.pop(context),
               onApply:  () => Navigator.pop(
-                  context, DateTimeRange(start: _start, end: _end)),
+                  context,
+                  _start.isAfter(_end)
+                      ? DateTimeRange(start: _end, end: _start)
+                      : DateTimeRange(start: _start, end: _end)),
             ),
           ],
         ),
@@ -308,15 +286,13 @@ class WahaDateChip extends StatelessWidget {
 
 class WahaCalendarGrid extends StatelessWidget {
   final DateTime month;
-  final DateTime start;
-  final DateTime end;
+  final DateTime? selected;
   final ValueChanged<DateTime> onSelect;
 
   const WahaCalendarGrid({
     super.key,
     required this.month,
-    required this.start,
-    required this.end,
+    required this.selected,
     required this.onSelect,
   });
 
@@ -336,26 +312,22 @@ class WahaCalendarGrid extends StatelessWidget {
                     color: scheme.outline)))),
       ...List.generate(startWeekday, (_) => const SizedBox.shrink()),
       ...List.generate(daysInMonth, (i) {
-        final d      = DateTime(month.year, month.month, i + 1);
-        final isStart = _same(d, start);
-        final isEnd   = _same(d, end);
-        final inRange = d.isAfter(start) && d.isBefore(end);
-        final future  = d.isAfter(DateTime.now());
-
-        Color? bg;
-        if (isStart || isEnd) bg = scheme.primary;
-        else if (inRange)     bg = scheme.primaryContainer;
+        final d        = DateTime(month.year, month.month, i + 1);
+        final isSelected = selected != null && _same(d, selected!);
+        final future   = d.isAfter(DateTime.now());
 
         return GestureDetector(
           onTap: future ? null : () => onSelect(d),
           child: Container(
             margin: const EdgeInsets.all(1),
-            decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+            decoration: BoxDecoration(
+                color: isSelected ? scheme.primary : null,
+                shape: BoxShape.circle),
             alignment: Alignment.center,
             child: Text('${i + 1}',
                 style: TextStyle(
                     fontSize: 12,
-                    color: (isStart || isEnd)
+                    color: isSelected
                         ? scheme.onPrimary
                         : future
                             ? scheme.outline.withValues(alpha: 0.35)

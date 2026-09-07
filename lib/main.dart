@@ -3,11 +3,17 @@ import 'package:provider/provider.dart';
 
 import 'models/account_user.dart';
 import 'models/category.dart';
+import 'models/device.dart';
+import 'models/employee.dart';
 import 'models/store.dart';
 import 'router/routes.dart';
 import 'screens/account_edit_screen.dart';
 import 'screens/accounts_screen.dart';
 import 'screens/advertisements_screen.dart';
+import 'screens/device_edit_screen.dart';
+import 'screens/devices_screen.dart';
+import 'screens/employee_edit_screen.dart';
+import 'screens/employees_screen.dart';
 import 'screens/orders_screen.dart';
 import 'screens/categories_admin_screen.dart';
 import 'screens/categories_screen.dart';
@@ -82,6 +88,24 @@ class WahaAdminApp extends StatelessWidget {
             final account = settings.arguments as AccountUser?;
             return MaterialPageRoute(
                 builder: (_) => AccountEditScreen(account: account), settings: settings);
+
+          case Routes.employees:
+            return MaterialPageRoute(
+                builder: (_) => const EmployeesScreen(), settings: settings);
+
+          case Routes.employeeEdit:
+            final employee = settings.arguments as Employee?;
+            return MaterialPageRoute(
+                builder: (_) => EmployeeEditScreen(employee: employee), settings: settings);
+
+          case Routes.devices:
+            return MaterialPageRoute(
+                builder: (_) => const DevicesScreen(), settings: settings);
+
+          case Routes.deviceEdit:
+            final device = settings.arguments as Device?;
+            return MaterialPageRoute(
+                builder: (_) => DeviceEditScreen(device: device), settings: settings);
 
           case Routes.register:
             return MaterialPageRoute(

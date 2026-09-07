@@ -31,6 +31,7 @@ Future<PickedResource?> showImageSourcePicker(
     BuildContext context, {
     required String storeSlug,
     required String token,
+    String? orgSlug,
   }) async {
   final source = await showModalBottomSheet<_ImgSource>(
     context: context,
@@ -87,7 +88,7 @@ Future<PickedResource?> showImageSourcePicker(
 
   if (source == _ImgSource.files) {
     return showResourcePickerModal(context,
-        storeSlug: storeSlug, token: token, imagesOnly: true);
+        storeSlug: storeSlug, orgSlug: orgSlug, token: token, imagesOnly: true);
   }
 
   // Camera or Gallery — pick a local file then upload
@@ -117,9 +118,10 @@ Future<PickedResource?> showImageSourcePicker(
     } catch (_) { /* already exists — ignore */ }
     final mime = mimeForFilename(filename);
     final asset = await api.uploadAsset(storeSlug, 'res', bytes, filename, mime, token);
+    final base = _resourceBase(orgSlug, storeSlug);
     return PickedResource(
       resourceId: asset.id,
-      publicUrl: asset.publicUrl(storeSlug, 'res'),
+      publicUrl: asset.publicUrl(base, 'res'),
     );
   } catch (e) {
     if (context.mounted) {
@@ -128,6 +130,12 @@ Future<PickedResource?> showImageSourcePicker(
     }
     return null;
   }
+}
+
+// Builds the public URL prefix: '{org}' for global, '{org}/{branch}' for branch.
+String _resourceBase(String? orgSlug, String storeSlug) {
+  if (orgSlug == null || orgSlug == storeSlug) return storeSlug;
+  return '$orgSlug/$storeSlug';
 }
 
 enum _ImgSource { camera, gallery, files }
@@ -192,12 +200,14 @@ Future<PickedResource?> showResourcePickerModal(
     BuildContext context, {
     required String storeSlug,
     required String token,
+    String? orgSlug,
     bool imagesOnly = false,
   }) {
   return showDialog<PickedResource>(
     context: context,
     builder: (_) => ResourcePickerModal(
       storeSlug: storeSlug,
+      orgSlug: orgSlug,
       token: token,
       imagesOnly: imagesOnly,
     ),
@@ -206,12 +216,14 @@ Future<PickedResource?> showResourcePickerModal(
 
 class ResourcePickerModal extends StatefulWidget {
   final String storeSlug;
+  final String? orgSlug;
   final String token;
   final bool imagesOnly;
 
   const ResourcePickerModal({
     super.key,
     required this.storeSlug,
+    this.orgSlug,
     required this.token,
     this.imagesOnly = false,
   });
@@ -261,9 +273,10 @@ class _ResourcePickerModalState extends State<ResourcePickerModal> {
   }
 
   void _pick(ResourceAsset asset) {
+    final base = _resourceBase(widget.orgSlug, widget.storeSlug);
     Navigator.of(context).pop(PickedResource(
-      resourceId: asset.id,
-      publicUrl: asset.publicUrl(widget.storeSlug, _selectedDir!.name),
+      resourceId: asset.resourceId,
+      publicUrl: asset.publicUrl(base, _selectedDir!.name),
     ));
   }
 
@@ -438,8 +451,6 @@ class _ResourcePickerModalState extends State<ResourcePickerModal> {
                                               final asset = visible[i];
                                               return _AssetTile(
                                                 asset: asset,
-                                                storeSlug: widget.storeSlug,
-                                                dirName: _selectedDir!.name,
                                                 onTap: () => _pick(asset),
                                               );
                                             },
@@ -469,21 +480,16 @@ class _ResourcePickerModalState extends State<ResourcePickerModal> {
 
 class _AssetTile extends StatelessWidget {
   final ResourceAsset asset;
-  final String storeSlug;
-  final String dirName;
   final VoidCallback onTap;
 
   const _AssetTile({
     required this.asset,
-    required this.storeSlug,
-    required this.dirName,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final url = asset.publicUrl(storeSlug, dirName);
 
     return GestureDetector(
       onTap: onTap,
@@ -493,7 +499,7 @@ class _AssetTile extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             if (asset.isImage)
-              Image.network('${AppConfig.apiBaseUrl}$url',
+              Image.network('${AppConfig.apiBaseUrl}/api/resources/${asset.resourceId}',
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => _fallbackIcon(scheme))
             else

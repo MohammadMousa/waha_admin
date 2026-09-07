@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../models/account_user.dart';
+import '../models/device.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
 
-class AccountsScreen extends StatefulWidget {
-  const AccountsScreen({super.key});
+class DevicesScreen extends StatefulWidget {
+  const DevicesScreen({super.key});
 
   @override
-  State<AccountsScreen> createState() => _AccountsScreenState();
+  State<DevicesScreen> createState() => _DevicesScreenState();
 }
 
-class _AccountsScreenState extends State<AccountsScreen> {
-  List<AccountUser>? _accounts;
+class _DevicesScreenState extends State<DevicesScreen> {
+  List<Device>? _devices;
   bool _loading = true;
   String? _error;
 
@@ -30,13 +30,9 @@ class _AccountsScreenState extends State<AccountsScreen> {
     final token = context.read<AuthState>().token;
     if (token == null) { _redirectLogin(); return; }
     try {
-      // Accounts always shows the `users` table only — SUPER_ADMIN,
-      // ORGANIZATION_OWNER, BRANCH_ADMIN, OPERATOR. KIOSK devices and
-      // CASHIER/employee-level staff live in separate tables now
-      // (see Devices / Employees screens), so there's no role filter here.
-      final list = await ApiClient().getAdminAccounts(token);
+      final list = await ApiClient().getDevices(token);
       if (!mounted) return;
-      setState(() { _accounts = list; _loading = false; });
+      setState(() { _devices = list; _loading = false; });
     } on ApiException catch (e) {
       if (e.statusCode == 401) { _redirectLogin(); return; }
       if (mounted) setState(() { _error = e.message; _loading = false; });
@@ -48,23 +44,23 @@ class _AccountsScreenState extends State<AccountsScreen> {
     Navigator.of(context).pushReplacementNamed(Routes.login);
   }
 
-  Future<void> _toggleEnabled(AccountUser u) async {
+  Future<void> _toggleEnabled(Device d) async {
     final token = context.read<AuthState>().token;
     if (token == null) return;
     try {
-      await ApiClient().patchAdminAccount(u.id, {'enabled': !u.enabled}, token: token);
+      await ApiClient().patchDevice(d.id, {'enabled': !d.enabled}, token: token);
       _load();
-    } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } on ApiException catch (err) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err.message)));
     }
   }
 
-  Future<void> _delete(AccountUser u) async {
+  Future<void> _delete(Device d) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete account?'),
-        content: Text('Delete "${u.username}"? This cannot be undone.'),
+        title: const Text('Delete device?'),
+        content: Text('Delete "${d.displayName}"? This cannot be undone.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
           FilledButton(
@@ -79,10 +75,10 @@ class _AccountsScreenState extends State<AccountsScreen> {
     final token = context.read<AuthState>().token;
     if (token == null) return;
     try {
-      await ApiClient().deleteAdminAccount(u.id, token: token);
+      await ApiClient().deleteDevice(d.id, token: token);
       _load();
-    } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } on ApiException catch (err) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err.message)));
     }
   }
 
@@ -93,7 +89,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
         children: [
-          const AdminSidebar(currentRoute: Routes.accounts),
+          const AdminSidebar(currentRoute: Routes.devices),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -102,23 +98,22 @@ class _AccountsScreenState extends State<AccountsScreen> {
                   padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
                   child: Row(
                     children: [
-                      Text('Accounts',
+                      Text('Devices',
                           style: Theme.of(context)
                               .textTheme
                               .headlineSmall
                               ?.copyWith(fontWeight: FontWeight.w700)),
                       const Spacer(),
                       FilledButton.icon(
-                        icon: const Icon(Icons.person_add_outlined, size: 18),
-                        label: const Text('New Account'),
+                        icon: const Icon(Icons.add_to_queue_outlined, size: 18),
+                        label: const Text('New Device'),
                         onPressed: () => Navigator.of(context)
-                            .pushNamed(Routes.accountEdit, arguments: null)
+                            .pushNamed(Routes.deviceEdit, arguments: null)
                             .then((_) => _load()),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 4),
                 Expanded(
                   child: _loading
                       ? const Center(child: CircularProgressIndicator())
@@ -128,20 +123,20 @@ class _AccountsScreenState extends State<AccountsScreen> {
                               const SizedBox(height: 16),
                               FilledButton(onPressed: _load, child: const Text('Retry')),
                             ]))
-                          : _accounts == null || _accounts!.isEmpty
-                              ? const Center(child: Text('No accounts found.'))
+                          : _devices == null || _devices!.isEmpty
+                              ? const Center(child: Text('No devices found.'))
                               : RefreshIndicator(
                                   onRefresh: _load,
                                   child: ListView.builder(
                                     padding: const EdgeInsets.fromLTRB(24, 4, 24, 100),
-                                    itemCount: _accounts!.length,
-                                    itemBuilder: (_, i) => _AccountCard(
-                                      account: _accounts![i],
+                                    itemCount: _devices!.length,
+                                    itemBuilder: (_, i) => _DeviceCard(
+                                      device: _devices![i],
                                       onEdit: () => Navigator.of(context)
-                                          .pushNamed(Routes.accountEdit, arguments: _accounts![i])
+                                          .pushNamed(Routes.deviceEdit, arguments: _devices![i])
                                           .then((_) => _load()),
-                                      onToggle: () => _toggleEnabled(_accounts![i]),
-                                      onDelete: () => _delete(_accounts![i]),
+                                      onToggle: () => _toggleEnabled(_devices![i]),
+                                      onDelete: () => _delete(_devices![i]),
                                     ),
                                   ),
                                 ),
@@ -155,20 +150,23 @@ class _AccountsScreenState extends State<AccountsScreen> {
   }
 }
 
-
-class _AccountCard extends StatelessWidget {
-  final AccountUser account;
+class _DeviceCard extends StatelessWidget {
+  final Device device;
   final VoidCallback onEdit;
   final VoidCallback onToggle;
   final VoidCallback onDelete;
 
-  const _AccountCard({required this.account, required this.onEdit,
-      required this.onToggle, required this.onDelete});
+  const _DeviceCard({
+    required this.device,
+    required this.onEdit,
+    required this.onToggle,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final u = account;
+    final d = device;
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: Padding(
@@ -177,11 +175,8 @@ class _AccountCard extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 24,
-              backgroundColor: _typeColor(u.accountType, scheme).withValues(alpha: 0.15),
-              child: Text(u.initials, style: TextStyle(
-                color: _typeColor(u.accountType, scheme),
-                fontWeight: FontWeight.w700, fontSize: 18,
-              )),
+              backgroundColor: Colors.deepPurple.withValues(alpha: 0.15),
+              child: const Icon(Icons.tv_outlined, color: Colors.deepPurple),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -189,28 +184,24 @@ class _AccountCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(children: [
-                    Text(u.username, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                    Text(d.displayName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
                     const SizedBox(width: 8),
-                    _TypeBadge(u.accountType),
-                    if (!u.enabled) ...[
+                    _Badge(d.deviceType, Colors.deepPurple),
+                    if (!d.enabled) ...[
                       const SizedBox(width: 6),
                       _Badge('Disabled', Colors.grey),
                     ],
                   ]),
-                  if (u.displayName != u.username) ...[
+                  if (d.displayName != d.username) ...[
                     const SizedBox(height: 2),
-                    Text(u.displayName, style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+                    Text('@${d.username}', style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
                   ],
                   const SizedBox(height: 4),
                   Wrap(spacing: 8, children: [
-                    if (u.roleName != null)
-                      Text(u.roleName!, style: TextStyle(fontSize: 12, color: scheme.primary,
-                          fontWeight: FontWeight.w500)),
-                    if (u.storeName != null)
-                      Text(u.storeName!, style: TextStyle(fontSize: 12, color: scheme.outline)),
-                    if (u.lastLoginAt != null)
-                      Text('Last login: ${_fmtDate(u.lastLoginAt!)}',
-                          style: TextStyle(fontSize: 11, color: scheme.outline)),
+                    if (d.storeName != null)
+                      Text(d.storeName!, style: TextStyle(fontSize: 12, color: scheme.outline)),
+                    if (d.deviceKey != null)
+                      Text('Key: ${d.deviceKey}', style: TextStyle(fontSize: 11, color: scheme.outline)),
                   ]),
                 ],
               ),
@@ -224,7 +215,7 @@ class _AccountCard extends StatelessWidget {
               },
               itemBuilder: (_) => [
                 const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                PopupMenuItem(value: 'toggle', child: Text(u.enabled ? 'Disable' : 'Enable')),
+                PopupMenuItem(value: 'toggle', child: Text(d.enabled ? 'Disable' : 'Enable')),
                 const PopupMenuItem(value: 'delete',
                     child: Text('Delete', style: TextStyle(color: Colors.red))),
               ],
@@ -232,40 +223,6 @@ class _AccountCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-
-  Color _typeColor(String type, ColorScheme scheme) => switch (type) {
-        'KIOSK' => Colors.deepPurple,
-        'SYSTEM' => Colors.orange,
-        _ => scheme.primary,
-      };
-
-  String _fmtDate(String iso) {
-    try {
-      final dt = DateTime.parse(iso);
-      return '${dt.year}-${dt.month.toString().padLeft(2,'0')}-${dt.day.toString().padLeft(2,'0')}';
-    } catch (_) {
-      return iso.length > 10 ? iso.substring(0, 10) : iso;
-    }
-  }
-}
-
-class _TypeBadge extends StatelessWidget {
-  final String type;
-  const _TypeBadge(this.type);
-  @override
-  Widget build(BuildContext context) {
-    final (bg, fg) = switch (type) {
-      'KIOSK' => (Colors.deepPurple.shade50, Colors.deepPurple),
-      'SYSTEM' => (Colors.orange.shade50, Colors.orange.shade800),
-      _ => (Theme.of(context).colorScheme.primaryContainer,
-            Theme.of(context).colorScheme.onPrimaryContainer),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
-      child: Text(type, style: TextStyle(fontSize: 10, color: fg, fontWeight: FontWeight.w600)),
     );
   }
 }

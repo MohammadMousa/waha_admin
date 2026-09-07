@@ -117,24 +117,10 @@ class _StoresScreenState extends State<StoresScreen> {
                                           ),
                                           const SizedBox(width: 4),
                                           _StoreActionBtn(
-                                            label: 'Resources',
-                                            icon: Icons.folder_outlined,
-                                            onTap: () => Navigator.of(context)
-                                                .pushNamed(Routes.resourceExplorer, arguments: s),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          _StoreActionBtn(
                                             label: 'Payment',
                                             icon: Icons.payment_outlined,
                                             onTap: () => Navigator.of(context)
                                                 .pushNamed(Routes.paymentMethods, arguments: s),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          _StoreActionBtn(
-                                            label: 'Receipt',
-                                            icon: Icons.receipt_long_outlined,
-                                            onTap: () => Navigator.of(context)
-                                                .pushNamed(Routes.receiptInfoEdit, arguments: s),
                                           ),
                                           const SizedBox(width: 4),
                                           _StoreActionBtn(

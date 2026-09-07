@@ -4,9 +4,12 @@ import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
 import '../models/account_user.dart';
 import '../models/category.dart';
+import '../models/device.dart';
+import '../models/employee.dart';
 import '../models/payment_method.dart';
 import '../models/receipt_info.dart';
 import '../models/resource.dart';
+import '../models/branch_group.dart';
 import '../models/organization.dart';
 import '../models/store.dart';
 
@@ -52,17 +55,21 @@ class ApiClient {
 
   // ── Dashboard ─────────────────────────────────────────────────────────────
 
-  Future<Map<String, dynamic>> getDashboardKpis(String token) async {
-    final resp = await _http.get(_uri('/api/admin/dashboard/kpis'),
-        headers: _headers(token: token));
+  Future<Map<String, dynamic>> getDashboardKpis(String token, {int? storeId}) async {
+    final uri = _uri('/api/admin/dashboard/kpis')
+        .replace(queryParameters: storeId != null ? {'storeId': '$storeId'} : null);
+    final resp = await _http.get(uri, headers: _headers(token: token));
     if (resp.statusCode == 200) return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
 
   Future<List<Map<String, dynamic>>> getDashboardSeries(
-      String token, String metric, String period) async {
-    final uri = _uri('/api/admin/dashboard/series')
-        .replace(queryParameters: {'metric': metric, 'period': period});
+      String token, String metric, String period, {int? storeId}) async {
+    final uri = _uri('/api/admin/dashboard/series').replace(queryParameters: {
+      'metric': metric,
+      'period': period,
+      if (storeId != null) 'storeId': '$storeId',
+    });
     final resp = await _http.get(uri, headers: _headers(token: token));
     if (resp.statusCode == 200) {
       return (jsonDecode(utf8.decode(resp.bodyBytes)) as List)
@@ -72,9 +79,11 @@ class ApiClient {
   }
 
   Future<List<Map<String, dynamic>>> getDashboardMonthly(
-      String token, String period) async {
-    final uri = _uri('/api/admin/dashboard/monthly')
-        .replace(queryParameters: {'period': period});
+      String token, String period, {int? storeId}) async {
+    final uri = _uri('/api/admin/dashboard/monthly').replace(queryParameters: {
+      'period': period,
+      if (storeId != null) 'storeId': '$storeId',
+    });
     final resp = await _http.get(uri, headers: _headers(token: token));
     if (resp.statusCode == 200) {
       return (jsonDecode(utf8.decode(resp.bodyBytes)) as List)
@@ -83,9 +92,10 @@ class ApiClient {
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
 
-  Future<List<Map<String, dynamic>>> getRecentOrders(String token) async {
-    final resp = await _http.get(_uri('/api/admin/dashboard/recent-orders'),
-        headers: _headers(token: token));
+  Future<List<Map<String, dynamic>>> getRecentOrders(String token, {int? storeId}) async {
+    final uri = _uri('/api/admin/dashboard/recent-orders')
+        .replace(queryParameters: storeId != null ? {'storeId': '$storeId'} : null);
+    final resp = await _http.get(uri, headers: _headers(token: token));
     if (resp.statusCode == 200) {
       return (jsonDecode(utf8.decode(resp.bodyBytes)) as List)
           .cast<Map<String, dynamic>>();
@@ -198,6 +208,16 @@ class ApiClient {
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
 
+  Future<List<BranchGroup>> getBranchGroups(String token) async {
+    final resp = await _http.get(_uri('/api/branch-groups'), headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      return (jsonDecode(utf8.decode(resp.bodyBytes)) as List)
+          .map((e) => BranchGroup.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
   // ── Categories ────────────────────────────────────────────────────────────
 
   Future<List<Category>> getCategories({required int storeId, String? token}) async {
@@ -297,9 +317,17 @@ class ApiClient {
 
   // ── Accounts ──────────────────────────────────────────────────────────────
 
-  Future<List<AccountUser>> getAdminAccounts(String token, {String? accountType}) async {
+  Future<List<String>> getAssignableRoles(String token) async {
+    final resp = await _http.get(_uri('/api/admin/users/roles'), headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      return (jsonDecode(utf8.decode(resp.bodyBytes)) as List).cast<String>();
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<List<AccountUser>> getAdminAccounts(String token, {String? role}) async {
     final uri = _uri('/api/admin/users').replace(
-      queryParameters: accountType != null ? {'accountType': accountType} : null,
+      queryParameters: role != null ? {'role': role} : null,
     );
     final resp = await _http.get(uri, headers: _headers(token: token));
     if (resp.statusCode == 200) {
@@ -335,6 +363,104 @@ class ApiClient {
   Future<void> register(String username, String password) async {
     final resp = await _http.post(_uri('/api/auth/register'),
         headers: _headers(), body: jsonEncode({'username': username, 'password': password}));
+    if (resp.statusCode == 200) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  // ── Employees (POS staff — org owner manages) ────────────────────────────────
+
+  Future<List<Employee>> getEmployees(String token) async {
+    final resp = await _http.get(_uri('/api/admin/employees'), headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      return (jsonDecode(utf8.decode(resp.bodyBytes)) as List)
+          .map((e) => Employee.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<Employee> getEmployee(int id, {required String token}) async {
+    final resp = await _http.get(_uri('/api/admin/employees/$id'), headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      return Employee.fromJson(jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>);
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<int> createEmployee(Map<String, dynamic> body, {required String token}) async {
+    final resp = await _http.post(_uri('/api/admin/employees'),
+        headers: _headers(token: token), body: jsonEncode(body));
+    if (resp.statusCode == 200) {
+      return ((jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>)['id'] as num).toInt();
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<void> patchEmployee(int id, Map<String, dynamic> body, {required String token}) async {
+    final resp = await _http.patch(_uri('/api/admin/employees/$id'),
+        headers: _headers(token: token), body: jsonEncode(body));
+    if (resp.statusCode == 200) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<void> deleteEmployee(int id, {required String token}) async {
+    final resp = await _http.delete(_uri('/api/admin/employees/$id'), headers: _headers(token: token));
+    if (resp.statusCode == 200) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<void> addEmployeeStore(int id, int storeId, {required String token}) async {
+    final resp = await _http.post(_uri('/api/admin/employees/$id/stores'),
+        headers: _headers(token: token), body: jsonEncode({'storeId': storeId}));
+    if (resp.statusCode == 200) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<void> removeEmployeeStore(int id, int storeId, {required String token}) async {
+    final resp = await _http.delete(_uri('/api/admin/employees/$id/stores/$storeId'),
+        headers: _headers(token: token));
+    if (resp.statusCode == 200) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  // ── Devices (kiosks — org owner manages) ─────────────────────────────────────
+
+  Future<List<Device>> getDevices(String token) async {
+    final resp = await _http.get(_uri('/api/admin/devices'), headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      return (jsonDecode(utf8.decode(resp.bodyBytes)) as List)
+          .map((e) => Device.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<Device> getDevice(int id, {required String token}) async {
+    final resp = await _http.get(_uri('/api/admin/devices/$id'), headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      return Device.fromJson(jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>);
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<Map<String, dynamic>> createDevice(Map<String, dynamic> body, {required String token}) async {
+    final resp = await _http.post(_uri('/api/admin/devices'),
+        headers: _headers(token: token), body: jsonEncode(body));
+    if (resp.statusCode == 200) {
+      return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<void> patchDevice(int id, Map<String, dynamic> body, {required String token}) async {
+    final resp = await _http.patch(_uri('/api/admin/devices/$id'),
+        headers: _headers(token: token), body: jsonEncode(body));
+    if (resp.statusCode == 200) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<void> deleteDevice(int id, {required String token}) async {
+    final resp = await _http.delete(_uri('/api/admin/devices/$id'), headers: _headers(token: token));
     if (resp.statusCode == 200) return;
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
@@ -502,8 +628,10 @@ class ApiClient {
     final resp = await http.Response.fromStream(streamed);
     if (resp.statusCode == 200) {
       final body = jsonDecode(resp.body) as Map<String, dynamic>;
+      final rid = (body['resourceId'] as num).toInt();
       return ResourceAsset(
-        id: (body['resourceId'] as num).toInt(),
+        id: 0, // upload response has no resource_assets.id
+        resourceId: rid,
         name: body['name'] as String,
         mimeType: mimeType,
         sizeBytes: bytes.length,
@@ -544,8 +672,9 @@ class ApiClient {
 
   // ── Landing page ──────────────────────────────────────────────────────────
 
-  Future<Map<String, dynamic>?> getLandingPage(String pageKey, String? token) async {
-    final resp = await _http.get(_uri('/api/landing/$pageKey'), headers: _headers(token: token));
+  Future<Map<String, dynamic>?> getLandingPage(String pageKey, String? token, {int? storeId}) async {
+    final query = storeId != null ? '?storeId=$storeId' : '';
+    final resp = await _http.get(_uri('/api/landing/$pageKey$query'), headers: _headers(token: token));
     if (resp.statusCode == 404) return null;
     if (resp.statusCode == 200) {
       return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;

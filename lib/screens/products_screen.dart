@@ -9,6 +9,7 @@ import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/product_image.dart';
+import '../widgets/waha_filter_controls.dart';
 
 // Global parent store id — products are always scoped to this.
 const _kRootStoreId = 1;
@@ -217,11 +218,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
             children: [
               // Category filter
               if (_categories.isNotEmpty)
-                _FilterDropdown<Category?>(
+                WahaFilterDropdown<Category?>(
                   value: _selectedCategory,
-                  hint: 'All categories',
+                  hint: 'Select Category',
                   items: [
-                    const DropdownMenuItem(value: null, child: Text('All categories')),
+                    const DropdownMenuItem(value: null, child: Text('Select Category')),
                     ..._categories.map((c) {
                       final name = (c.name['en'] ?? c.name['ar'] ?? '').toString();
                       return DropdownMenuItem(value: c, child: Text(name));
@@ -233,11 +234,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   },
                 ),
               // Status filter
-              _FilterDropdown<bool?>(
+              WahaFilterDropdown<bool?>(
                 value: _activeFilter,
-                hint: 'All',
+                hint: 'Select Status',
                 items: const [
-                  DropdownMenuItem(value: null, child: Text('All')),
+                  DropdownMenuItem(value: null, child: Text('Select Status')),
                   DropdownMenuItem(value: true, child: Text('Enabled')),
                   DropdownMenuItem(value: false, child: Text('Disabled')),
                 ],
@@ -247,20 +248,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 },
               ),
               // Search
-              SizedBox(
-                width: 220,
-                height: 38,
-                child: TextField(
-                  controller: _searchCtrl,
-                  decoration: InputDecoration(
-                    hintText: 'Search products…',
-                    prefixIcon: const Icon(Icons.search, size: 18),
-                    contentPadding: EdgeInsets.zero,
-                    isDense: true,
-                    border:
-                        OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                ),
+              WahaSearchField(
+                controller: _searchCtrl,
+                hintText: 'Search products…',
               ),
             ],
           ),
@@ -331,75 +321,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
             child: const Text('Next →'),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ── Dropdown widget ───────────────────────────────────────────────────────────
-
-class _FilterDropdown<T> extends StatefulWidget {
-  final T value;
-  final String hint;
-  final List<DropdownMenuItem<T>> items;
-  final ValueChanged<T?> onChanged;
-  const _FilterDropdown({
-    required this.value,
-    required this.hint,
-    required this.items,
-    required this.onChanged,
-  });
-
-  @override
-  State<_FilterDropdown<T>> createState() => _FilterDropdownState<T>();
-}
-
-class _FilterDropdownState<T> extends State<_FilterDropdown<T>> {
-  final _menuCtrl = MenuController();
-
-  String _labelFor(T v) {
-    final match = widget.items.where((i) => i.value == v).firstOrNull;
-    final child = match?.child;
-    if (child is Text) return child.data ?? widget.hint;
-    return widget.hint;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final label = widget.value == null ? widget.hint : _labelFor(widget.value);
-    final isPlaceholder = widget.value == null;
-
-    return MenuAnchor(
-      controller: _menuCtrl,
-      alignmentOffset: const Offset(0, 4),
-      menuChildren: widget.items
-          .map((item) => MenuItemButton(
-                onPressed: () => widget.onChanged(item.value),
-                child: item.child,
-              ))
-          .toList(),
-      child: GestureDetector(
-        onTap: () => _menuCtrl.open(),
-        child: Container(
-          height: 38,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            border: Border.all(color: scheme.outline.withValues(alpha: 0.4)),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(label,
-                  style: TextStyle(
-                      fontSize: 13,
-                      color: isPlaceholder ? scheme.outline : scheme.onSurface)),
-              const SizedBox(width: 4),
-              Icon(Icons.arrow_drop_down, size: 18, color: scheme.outline),
-            ],
-          ),
-        ),
       ),
     );
   }

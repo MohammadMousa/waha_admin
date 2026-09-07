@@ -40,8 +40,9 @@ class _LandingEditorScreenState extends State<LandingEditorScreen> {
 
   static const _pagesDir = 'pages';
 
-  String get _storeSlug => widget.store.name;
-  String get _filename  => '${widget.pageKey}.html';
+  String get _storeSlug    => widget.store.name;
+  String get _resourceBase => widget.store.resourceBase;
+  String get _filename     => '${widget.pageKey}.html';
 
   @override
   void initState() {
@@ -53,8 +54,8 @@ class _LandingEditorScreenState extends State<LandingEditorScreen> {
     try {
       final token = context.read<AuthState>().token;
       final uri = Uri.parse(
-          '${AppConfig.apiBaseUrl}/resource/$_storeSlug/$_pagesDir/$_filename');
-      final resp = await http.get(uri); // public resource — no auth header (avoids CORS preflight)
+          '${AppConfig.apiBaseUrl}/resource/$_resourceBase/$_pagesDir/$_filename');
+      final resp = await http.get(uri);
       if (resp.statusCode == 200) {
         final htmlBody = utf8.decode(resp.bodyBytes);
         if (htmlBody.contains('data-rid=')) {
@@ -89,7 +90,7 @@ class _LandingEditorScreenState extends State<LandingEditorScreen> {
     final token = context.read<AuthState>().token;
     if (token == null) return;
     final picked = await showImageSourcePicker(context,
-        storeSlug: _storeSlug, token: token);
+        storeSlug: _storeSlug, orgSlug: widget.store.orgSlug, token: token);
     if (picked == null || !mounted) return;
     setState(() => _slides.add(_Slide(
       resourceId: picked.resourceId,
@@ -219,7 +220,7 @@ $slideHtml
   Future<bool> _pageExistsOnServer() async {
     try {
       final uri = Uri.parse(
-          '${AppConfig.apiBaseUrl}/resource/$_storeSlug/$_pagesDir/$_filename');
+          '${AppConfig.apiBaseUrl}/resource/$_resourceBase/$_pagesDir/$_filename');
       final resp = await http.head(uri);
       return resp.statusCode == 200;
     } catch (_) { return false; }

@@ -7,13 +7,15 @@ class ResourceDirectory {
 }
 
 class ResourceAsset {
-  final int id;
+  final int id;           // resource_assets.id
+  final int resourceId;   // resources.id — use this for /api/resources/{id}
   final String name;
   final String mimeType;
   final int sizeBytes;
   final String sha256;
   const ResourceAsset({
     required this.id,
+    required this.resourceId,
     required this.name,
     required this.mimeType,
     required this.sizeBytes,
@@ -21,6 +23,7 @@ class ResourceAsset {
   });
   factory ResourceAsset.fromJson(Map<String, dynamic> json) => ResourceAsset(
         id: (json['id'] as num).toInt(),
+        resourceId: (json['resourceId'] as num).toInt(),
         name: json['name'] as String,
         mimeType: json['mimeType'] as String,
         sizeBytes: (json['sizeBytes'] as num).toInt(),
@@ -32,7 +35,8 @@ class ResourceAsset {
     final n = name.toLowerCase();
     return n.endsWith('.html') || n.endsWith('.htm');
   }
-  String publicUrl(String store, String dir) => '/resource/$store/$dir/$name';
+  // resourceBase is either '{org}' (global) or '{org}/{branch}' (branch-level).
+  String publicUrl(String resourceBase, String dir) => '/resource/$resourceBase/$dir/$name';
 }
 
 class PickedResource {

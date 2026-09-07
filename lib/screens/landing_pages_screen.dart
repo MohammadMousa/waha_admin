@@ -68,23 +68,35 @@ class _LandingPagesScreenState extends State<LandingPagesScreen> {
     try {
       final stores = await ApiClient().getAdminStores(token);
       if (!mounted) return;
-      // Default to global store (id == 1)
-      final global = stores.where((s) => s.id == 1).firstOrNull;
       setState(() { _stores = stores; _loadingStores = false; });
-      if (global != null) _selectStore(global);
-      else if (stores.isNotEmpty) _selectStore(stores.first);
+      // Load pages for global scope by default (no branch selected)
+      _loadPages();
     } on ApiException catch (e) {
       if (e.statusCode == 401) _logout();
       if (mounted) setState(() => _loadingStores = false);
     }
   }
 
-  Future<void> _selectStore(Store store) async {
-    setState(() { _selectedStore = store; _pageStatus = {}; _loadingPages = true; });
+  Store? get _globalStore => _stores?.where((s) => s.id == 1).firstOrNull;
+
+  // Public URL prefix: delegates to store.resourceBase.
+  String get _resourceBase =>
+      (_selectedStore ?? _globalStore)?.resourceBase ?? 'global';
+
+  void _selectStore(Store? store) {
+    setState(() => _selectedStore = store);
+    _loadPages();
+  }
+
+  Future<void> _loadPages() async {
+    setState(() { _pageStatus = {}; _loadingPages = true; });
     final token = context.read<AuthState>().token!;
+    // Pass the explicit store ID so the backend scope matches the dropdown selection.
+    // Passing storeId=1 for global scope ensures session store doesn't leak into the query.
+    final scopeStoreId = _selectedStore?.id ?? 1;
     final results = await Future.wait(
       _pageKeys.map((key) => ApiClient()
-          .getLandingPage(key, token)
+          .getLandingPage(key, token, storeId: scopeStoreId)
           .then<MapEntry<String, Map<String, dynamic>?>>((r) => MapEntry(key, r))
           .catchError((_) => MapEntry(key, null))),
     );
@@ -96,10 +108,7 @@ class _LandingPagesScreenState extends State<LandingPagesScreen> {
   }
 
   void _previewPage(String key) {
-    final store = _selectedStore;
-    if (store == null) return;
-    final url = '${AppConfig.apiBaseUrl}/resource/${store.name}/pages/$key.html';
-    // Open in a kiosk-sized popup window (9:16 portrait)
+    final url = '${AppConfig.apiBaseUrl}/resource/$_resourceBase/pages/$key.html';
     html.window.open(url, '_blank', 'width=450,height=800,resizable=yes');
   }
 
@@ -132,21 +141,19 @@ class _LandingPagesScreenState extends State<LandingPagesScreen> {
   }
 
   Future<void> _duplicatePage(String key) async {
-    final store = _selectedStore;
+    final store = _selectedStore ?? _globalStore;
     if (store == null) return;
     final token = context.read<AuthState>().token;
     if (token == null) return;
-    // Fetch the existing HTML
     try {
-      final url = '${AppConfig.apiBaseUrl}/resource/${store.name}/pages/$key.html';
-      final resp = await http.get(Uri.parse(url)); // public resource — no auth header (avoids CORS preflight)
+      final url = '${AppConfig.apiBaseUrl}/resource/$_resourceBase/pages/$key.html';
+      final resp = await http.get(Uri.parse(url));
       if (!mounted) return;
       if (resp.statusCode != 200) {
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('No content to duplicate')));
         return;
       }
-      // Upload as ${key}_COPY.html
       final copyKey = '${key}_COPY';
       final copyFilename = '$copyKey.html';
       await ApiClient().uploadAsset(
@@ -217,7 +224,7 @@ class _LandingPagesScreenState extends State<LandingPagesScreen> {
             _BranchDropdown(
               stores: _stores!,
               selected: _selectedStore,
-              onSelect: _selectStore,
+              onSelect: (s) => _selectStore(s),
             ),
           const SizedBox(height: 12),
           const Divider(height: 1),
@@ -227,11 +234,6 @@ class _LandingPagesScreenState extends State<LandingPagesScreen> {
   }
 
   Widget _buildGrid(ColorScheme scheme) {
-    if (_selectedStore == null) {
-      return Center(child: Text('Select a branch',
-          style: TextStyle(color: scheme.outline)));
-    }
-
     return GridView.builder(
       padding: const EdgeInsets.all(24),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
@@ -254,13 +256,20 @@ class _LandingPagesScreenState extends State<LandingPagesScreen> {
           configured: isConfigured,
           local: isLocal,
           loading: _loadingPages,
-          storeName: _selectedStore!.label(),
-          onEdit: () => Navigator.of(context)
-              .pushNamed(Routes.landingEditor, arguments: {
-                'store': _selectedStore,
-                'pageKey': key,
-              })
-              .then((_) { if (_selectedStore != null) _selectStore(_selectedStore!); }),
+          storeName: _selectedStore?.label() ?? 'Global',
+          onEdit: () {
+            // Local page → edit on the selected branch.
+            // Global page → edit on the global store (id=1), regardless of dropdown.
+            final editorStore = (isLocal && _selectedStore != null)
+                ? _selectedStore!
+                : (_stores?.where((s) => s.id == 1).firstOrNull ?? _selectedStore!);
+            Navigator.of(context)
+                .pushNamed(Routes.landingEditor, arguments: {
+                  'store': editorStore,
+                  'pageKey': key,
+                })
+                .then((_) => _loadPages());
+          },
           onPreview: () => _previewPage(key),
           onRename: () => _renamePage(key),
           onDuplicate: () => _duplicatePage(key),
@@ -273,12 +282,13 @@ class _LandingPagesScreenState extends State<LandingPagesScreen> {
 class _BranchDropdown extends StatelessWidget {
   final List<Store> stores;
   final Store? selected;
-  final ValueChanged<Store> onSelect;
+  final ValueChanged<Store?> onSelect;
   const _BranchDropdown({required this.stores, required this.selected, required this.onSelect});
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final branches = stores.where((s) => s.id != 1).toList();
     return Container(
       height: 36,
       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -289,13 +299,14 @@ class _BranchDropdown extends StatelessWidget {
       child: DropdownButtonHideUnderline(
         child: DropdownButton<Store>(
           value: selected,
+          hint: Text('Pick Branch', style: TextStyle(fontSize: 13, color: scheme.outline)),
           isDense: true,
           style: TextStyle(fontSize: 13, color: scheme.onSurface),
-          items: stores.map((s) => DropdownMenuItem<Store>(
+          items: branches.map((s) => DropdownMenuItem<Store>(
             value: s,
             child: Text(s.label()),
           )).toList(),
-          onChanged: (s) { if (s != null) onSelect(s); },
+          onChanged: onSelect,
         ),
       ),
     );

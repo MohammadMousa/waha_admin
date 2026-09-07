@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -10,6 +12,21 @@ import '../widgets/revenue_chart.dart';
 import '../widgets/orders_chart.dart';
 import '../widgets/monthly_bar_chart.dart';
 import '../widgets/recent_orders_table.dart';
+import '../widgets/waha_filter_controls.dart';
+
+String branchLabel(Map<String, dynamic> s) {
+  final raw = s['display_name'];
+  if (raw != null) {
+    try {
+      final m = (raw is Map)
+          ? Map<String, dynamic>.from(raw)
+          : Map<String, dynamic>.from(jsonDecode(raw.toString()) as Map);
+      final name = (m['en'] ?? m['ar'] ?? '').toString().trim();
+      if (name.isNotEmpty) return name;
+    } catch (_) {}
+  }
+  return s['name']?.toString() ?? '';
+}
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -24,6 +41,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Map<String, dynamic>> _ordersSeries = [];
   List<Map<String, dynamic>> _monthlyRevenue = [];
   List<Map<String, dynamic>> _recentOrders = [];
+  List<Map<String, dynamic>> _stores = [];
+  int? _storeId;
 
   bool _loading = true;
   String? _error;
@@ -45,11 +64,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final api = ApiClient();
     try {
       final results = await Future.wait([
-        api.getDashboardKpis(token),
-        api.getDashboardSeries(token, 'revenue', _revenuePeriod),
-        api.getDashboardSeries(token, 'orders', _ordersPeriod),
-        api.getDashboardMonthly(token, _monthlyPeriod),
-        api.getRecentOrders(token),
+        api.getDashboardKpis(token, storeId: _storeId),
+        api.getDashboardSeries(token, 'revenue', _revenuePeriod, storeId: _storeId),
+        api.getDashboardSeries(token, 'orders', _ordersPeriod, storeId: _storeId),
+        api.getDashboardMonthly(token, _monthlyPeriod, storeId: _storeId),
+        api.getRecentOrders(token, storeId: _storeId),
+        if (_stores.isEmpty) api.getReportStores(token),
       ]);
       if (!mounted) return;
       // ignore: unnecessary_cast
@@ -59,6 +79,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _ordersSeries = (results[2] as List).cast<Map<String, dynamic>>();
         _monthlyRevenue = (results[3] as List).cast<Map<String, dynamic>>();
         _recentOrders = (results[4] as List).cast<Map<String, dynamic>>();
+        if (results.length > 5) _stores = (results[5] as List).cast<Map<String, dynamic>>();
         _loading = false;
       });
     } on ApiException catch (e) {
@@ -72,9 +93,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (token == null) return;
     final api = ApiClient();
     final results = await Future.wait([
-      api.getDashboardSeries(token, 'revenue', _revenuePeriod),
-      api.getDashboardSeries(token, 'orders', _ordersPeriod),
-      api.getDashboardMonthly(token, _monthlyPeriod),
+      api.getDashboardSeries(token, 'revenue', _revenuePeriod, storeId: _storeId),
+      api.getDashboardSeries(token, 'orders', _ordersPeriod, storeId: _storeId),
+      api.getDashboardMonthly(token, _monthlyPeriod, storeId: _storeId),
     ]);
     if (!mounted) return;
     setState(() {
@@ -87,6 +108,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void _logout() {
     context.read<AuthState>().logout();
     Navigator.of(context).pushReplacementNamed(Routes.login);
+  }
+
+  void _onStoreChanged(int? storeId) {
+    setState(() => _storeId = storeId);
+    _load();
   }
 
   @override
@@ -122,7 +148,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _Header(onRefresh: _load),
+                              _Header(
+                                onRefresh: _load,
+                                stores: _stores,
+                                selectedStoreId: _storeId,
+                                onStoreChanged: _onStoreChanged,
+                              ),
                               const SizedBox(height: 24),
 
                               // ── KPI cards ───────────────────────────────
@@ -217,7 +248,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 class _Header extends StatelessWidget {
   final VoidCallback onRefresh;
-  const _Header({required this.onRefresh});
+  final List<Map<String, dynamic>> stores;
+  final int? selectedStoreId;
+  final ValueChanged<int?> onStoreChanged;
+
+  const _Header({
+    required this.onRefresh,
+    required this.stores,
+    required this.selectedStoreId,
+    required this.onStoreChanged,
+  });
 
   @override
   Widget build(BuildContext context) => Row(
@@ -228,6 +268,19 @@ class _Header extends StatelessWidget {
                   .headlineSmall
                   ?.copyWith(fontWeight: FontWeight.w700)),
           const Spacer(),
+          WahaFilterDropdown<int?>(
+            value: selectedStoreId,
+            hint: 'Select Branch',
+            items: [
+              const DropdownMenuItem(value: null, child: Text('Select Branch')),
+              ...stores.map((s) => DropdownMenuItem(
+                    value: (s['id'] as num).toInt(),
+                    child: Text(branchLabel(s)),
+                  )),
+            ],
+            onChanged: onStoreChanged,
+          ),
+          const SizedBox(width: 8),
           IconButton(
             icon: const Icon(Icons.refresh_outlined),
             tooltip: 'Refresh',

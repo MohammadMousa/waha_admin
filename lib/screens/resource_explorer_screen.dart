@@ -38,6 +38,7 @@ class _ResourceExplorerScreenState extends State<ResourceExplorerScreen> {
   _AssetLayout get _layout => _layoutPrefs[_selectedDir?.id] ?? _AssetLayout.list;
 
   String get _storeSlug => widget.store.name;
+  String get _resourceBase => widget.store.resourceBase;
 
   @override
   void initState() {
@@ -229,14 +230,14 @@ class _ResourceExplorerScreenState extends State<ResourceExplorerScreen> {
   void _previewKiosk(ResourceAsset asset) {
     final dir = _selectedDir;
     if (dir == null) return;
-    final url = '${AppConfig.apiBaseUrl}${asset.publicUrl(_storeSlug, dir.name)}';
+    final url = '${AppConfig.apiBaseUrl}${asset.publicUrl(_resourceBase, dir.name)}';
     html.window.open(url, '_blank', 'width=450,height=800,resizable=yes');
   }
 
   Future<void> _duplicateAsset(ResourceAsset asset) async {
     final dir = _selectedDir;
     if (dir == null) return;
-    final url = '${AppConfig.apiBaseUrl}${asset.publicUrl(_storeSlug, dir.name)}';
+    final url = '${AppConfig.apiBaseUrl}${asset.publicUrl(_resourceBase, dir.name)}';
     final messenger = ScaffoldMessenger.of(context);
     try {
       final resp = await http.get(Uri.parse(url)); // public resource
@@ -261,7 +262,7 @@ class _ResourceExplorerScreenState extends State<ResourceExplorerScreen> {
   void _copyUrl(ResourceAsset asset) {
     final dir = _selectedDir;
     if (dir == null) return;
-    final url = asset.publicUrl(_storeSlug, dir.name);
+    final url = asset.publicUrl(_resourceBase, dir.name);
     Clipboard.setData(ClipboardData(text: url));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Copied: $url')));
@@ -299,7 +300,7 @@ class _ResourceExplorerScreenState extends State<ResourceExplorerScreen> {
               onUpload: _upload, onUploadMultiple: _uploadMultiple,
               onDelete: _delete, onCopyUrl: _copyUrl, onMove: _move, onRename: _rename,
               onPreviewKiosk: _previewKiosk, onDuplicate: _duplicateAsset,
-              storeName: _storeSlug, layout: _layout, onLayoutChange: _setLayout,
+              resourceBase: _resourceBase, layout: _layout, onLayoutChange: _setLayout,
             )),
           ]);
 
@@ -421,7 +422,7 @@ class _AssetPanel extends StatelessWidget {
   final ValueChanged<ResourceAsset> onRename;
   final ValueChanged<ResourceAsset> onPreviewKiosk;
   final ValueChanged<ResourceAsset> onDuplicate;
-  final String storeName;
+  final String resourceBase;
   final _AssetLayout layout;
   final ValueChanged<_AssetLayout> onLayoutChange;
 
@@ -430,7 +431,7 @@ class _AssetPanel extends StatelessWidget {
     required this.onUpload, required this.onUploadMultiple,
     required this.onDelete, required this.onCopyUrl, required this.onMove,
     required this.onRename, required this.onPreviewKiosk, required this.onDuplicate,
-    required this.storeName, required this.layout, required this.onLayoutChange,
+    required this.resourceBase, required this.layout, required this.onLayoutChange,
   });
 
   @override
@@ -490,7 +491,7 @@ class _AssetPanel extends StatelessWidget {
   Widget _buildList(BuildContext context) => ListView.builder(
     itemCount: assets.length,
     itemBuilder: (_, i) => _AssetRow(
-      asset: assets[i], dir: dir!, storeName: storeName, showThumb: false,
+      asset: assets[i], dir: dir!, resourceBase: resourceBase, showThumb: false,
       onDelete: () => onDelete(assets[i]),
       onCopyUrl: () => onCopyUrl(assets[i]),
       onMove: () => onMove(assets[i]),
@@ -503,7 +504,7 @@ class _AssetPanel extends StatelessWidget {
   Widget _buildListThumb(BuildContext context) => ListView.builder(
     itemCount: assets.length,
     itemBuilder: (_, i) => _AssetRow(
-      asset: assets[i], dir: dir!, storeName: storeName, showThumb: true,
+      asset: assets[i], dir: dir!, resourceBase: resourceBase, showThumb: true,
       onDelete: () => onDelete(assets[i]),
       onCopyUrl: () => onCopyUrl(assets[i]),
       onMove: () => onMove(assets[i]),
@@ -521,7 +522,7 @@ class _AssetPanel extends StatelessWidget {
     ),
     itemCount: assets.length,
     itemBuilder: (_, i) => _AssetCard(
-      asset: assets[i], dir: dir!, storeName: storeName,
+      asset: assets[i], dir: dir!, resourceBase: resourceBase,
       onDelete: () => onDelete(assets[i]),
       onCopyUrl: () => onCopyUrl(assets[i]),
       onMove: () => onMove(assets[i]),
@@ -559,7 +560,7 @@ class _LayoutToggle extends StatelessWidget {
 class _AssetRow extends StatelessWidget {
   final ResourceAsset asset;
   final ResourceDirectory dir;
-  final String storeName;
+  final String resourceBase;
   final bool showThumb;
   final VoidCallback onDelete;
   final VoidCallback onCopyUrl;
@@ -569,7 +570,7 @@ class _AssetRow extends StatelessWidget {
   final VoidCallback onDuplicate;
 
   const _AssetRow({
-    required this.asset, required this.dir, required this.storeName,
+    required this.asset, required this.dir, required this.resourceBase,
     required this.showThumb, required this.onDelete, required this.onCopyUrl,
     required this.onMove, required this.onRename,
     required this.onPreviewKiosk, required this.onDuplicate,
@@ -579,7 +580,7 @@ class _AssetRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final Widget leading = showThumb
-        ? _AssetThumb(asset: asset, storeName: storeName, dirName: dir.name, size: 52)
+        ? _AssetThumb(asset: asset, resourceBase: resourceBase, dirName: dir.name, size: 52)
         : Icon(_typeIcon(asset), color: scheme.primary, size: 22);
 
     return ListTile(
@@ -588,11 +589,11 @@ class _AssetRow extends StatelessWidget {
       subtitle: Text('${_fmtSize(asset.sizeBytes)} · ${asset.mimeType}',
           style: TextStyle(color: scheme.outline, fontSize: 11)),
       trailing: _AssetMenu(
-        asset: asset, dir: dir, storeName: storeName,
+        asset: asset, dir: dir, resourceBase: resourceBase,
         onCopyUrl: onCopyUrl, onMove: onMove, onRename: onRename, onDelete: onDelete,
         onPreviewKiosk: onPreviewKiosk, onDuplicate: onDuplicate,
       ),
-      onTap: () => _openPreview(context, asset, dir, storeName),
+      onTap: () => _openPreview(context, asset, dir, resourceBase),
     );
   }
 }
@@ -602,7 +603,7 @@ class _AssetRow extends StatelessWidget {
 class _AssetCard extends StatelessWidget {
   final ResourceAsset asset;
   final ResourceDirectory dir;
-  final String storeName;
+  final String resourceBase;
   final VoidCallback onDelete;
   final VoidCallback onCopyUrl;
   final VoidCallback onMove;
@@ -611,7 +612,7 @@ class _AssetCard extends StatelessWidget {
   final VoidCallback onDuplicate;
 
   const _AssetCard({
-    required this.asset, required this.dir, required this.storeName,
+    required this.asset, required this.dir, required this.resourceBase,
     required this.onDelete, required this.onCopyUrl, required this.onMove,
     required this.onRename, required this.onPreviewKiosk, required this.onDuplicate,
   });
@@ -620,7 +621,7 @@ class _AssetCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return GestureDetector(
-      onTap: () => _openPreview(context, asset, dir, storeName),
+      onTap: () => _openPreview(context, asset, dir, resourceBase),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -630,7 +631,7 @@ class _AssetCard extends StatelessWidget {
               child: Container(
                 color: scheme.surfaceContainerHighest,
                 child: _AssetThumb(
-                  asset: asset, storeName: storeName, dirName: dir.name,
+                  asset: asset, resourceBase: resourceBase, dirName: dir.name,
                   size: 140, fit: BoxFit.cover,
                 ),
               ),
@@ -650,7 +651,7 @@ class _AssetCard extends StatelessWidget {
                       style: const TextStyle(fontSize: 11)),
                 ),
                 _AssetMenu(
-                  asset: asset, dir: dir, storeName: storeName, compact: true,
+                  asset: asset, dir: dir, resourceBase: resourceBase, compact: true,
                   onCopyUrl: onCopyUrl, onMove: onMove, onRename: onRename, onDelete: onDelete,
                   onPreviewKiosk: onPreviewKiosk, onDuplicate: onDuplicate,
                 ),
@@ -670,7 +671,7 @@ enum _AssetAction { view, previewKiosk, copyUrl, move, rename, duplicate, delete
 class _AssetMenu extends StatelessWidget {
   final ResourceAsset asset;
   final ResourceDirectory dir;
-  final String storeName;
+  final String resourceBase;
   final VoidCallback onCopyUrl;
   final VoidCallback onMove;
   final VoidCallback onRename;
@@ -680,7 +681,7 @@ class _AssetMenu extends StatelessWidget {
   final bool compact;
 
   const _AssetMenu({
-    required this.asset, required this.dir, required this.storeName,
+    required this.asset, required this.dir, required this.resourceBase,
     required this.onCopyUrl, required this.onMove,
     required this.onRename, required this.onDelete,
     required this.onPreviewKiosk, required this.onDuplicate,
@@ -751,7 +752,7 @@ class _AssetMenu extends StatelessWidget {
         switch (action) {
           case _AssetAction.view:
             final assetUrl =
-                '${AppConfig.apiBaseUrl}${asset.publicUrl(storeName, dir.name)}';
+                '${AppConfig.apiBaseUrl}${asset.publicUrl(resourceBase, dir.name)}';
             launchUrl(Uri.parse(assetUrl), mode: LaunchMode.externalApplication);
           case _AssetAction.previewKiosk: onPreviewKiosk();
           case _AssetAction.copyUrl:      onCopyUrl();
@@ -787,13 +788,13 @@ Widget _assetFallbackIcon(ResourceAsset asset, ColorScheme scheme, double size) 
 
 class _AssetThumb extends StatelessWidget {
   final ResourceAsset asset;
-  final String storeName;
+  final String resourceBase;
   final String dirName;
   final double size;
   final BoxFit fit;
 
   const _AssetThumb({
-    required this.asset, required this.storeName, required this.dirName,
+    required this.asset, required this.resourceBase, required this.dirName,
     this.size = 40, this.fit = BoxFit.cover,
   });
 
@@ -801,7 +802,7 @@ class _AssetThumb extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     if (asset.isImage) {
-      final url = '${AppConfig.apiBaseUrl}${asset.publicUrl(storeName, dirName)}';
+      final url = '${AppConfig.apiBaseUrl}/api/resources/${asset.resourceId}';
       return ClipRRect(
         borderRadius: BorderRadius.circular(6),
         child: Image.network(url, width: size, height: size, fit: fit,
@@ -815,18 +816,18 @@ class _AssetThumb extends StatelessWidget {
 // ── Preview dialog ─────────────────────────────────────────────────────────────
 
 void _openPreview(BuildContext context, ResourceAsset asset,
-    ResourceDirectory dir, String storeName) {
+    ResourceDirectory dir, String resourceBase) {
   showDialog<void>(
     context: context,
-    builder: (_) => _PreviewDialog(asset: asset, dir: dir, storeName: storeName),
+    builder: (_) => _PreviewDialog(asset: asset, dir: dir, resourceBase: resourceBase),
   );
 }
 
 class _PreviewDialog extends StatefulWidget {
   final ResourceAsset asset;
   final ResourceDirectory dir;
-  final String storeName;
-  const _PreviewDialog({required this.asset, required this.dir, required this.storeName});
+  final String resourceBase;
+  const _PreviewDialog({required this.asset, required this.dir, required this.resourceBase});
 
   @override
   State<_PreviewDialog> createState() => _PreviewDialogState();
@@ -836,7 +837,7 @@ class _PreviewDialogState extends State<_PreviewDialog> {
   _PreviewLayout _layout = _PreviewLayout.fitWidth;
 
   String get _url =>
-      '${AppConfig.apiBaseUrl}${widget.asset.publicUrl(widget.storeName, widget.dir.name)}';
+      '${AppConfig.apiBaseUrl}${widget.asset.publicUrl(widget.resourceBase, widget.dir.name)}';
 
   void _copyUrl() {
     Clipboard.setData(ClipboardData(text: _url));

@@ -32,12 +32,20 @@ class _AdvertisementsScreenState extends State<AdvertisementsScreen> {
 
   final List<_Slide> _slides = [];
   int? _draggingIndex;
+  bool _pageExists = false;
 
   static const _pagesDir = 'pages';
   static const _filename  = 'KIOSK_LANDING.html';
 
   Store? get _globalStore => _stores?.where((s) => s.id == 1).firstOrNull;
+
+  // Public URL prefix: delegates to store.resourceBase.
+  String? get _resourceBase => (_selectedStore ?? _globalStore)?.resourceBase;
+
+  // Store name used for admin API endpoints (always the leaf store, no org prefix).
   String? get _activeSlug => (_selectedStore ?? _globalStore)?.name;
+
+  String? get _orgSlug => _globalStore?.orgSlug ?? _globalStore?.name;
 
   @override
   void initState() {
@@ -60,19 +68,22 @@ class _AdvertisementsScreenState extends State<AdvertisementsScreen> {
   }
 
   Future<void> _loadSlides() async {
-    final slug = _activeSlug;
-    if (slug == null) {
-      setState(() { _error = 'Could not resolve store slug'; _loadingSlides = false; });
+    final base = _resourceBase;
+    if (base == null) {
+      setState(() { _error = 'Could not resolve store'; _loadingSlides = false; });
       return;
     }
     setState(() { _slides.clear(); _loadingSlides = true; _error = null; _successMsg = null; });
     try {
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/resource/$slug/$_pagesDir/$_filename');
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/resource/$base/$_pagesDir/$_filename');
       final resp = await http.get(uri);
       if (!mounted) return;
       if (resp.statusCode == 200) {
+        _pageExists = true;
         _parseHtml(utf8.decode(resp.bodyBytes));
-      } else if (resp.statusCode != 404) {
+      } else if (resp.statusCode == 404) {
+        _pageExists = false;
+      } else {
         _error = 'Failed to load: HTTP ${resp.statusCode}';
       }
     } catch (e) {
@@ -101,9 +112,10 @@ class _AdvertisementsScreenState extends State<AdvertisementsScreen> {
   Future<void> _addSlide() async {
     final token = context.read<AuthState>().token;
     final slug  = _activeSlug;
-    if (token == null || slug == null) return;
+    final org   = _orgSlug;
+    if (token == null || slug == null || org == null) return;
 
-    final picked = await showImageSourcePicker(context, storeSlug: slug, token: token);
+    final picked = await showImageSourcePicker(context, storeSlug: slug, orgSlug: org, token: token);
     if (picked == null || !mounted) return;
 
     final defaultLabel = _defaultLabelFromUrl(picked.publicUrl);
@@ -250,9 +262,9 @@ $slideHtml
   Future<void> _previewKiosk() async {
     final ok = await _save();
     if (!ok || !mounted) return;
-    final slug = _activeSlug;
-    if (slug == null) return;
-    final url = '${AppConfig.apiBaseUrl}/resource/$slug/$_pagesDir/$_filename';
+    final base = _resourceBase;
+    if (base == null) return;
+    final url = '${AppConfig.apiBaseUrl}/resource/$base/$_pagesDir/$_filename';
     html.window.open(url, '_blank', 'width=450,height=800,resizable=yes');
   }
 
@@ -295,7 +307,7 @@ $slideHtml
   }
 
   Widget _buildTopBar(ColorScheme scheme) {
-    final branches = <Store>[...?_stores];
+    final branches = (_stores ?? []).where((s) => s.id != 1).toList();
     final busy = _loadingSlides || _saving;
 
     return Container(
@@ -310,8 +322,10 @@ $slideHtml
                 children: [
                   Text('Advertisements',
                       style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
-                  if (_activeSlug != null)
-                    Text('store: $_activeSlug', style: TextStyle(fontSize: 11, color: scheme.outline)),
+                  Text(
+                    _selectedStore != null ? 'Branch: ${_selectedStore!.label()}' : 'Global scope',
+                    style: TextStyle(fontSize: 11, color: scheme.outline),
+                  ),
                 ],
               ),
               const Spacer(),
@@ -334,7 +348,7 @@ $slideHtml
               const SizedBox(width: 8),
               FilledButton(
                 onPressed: (busy || _slides.isEmpty) ? null : () => _save(),
-                child: const Text('Save'),
+                child: Text(_pageExists ? 'Save' : 'Create'),
               ),
             ],
           ),
@@ -349,12 +363,12 @@ $slideHtml
             child: DropdownButtonHideUnderline(
               child: DropdownButton<Store>(
                 value: _selectedStore,
-                hint: Text('Pick store', style: TextStyle(fontSize: 13, color: scheme.outline)),
+                hint: Text('Select Branch', style: TextStyle(fontSize: 13, color: scheme.outline)),
                 isDense: true,
                 style: TextStyle(fontSize: 13, color: scheme.onSurface),
                 items: branches.map((s) => DropdownMenuItem<Store>(
                   value: s,
-                  child: Text(s.id == 1 ? 'Global (all branches)' : s.label()),
+                  child: Text(s.label()),
                 )).toList(),
                 onChanged: busy ? null : (s) {
                   setState(() => _selectedStore = s);

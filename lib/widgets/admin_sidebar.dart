@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../router/routes.dart';
 import '../state/auth_state.dart';
+import '../utils/role_labels.dart';
 
 class AdminSidebar extends StatelessWidget {
   final String currentRoute;
@@ -10,7 +11,14 @@ class AdminSidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final username = context.watch<AuthState>().username ?? '';
+    final auth = context.watch<AuthState>();
+    final username = auth.username ?? '';
+    final roleName = auth.roleName;
+    // Accounts (users table) is SUPER_ADMIN-only. Employees/Devices are
+    // permission-gated so BRANCH_ADMIN and ORGANIZATION_OWNER both see them.
+    final canManageUsers = auth.hasPermission('MANAGE_USERS');
+    final canManageEmployees = auth.hasPermission('MANAGE_EMPLOYEES');
+    final canManageDevices = auth.hasPermission('MANAGE_DEVICES');
 
     return Container(
       width: 220,
@@ -42,7 +50,9 @@ class AdminSidebar extends StatelessWidget {
                               color: scheme.onPrimaryContainer,
                               fontWeight: FontWeight.w700,
                               fontSize: 13)),
-                      Text('Admin',
+                      Text(roleDisplayName(roleName),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                               color: scheme.onPrimaryContainer.withValues(alpha: 0.7),
                               fontSize: 11)),
@@ -94,13 +104,30 @@ class AdminSidebar extends StatelessWidget {
                   current: currentRoute,
                   indent: true,
                 ),
-                _NavItem(
-                  icon: Icons.people_outline,
-                  label: 'Accounts',
-                  route: Routes.accounts,
-                  current: currentRoute,
-                  indent: true,
-                ),
+                if (canManageUsers)
+                  _NavItem(
+                    icon: Icons.people_outline,
+                    label: 'Accounts',
+                    route: Routes.accounts,
+                    current: currentRoute,
+                    indent: true,
+                  ),
+                if (canManageEmployees)
+                  _NavItem(
+                    icon: Icons.badge_outlined,
+                    label: 'Employees',
+                    route: Routes.employees,
+                    current: currentRoute,
+                    indent: true,
+                  ),
+                if (canManageDevices)
+                  _NavItem(
+                    icon: Icons.devices_outlined,
+                    label: 'Devices',
+                    route: Routes.devices,
+                    current: currentRoute,
+                    indent: true,
+                  ),
                 _NavItem(
                   icon: Icons.payment_outlined,
                   label: 'Payment Methods',

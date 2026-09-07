@@ -13,6 +13,7 @@ import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/waha_date_picker.dart';
+import '../widgets/waha_filter_controls.dart';
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
@@ -57,7 +58,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   static const _statuses = [null, 'PAID', 'CREATED', 'PENDING', 'CANCELLED'];
   static const _statusLabels = {
-    null: 'All Statuses',
+    null: 'Select Status',
     'PAID': 'Paid',
     'CREATED': 'Created',
     'PENDING': 'Pending',
@@ -409,11 +410,11 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
         runSpacing: 8,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          _FilterDrop<int?>(
+          WahaFilterDropdown<int?>(
             value: _storeId,
-            hint: 'Pick Branch',
+            hint: 'Select Branch',
             items: [
-              const DropdownMenuItem(value: null, child: Text('Pick Branch')),
+              const DropdownMenuItem(value: null, child: Text('Select Branch')),
               ..._stores.map((s) => DropdownMenuItem(
                     value: (s['id'] as num).toInt(),
                     child: Text(_branchLabel(s)),
@@ -421,40 +422,40 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
             ],
             onChanged: (v) { setState(() { _storeId = v; _page = 0; }); _load(); },
           ),
-          _FilterDrop<String?>(
+          WahaFilterDropdown<String?>(
             value: _status,
-            hint: 'All Statuses',
+            hint: 'Select Status',
             items: _statuses.map((s) => DropdownMenuItem(
                   value: s,
-                  child: Text(_statusLabels[s] ?? s ?? 'All'),
+                  child: Text(_statusLabels[s] ?? s ?? 'Select Status'),
                 )).toList(),
             onChanged: (v) { setState(() { _status = v; _page = 0; }); _load(); },
           ),
           if (_kiosks.isNotEmpty)
-            _FilterDrop<String?>(
+            WahaFilterDropdown<String?>(
               value: _kiosk,
-              hint: 'All Kiosks',
+              hint: 'Select Kiosk',
               items: [
-                const DropdownMenuItem(value: null, child: Text('All Kiosks')),
+                const DropdownMenuItem(value: null, child: Text('Select Kiosk')),
                 ..._kiosks.map((k) => DropdownMenuItem(value: k, child: Text(k))),
               ],
               onChanged: (v) { setState(() { _kiosk = v; _page = 0; }); _load(); },
             ),
           if (_paymentMethods.isNotEmpty)
-            _FilterDrop<String?>(
+            WahaFilterDropdown<String?>(
               value: _paymentType,
-              hint: 'All Payments',
+              hint: 'Select Payment Method',
               items: [
-                const DropdownMenuItem(value: null, child: Text('All Payments')),
+                const DropdownMenuItem(value: null, child: Text('Select Payment Method')),
                 ..._paymentMethods.map((m) => DropdownMenuItem(value: m, child: Text(m))),
               ],
               onChanged: (v) { setState(() { _paymentType = v; _page = 0; }); _load(); },
             ),
-          _FilterDrop<bool?>(
+          WahaFilterDropdown<bool?>(
             value: _synced,
-            hint: 'All Sync',
+            hint: 'Select Sync',
             items: const [
-              DropdownMenuItem(value: null,  child: Text('All Sync')),
+              DropdownMenuItem(value: null,  child: Text('Select Sync')),
               DropdownMenuItem(value: true,  child: Text('Yes')),
               DropdownMenuItem(value: false, child: Text('No')),
             ],
@@ -707,75 +708,6 @@ class _SumTile extends StatelessWidget {
             ],
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ── Filter dropdown ───────────────────────────────────────────────────────────
-
-class _FilterDrop<T> extends StatefulWidget {
-  final T value;
-  final String hint;
-  final List<DropdownMenuItem<T>> items;
-  final ValueChanged<T?> onChanged;
-
-  const _FilterDrop({
-    required this.value,
-    required this.hint,
-    required this.items,
-    required this.onChanged,
-  });
-
-  @override
-  State<_FilterDrop<T>> createState() => _FilterDropState<T>();
-}
-
-class _FilterDropState<T> extends State<_FilterDrop<T>> {
-  final _menuCtrl = MenuController();
-
-  String _label() {
-    if (widget.value == null) return widget.hint;
-    final match = widget.items.where((i) => i.value == widget.value).firstOrNull;
-    final child = match?.child;
-    if (child is Text) return child.data ?? widget.hint;
-    return widget.hint;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final label = _label();
-    final isPlaceholder = widget.value == null;
-
-    return MenuAnchor(
-      controller: _menuCtrl,
-      alignmentOffset: const Offset(0, 4),
-      menuChildren: widget.items.map((item) => MenuItemButton(
-        onPressed: () => widget.onChanged(item.value),
-        child: item.child,
-      )).toList(),
-      child: GestureDetector(
-        onTap: () => _menuCtrl.open(),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-          decoration: BoxDecoration(
-            border: Border.all(color: scheme.outline),
-            borderRadius: BorderRadius.circular(8),
-            color: scheme.surface,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(label,
-                  style: TextStyle(
-                      fontSize: 13,
-                      color: isPlaceholder ? scheme.onSurfaceVariant : scheme.onSurface)),
-              const SizedBox(width: 4),
-              Icon(Icons.arrow_drop_down, size: 18, color: scheme.outline),
-            ],
-          ),
-        ),
       ),
     );
   }

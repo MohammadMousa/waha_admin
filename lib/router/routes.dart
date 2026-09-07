@@ -9,6 +9,10 @@ class Routes {
   static const storeEdit       = '/stores/edit';
   static const accounts        = '/accounts';
   static const accountEdit     = '/accounts/edit';
+  static const employees       = '/employees';
+  static const employeeEdit    = '/employees/edit';
+  static const devices         = '/devices';
+  static const deviceEdit      = '/devices/edit';
   static const register        = '/register';
 
   // Catalog

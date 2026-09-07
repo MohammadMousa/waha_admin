@@ -13,6 +13,7 @@ import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/waha_date_picker.dart';
+import '../widgets/waha_filter_controls.dart';
 
 class ProductsSalesScreen extends StatefulWidget {
   const ProductsSalesScreen({super.key});
@@ -365,11 +366,11 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
       child: Row(
         children: [
-          _FilterDropdown<int?>(
-            label: 'Pick Branch',
+          WahaFilterDropdown<int?>(
+            hint: 'Select Branch',
             value: _storeId,
             items: [
-              const DropdownMenuItem(value: null, child: Text('Pick Branch')),
+              const DropdownMenuItem(value: null, child: Text('Select Branch')),
               ..._stores.map((s) => DropdownMenuItem(
                     value: (s['id'] as num).toInt(),
                     child: Text(_branchLabel(s)),
@@ -378,11 +379,11 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
             onChanged: (v) { setState(() { _storeId = v; _page = 0; }); _load(); },
           ),
           const SizedBox(width: 10),
-          _FilterDropdown<int?>(
-            label: 'All Categories',
+          WahaFilterDropdown<int?>(
+            hint: 'Select Category',
             value: _categoryId,
             items: [
-              const DropdownMenuItem(value: null, child: Text('All Categories')),
+              const DropdownMenuItem(value: null, child: Text('Select Category')),
               ..._categories.map((c) => DropdownMenuItem(
                     value: (c['id'] as num).toInt(),
                     child: Text(_displayName(c['name_en'])),
@@ -586,43 +587,6 @@ class _SummaryTile extends StatelessWidget {
             ],
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ── Filter dropdown ───────────────────────────────────────────────────────────
-
-class _FilterDropdown<T> extends StatelessWidget {
-  final String label;
-  final T value;
-  final List<DropdownMenuItem<T>> items;
-  final ValueChanged<T?> onChanged;
-
-  const _FilterDropdown({
-    required this.label,
-    required this.value,
-    required this.items,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        border: Border.all(color: scheme.outline),
-        borderRadius: BorderRadius.circular(8),
-        color: scheme.surface,
-      ),
-      child: DropdownButton<T>(
-        value: value,
-        items: items,
-        onChanged: onChanged,
-        underline: const SizedBox.shrink(),
-        style: TextStyle(fontSize: 13, color: scheme.onSurface),
-        borderRadius: BorderRadius.circular(8),
       ),
     );
   }
