@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../config/app_config.dart';
+import '../models/store.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
@@ -39,6 +40,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
   List<Map<String, dynamic>> _stores        = [];
   List<String>               _kiosks        = [];
   List<String>               _paymentMethods = [];
+  // `getReportStores` (used for `_stores`, above) returns only `{id, name}`
+  // — no display name — so branch labels are resolved through this map,
+  // built from `getAdminStores` (the same endpoint the Stores admin screen
+  // uses), keyed by store id.
+  Map<int, Store> _storesById = {};
 
   // Data
   Map<String, dynamic>? _summary;
@@ -84,12 +90,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
         ApiClient().getReportStores(token),
         ApiClient().getReportKiosks(token),
         ApiClient().getReportPaymentMethods(token),
+        ApiClient().getAdminStores(token),
       ]);
       if (!mounted) return;
       setState(() {
         _stores         = (results[0] as List).cast<Map<String, dynamic>>();
         _kiosks         = (results[1] as List).map((e) => e['username']?.toString() ?? '').where((s) => s.isNotEmpty).toList();
         _paymentMethods = (results[2] as List).map((e) => e['provider']?.toString() ?? '').where((s) => s.isNotEmpty).toList();
+        _storesById     = {for (final s in (results[3] as List<Store>)) s.id: s};
       });
       await _load();
     } on ApiException catch (e) {
@@ -146,17 +154,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   String _branchLabel(Map<String, dynamic> s) {
-    final raw = s['display_name'];
-    if (raw != null) {
-      try {
-        final m = (raw is Map)
-            ? Map<String, dynamic>.from(raw)
-            : Map<String, dynamic>.from(jsonDecode(raw.toString()) as Map);
-        final name = (m['en'] ?? m['ar'] ?? '').toString().trim();
-        if (name.isNotEmpty) return name;
-      } catch (_) {}
-    }
-    return s['name']?.toString() ?? '';
+    final id = (s['id'] as num?)?.toInt();
+    final displayName = _storesById[id]?.displayName;
+    return displayName?['en'] ?? displayName?['ar'] ?? s['name']?.toString() ?? '';
   }
 
   String _parseBranchName(Map<String, dynamic> row) {

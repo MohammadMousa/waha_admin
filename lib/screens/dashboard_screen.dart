@@ -1,8 +1,7 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/store.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
@@ -14,18 +13,14 @@ import '../widgets/monthly_bar_chart.dart';
 import '../widgets/recent_orders_table.dart';
 import '../widgets/waha_filter_controls.dart';
 
-String branchLabel(Map<String, dynamic> s) {
-  final raw = s['display_name'];
-  if (raw != null) {
-    try {
-      final m = (raw is Map)
-          ? Map<String, dynamic>.from(raw)
-          : Map<String, dynamic>.from(jsonDecode(raw.toString()) as Map);
-      final name = (m['en'] ?? m['ar'] ?? '').toString().trim();
-      if (name.isNotEmpty) return name;
-    } catch (_) {}
-  }
-  return s['name']?.toString() ?? '';
+/// `getReportStores` (the source of the `stores` list passed around this
+/// screen) returns only `{id, name}` — no display name — so the label is
+/// resolved through [storesById], built from `getAdminStores` (the same
+/// endpoint the Stores admin screen uses).
+String branchLabel(Map<String, dynamic> s, Map<int, Store> storesById) {
+  final id = (s['id'] as num?)?.toInt();
+  final displayName = storesById[id]?.displayName;
+  return displayName?['en'] ?? displayName?['ar'] ?? s['name']?.toString() ?? '';
 }
 
 class DashboardScreen extends StatefulWidget {
@@ -42,6 +37,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Map<String, dynamic>> _monthlyRevenue = [];
   List<Map<String, dynamic>> _recentOrders = [];
   List<Map<String, dynamic>> _stores = [];
+  Map<int, Store> _storesById = {};
   int? _storeId;
 
   bool _loading = true;
@@ -70,6 +66,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         api.getDashboardMonthly(token, _monthlyPeriod, storeId: _storeId),
         api.getRecentOrders(token, storeId: _storeId),
         if (_stores.isEmpty) api.getReportStores(token),
+        if (_stores.isEmpty) api.getAdminStores(token),
       ]);
       if (!mounted) return;
       // ignore: unnecessary_cast
@@ -79,7 +76,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _ordersSeries = (results[2] as List).cast<Map<String, dynamic>>();
         _monthlyRevenue = (results[3] as List).cast<Map<String, dynamic>>();
         _recentOrders = (results[4] as List).cast<Map<String, dynamic>>();
-        if (results.length > 5) _stores = (results[5] as List).cast<Map<String, dynamic>>();
+        if (results.length > 5) {
+          _stores = (results[5] as List).cast<Map<String, dynamic>>();
+          _storesById = {for (final s in (results[6] as List<Store>)) s.id: s};
+        }
         _loading = false;
       });
     } on ApiException catch (e) {
@@ -151,6 +151,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               _Header(
                                 onRefresh: _load,
                                 stores: _stores,
+                                storesById: _storesById,
                                 selectedStoreId: _storeId,
                                 onStoreChanged: _onStoreChanged,
                               ),
@@ -249,12 +250,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
 class _Header extends StatelessWidget {
   final VoidCallback onRefresh;
   final List<Map<String, dynamic>> stores;
+  final Map<int, Store> storesById;
   final int? selectedStoreId;
   final ValueChanged<int?> onStoreChanged;
 
   const _Header({
     required this.onRefresh,
     required this.stores,
+    required this.storesById,
     required this.selectedStoreId,
     required this.onStoreChanged,
   });
@@ -275,7 +278,7 @@ class _Header extends StatelessWidget {
               const DropdownMenuItem(value: null, child: Text('Select Branch')),
               ...stores.map((s) => DropdownMenuItem(
                     value: (s['id'] as num).toInt(),
-                    child: Text(branchLabel(s)),
+                    child: Text(branchLabel(s, storesById)),
                   )),
             ],
             onChanged: onStoreChanged,

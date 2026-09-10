@@ -23,7 +23,11 @@ import 'screens/landing_editor_screen.dart';
 import 'screens/landing_pages_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/integration_logs_screen.dart';
+import 'screens/inventory_operations_screen.dart';
+import 'screens/inventory_stock_screen.dart';
+import 'screens/inventory_visits_screen.dart';
 import 'screens/odoo_admin_screen.dart';
+import 'services/api_client.dart';
 import 'screens/payment_methods_screen.dart';
 import 'screens/product_edit_screen.dart';
 import 'screens/products_sales_screen.dart';
@@ -114,6 +118,34 @@ class WahaAdminApp extends StatelessWidget {
           case Routes.orders:
             return MaterialPageRoute(
                 builder: (_) => const OrdersScreen(), settings: settings);
+
+          case Routes.inventoryVisits:
+            return MaterialPageRoute(
+                builder: (_) => const InventoryVisitsScreen(), settings: settings);
+
+          case Routes.inventoryTransfers:
+            return MaterialPageRoute(
+                builder: (_) => InventoryOperationsScreen(
+                      title: 'Inventory Transfers',
+                      route: Routes.inventoryTransfers,
+                      exportFilePrefix: 'inventory_transfers',
+                      fetcher: ApiClient().getInventoryTransfers,
+                    ),
+                settings: settings);
+
+          case Routes.inventoryReturns:
+            return MaterialPageRoute(
+                builder: (_) => InventoryOperationsScreen(
+                      title: 'Inventory Returns',
+                      route: Routes.inventoryReturns,
+                      exportFilePrefix: 'inventory_returns',
+                      fetcher: ApiClient().getInventoryReturns,
+                    ),
+                settings: settings);
+
+          case Routes.inventoryStock:
+            return MaterialPageRoute(
+                builder: (_) => const InventoryStockScreen(), settings: settings);
 
           case Routes.advertisements:
             return MaterialPageRoute(

@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../config/app_config.dart';
+import '../models/store.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
@@ -35,6 +36,11 @@ class _ProductsSalesScreenState extends State<ProductsSalesScreen> {
   // Lookups
   List<Map<String, dynamic>> _stores     = [];
   List<Map<String, dynamic>> _categories = [];
+  // `getReportStores` (used for `_stores`, above) returns only `{id, name}`
+  // — no display name — so branch labels are resolved through this map,
+  // built from `getAdminStores` (the same endpoint the Stores admin screen
+  // uses), keyed by store id.
+  Map<int, Store> _storesById = {};
 
   // Data
   Map<String, dynamic>? _summary;
@@ -70,11 +76,13 @@ class _ProductsSalesScreenState extends State<ProductsSalesScreen> {
       final results = await Future.wait([
         api.getReportStores(token),
         api.getReportCategories(token),
+        api.getAdminStores(token),
       ]);
       if (!mounted) return;
       setState(() {
         _stores     = (results[0] as List).cast<Map<String, dynamic>>();
         _categories = (results[1] as List).cast<Map<String, dynamic>>();
+        _storesById = {for (final s in (results[2] as List<Store>)) s.id: s};
       });
       await _load();
     } on ApiException catch (e) {
@@ -118,17 +126,9 @@ class _ProductsSalesScreenState extends State<ProductsSalesScreen> {
   }
 
   String _branchLabel(Map<String, dynamic> s) {
-    final raw = s['display_name'];
-    if (raw != null) {
-      try {
-        final m = (raw is Map)
-            ? Map<String, dynamic>.from(raw)
-            : Map<String, dynamic>.from(jsonDecode(raw.toString()) as Map);
-        final name = (m['en'] ?? m['ar'] ?? '').toString().trim();
-        if (name.isNotEmpty) return name;
-      } catch (_) {}
-    }
-    return s['name']?.toString() ?? '';
+    final id = (s['id'] as num?)?.toInt();
+    final displayName = _storesById[id]?.displayName;
+    return displayName?['en'] ?? displayName?['ar'] ?? s['name']?.toString() ?? '';
   }
 
   String _parseBranchName(Map<String, dynamic> row) {

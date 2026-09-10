@@ -25,6 +25,12 @@ class Routes {
   // Reporting
   static const charts          = '/reports/charts';
 
+  // Inventory
+  static const inventoryVisits    = '/reports/inventory-visits';
+  static const inventoryTransfers = '/reports/inventory-transfers';
+  static const inventoryReturns   = '/reports/inventory-returns';
+  static const inventoryStock     = '/reports/inventory-stock';
+
   // Global admin
   static const paymentMethodsGlobal    = '/payment-methods/global';
   static const receiptInfoGlobal       = '/receipt-info/global';

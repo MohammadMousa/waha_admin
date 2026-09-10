@@ -13,6 +13,13 @@ import '../models/branch_group.dart';
 import '../models/organization.dart';
 import '../models/store.dart';
 
+/// Server-enforced max page size for admin list/report endpoints
+/// (docs/inventory.md: "size (1–100, default 20)"). Requesting more is
+/// silently clamped back down to the default by the backend rather than
+/// honored or rejected — screens that need "everything" must page through
+/// results at this size instead of asking for one huge page.
+const kMaxApiPageSize = 100;
+
 class ApiException implements Exception {
   final int statusCode;
   final String message;
@@ -145,6 +152,105 @@ class ApiClient {
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
 
+  // ── Inventory reports (admin) ────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> getInventoryVisits(
+    String token, {
+    int? branchId,
+    int? employeeId,
+    String? from,
+    String? to,
+    int page = 0,
+    int size = 20,
+  }) async {
+    final uri = _uri('/api/admin/inventory/visits').replace(queryParameters: {
+      if (branchId    != null) 'branchId':   '$branchId',
+      if (employeeId  != null) 'employeeId': '$employeeId',
+      if (from        != null) 'from': from,
+      if (to          != null) 'to': to,
+      'page': '$page',
+      'size': '$size',
+    });
+    final resp = await _http.get(uri, headers: _headers(token: token));
+    if (resp.statusCode == 200) return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<Map<String, dynamic>> _getInventoryOperations(
+    String path,
+    String token, {
+    int? branchId,
+    int? productId,
+    int? employeeId,
+    String? from,
+    String? to,
+    int page = 0,
+    int size = 20,
+  }) async {
+    final uri = _uri(path).replace(queryParameters: {
+      if (branchId    != null) 'branchId':   '$branchId',
+      if (productId   != null) 'productId':  '$productId',
+      if (employeeId  != null) 'employeeId': '$employeeId',
+      if (from        != null) 'from': from,
+      if (to          != null) 'to': to,
+      'page': '$page',
+      'size': '$size',
+    });
+    final resp = await _http.get(uri, headers: _headers(token: token));
+    if (resp.statusCode == 200) return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<Map<String, dynamic>> getInventoryTransfers(
+    String token, {
+    int? branchId,
+    int? productId,
+    int? employeeId,
+    String? from,
+    String? to,
+    int page = 0,
+    int size = 20,
+  }) =>
+      _getInventoryOperations('/api/admin/inventory/transfers', token,
+          branchId: branchId, productId: productId, employeeId: employeeId,
+          from: from, to: to, page: page, size: size);
+
+  Future<Map<String, dynamic>> getInventoryReturns(
+    String token, {
+    int? branchId,
+    int? productId,
+    int? employeeId,
+    String? from,
+    String? to,
+    int page = 0,
+    int size = 20,
+  }) =>
+      _getInventoryOperations('/api/admin/inventory/returns', token,
+          branchId: branchId, productId: productId, employeeId: employeeId,
+          from: from, to: to, page: page, size: size);
+
+  Future<Map<String, dynamic>> getInventoryStock(
+    String token, {
+    String scope = 'BRANCHES',
+    int? branchId,
+    int? productId,
+    int? categoryId,
+    int page = 0,
+    int size = 20,
+  }) async {
+    final uri = _uri('/api/admin/inventory/stock').replace(queryParameters: {
+      'scope': scope,
+      if (branchId    != null) 'branchId':    '$branchId',
+      if (productId   != null) 'productId':   '$productId',
+      if (categoryId  != null) 'categoryId':  '$categoryId',
+      'page': '$page',
+      'size': '$size',
+    });
+    final resp = await _http.get(uri, headers: _headers(token: token));
+    if (resp.statusCode == 200) return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
   Future<Map<String, dynamic>> getIntegrationLogs(String token, {
     String? entityType, String? status, int page = 0, int size = 20,
   }) async {
@@ -257,6 +363,27 @@ class ApiClient {
     });
     final resp = await _http.get(uri, headers: _headers(token: token));
     if (resp.statusCode == 200) return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  /// Org-wide lookup (no storeId) for filter pickers — e.g. the Transfers/
+  /// Returns/Stock inventory reports. Capped at 100 results, unpaginated.
+  Future<List<Map<String, dynamic>>> getAdminProducts(
+    String token, {
+    String? search,
+    int? categoryId,
+    bool? active,
+  }) async {
+    final uri = _uri('/api/admin/reports/products').replace(queryParameters: {
+      if (search      != null) 'search':     search,
+      if (categoryId  != null) 'categoryId': '$categoryId',
+      if (active      != null) 'active':     '$active',
+    });
+    final resp = await _http.get(uri, headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      return (jsonDecode(utf8.decode(resp.bodyBytes)) as List)
+          .cast<Map<String, dynamic>>();
+    }
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
 
