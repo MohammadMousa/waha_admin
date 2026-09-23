@@ -15,15 +15,6 @@ class Store {
     this.imageResourceId,
   });
 
-  // Public URL prefix for resource serving:
-  //   global store (name == orgSlug) → '{org}'
-  //   branch store                   → '{org}/{branch}'
-  String get resourceBase {
-    final org = orgSlug;
-    if (org == null || org == name) return name;
-    return '$org/$name';
-  }
-
   String label([String languageCode = 'en']) {
     final map = displayName;
     if (map == null) return name;

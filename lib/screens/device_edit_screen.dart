@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../models/device.dart';
@@ -82,8 +83,12 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
       setState(() => _error = 'Username is required.');
       return;
     }
-    if (_isCreate && _pinCode.text.trim().length != 4) {
-      setState(() => _error = 'A 4-digit PIN is required for new devices.');
+    if (_isCreate && _pinCode.text.trim().length != 6) {
+      setState(() => _error = 'PIN must be exactly 6 digits');
+      return;
+    }
+    if (!_isCreate && _pinCode.text.trim().isNotEmpty && _pinCode.text.trim().length != 6) {
+      setState(() => _error = 'PIN must be exactly 6 digits');
       return;
     }
     if (_isCreate && _selectedStoreId == null) {
@@ -249,6 +254,21 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
               ),
+              if (!_isCreate && (widget.device?.isLocked ?? false)) ...[
+                const SizedBox(width: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    'Locked until ${DateFormat('h:mm a').format(widget.device!.lockedUntil!.toLocal())}',
+                    style: const TextStyle(
+                        fontSize: 11, color: Colors.red, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
               const Spacer(),
               if (!_loadingStores)
                 FilledButton(
@@ -295,7 +315,7 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
                             controller: _pinCode,
                             obscureText: _obscurePin,
                             keyboardType: TextInputType.number,
-                            maxLength: 4,
+                            maxLength: 6,
                             decoration: InputDecoration(
                               labelText: _isCreate
                                   ? 'PIN code *'

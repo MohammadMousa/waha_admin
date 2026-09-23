@@ -31,6 +31,15 @@
 
   <title>waha_admin</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Inter (theme's fontFamily) + Noto Sans Arabic (fontFamilyFallback in
+       main.dart's ThemeData) — without this link, ThemeData.fontFamily just
+       names a font the browser never loads, so Latin silently falls back to
+       the browser default (still readable) while Arabic renders as tofu
+       boxes (no fallback glyphs at all). -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <!--

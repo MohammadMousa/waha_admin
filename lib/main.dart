@@ -27,6 +27,7 @@ import 'screens/inventory_operations_screen.dart';
 import 'screens/inventory_stock_screen.dart';
 import 'screens/inventory_visits_screen.dart';
 import 'screens/odoo_admin_screen.dart';
+import 'screens/profile_screen.dart';
 import 'services/api_client.dart';
 import 'screens/payment_methods_screen.dart';
 import 'screens/product_edit_screen.dart';
@@ -70,6 +71,10 @@ class WahaAdminApp extends StatelessWidget {
           case Routes.dashboard:
             return MaterialPageRoute(
                 builder: (_) => const DashboardScreen(), settings: settings);
+
+          case Routes.profile:
+            return MaterialPageRoute(
+                builder: (_) => const ProfileScreen(), settings: settings);
 
           case Routes.productsSales:
             return MaterialPageRoute(
@@ -210,8 +215,7 @@ class WahaAdminApp extends StatelessWidget {
 
           case Routes.resourceExplorerGlobal:
             return MaterialPageRoute(
-                builder: (_) => const ResourceExplorerScreen(
-                    store: Store(id: 1, name: 'waha')),
+                builder: (_) => const ResourceExplorerScreen(),
                 settings: settings);
 
           case Routes.resourceExplorer:
@@ -221,17 +225,12 @@ class WahaAdminApp extends StatelessWidget {
                 settings: settings);
 
           case Routes.landingEditor:
-            final editorArgs = settings.arguments;
-            if (editorArgs is Map<String, dynamic>) {
-              return MaterialPageRoute(
-                  builder: (_) => LandingEditorScreen(
-                      store: editorArgs['store'] as Store,
-                      pageKey: editorArgs['pageKey'] as String? ?? 'KIOSK_LANDING'),
-                  settings: settings);
-            }
+            final editorArgs = settings.arguments as Map<String, dynamic>;
             return MaterialPageRoute(
                 builder: (_) => LandingEditorScreen(
-                    store: editorArgs as Store),
+                    store: editorArgs['store'] as Store?,
+                    orgSlug: editorArgs['orgSlug'] as String,
+                    pageKey: editorArgs['pageKey'] as String? ?? 'KIOSK_LANDING'),
                 settings: settings);
 
           case Routes.charts:
@@ -279,6 +278,11 @@ class WahaAdminApp extends StatelessWidget {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
       ),
       fontFamily: 'Inter',
+      // Inter has no Arabic glyphs at all — without an explicit fallback,
+      // Arabic text (product/category names, etc.) renders as empty tofu
+      // boxes instead of silently falling back to the browser default the
+      // way Latin text does. Loaded alongside Inter in web/index.html.
+      fontFamilyFallback: const ['Noto Sans Arabic'],
     );
   }
 }

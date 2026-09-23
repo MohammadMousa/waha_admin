@@ -26,8 +26,12 @@ class AdminSidebar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // User header
-          Container(
+          // User header — tap through to the "My Profile" screen.
+          InkWell(
+            onTap: currentRoute == Routes.profile
+                ? null
+                : () => Navigator.of(context).pushNamed(Routes.profile),
+            child: Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
             color: scheme.primaryContainer,
@@ -50,16 +54,27 @@ class AdminSidebar extends StatelessWidget {
                               color: scheme.onPrimaryContainer,
                               fontWeight: FontWeight.w700,
                               fontSize: 13)),
-                      Text(roleDisplayName(roleName),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              color: scheme.onPrimaryContainer.withValues(alpha: 0.7),
-                              fontSize: 11)),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(roleDisplayName(roleName),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    color: scheme.onPrimaryContainer.withValues(alpha: 0.7),
+                                    fontSize: 11)),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(Icons.chevron_right,
+                              size: 14, color: scheme.onPrimaryContainer.withValues(alpha: 0.7)),
+                        ],
+                      ),
                     ],
                   ),
                 ),
               ],
+            ),
             ),
           ),
 

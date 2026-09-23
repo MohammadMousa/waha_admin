@@ -5,10 +5,45 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/app_config.dart';
 import '../models/resource.dart';
 import '../services/api_client.dart';
+import '../utils/resource_scope.dart';
+
+// Per-entity-type "remember my choice" destination directory, set by the
+// upload-destination dialog below. Scoped by entityType only (not by
+// org/branch) — the dialog re-validates the directory still exists in the
+// current scope before trusting it, so a stale/foreign value just falls
+// back to asking again rather than silently uploading to the wrong place.
+Future<String?> _getRememberedDir(String entityType) async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getString('resourcePicker.rememberedDir.$entityType');
+}
+
+Future<void> _setRememberedDir(String entityType, String? dir) async {
+  final prefs = await SharedPreferences.getInstance();
+  if (dir == null) {
+    await prefs.remove('resourcePicker.rememberedDir.$entityType');
+  } else {
+    await prefs.setString('resourcePicker.rememberedDir.$entityType', dir);
+  }
+}
+
+// Last directory browsed per scope, in the Files Manager browse dialog below.
+// Same key namespace as the standalone Files Manager screen
+// (resource_explorer_screen.dart) so the two stay in sync — whichever one
+// you used last is where the other lands too (human lead, 2026-09-17).
+Future<String?> _getLastBrowsedDir(String apiScope) async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getString('filesManager.lastDir.$apiScope');
+}
+
+Future<void> _setLastBrowsedDir(String apiScope, String dirName) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('filesManager.lastDir.$apiScope', dirName);
+}
 
 String mimeForFilename(String name) {
   final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
@@ -29,9 +64,10 @@ String mimeForFilename(String name) {
 /// Uploads camera/gallery picks to the store's `res` directory automatically.
 Future<PickedResource?> showImageSourcePicker(
     BuildContext context, {
-    required String storeSlug,
+    required String orgSlug,
     required String token,
-    String? orgSlug,
+    required String entityType, // 'product' | 'category' | 'store' | 'employee' | 'advertisement' | 'landing' | 'receipt' — keys the "remember my choice" directory
+    String? branchName, // null = organization-level (global) scope
   }) async {
   final source = await showModalBottomSheet<_ImgSource>(
     context: context,
@@ -88,7 +124,7 @@ Future<PickedResource?> showImageSourcePicker(
 
   if (source == _ImgSource.files) {
     return showResourcePickerModal(context,
-        storeSlug: storeSlug, orgSlug: orgSlug, token: token, imagesOnly: true);
+        orgSlug: orgSlug, branchName: branchName, token: token, imagesOnly: true);
   }
 
   // Camera or Gallery — pick a local file then upload
@@ -110,32 +146,234 @@ Future<PickedResource?> showImageSourcePicker(
 
   if (bytes == null || filename == null || !context.mounted) return null;
 
-  // Upload to the store's `res` directory (create it first if needed)
-  try {
-    final api = ApiClient();
+  final api = ApiClient();
+  final apiScope = apiScopeFor(orgSlug, branchName);
+
+  // Fast path: a remembered directory from a previous "remember my choice" —
+  // skip the dialog entirely, as long as it still exists in this scope.
+  final remembered = await _getRememberedDir(entityType);
+  if (remembered != null && context.mounted) {
     try {
-      await api.createDirectory(storeSlug, 'res', token);
-    } catch (_) { /* already exists — ignore */ }
-    final mime = mimeForFilename(filename);
-    final asset = await api.uploadAsset(storeSlug, 'res', bytes, filename, mime, token);
-    final base = _resourceBase(orgSlug, storeSlug);
-    return PickedResource(
-      resourceId: asset.id,
-      publicUrl: asset.publicUrl(base, 'res'),
-    );
+      final dirs = await api.getDirectories(apiScope, token);
+      if (dirs.any((d) => d.name == remembered)) {
+        final mime = mimeForFilename(filename);
+        final asset =
+            await api.uploadAsset(apiScope, remembered, bytes, filename, mime, token);
+        final base = resourceBaseFor(orgSlug, branchName);
+        return PickedResource(
+          resourceId: asset.resourceId,
+          publicUrl: asset.publicUrl(base, remembered),
+        );
+      }
+      // Remembered directory no longer exists (deleted, or wrong scope) —
+      // forget it and fall through to the dialog below.
+      await _setRememberedDir(entityType, null);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+      }
+      return null;
+    }
+  }
+
+  if (!context.mounted) return null;
+  return _showUploadDestinationDialog(
+    context,
+    api: api,
+    apiScope: apiScope,
+    orgSlug: orgSlug,
+    branchName: branchName,
+    entityType: entityType,
+    token: token,
+    bytes: bytes,
+    filename: filename,
+  );
+}
+
+/// Lets the user pick (or create) the destination directory and optionally
+/// rename the file before it's uploaded — "old normal behaviour" (human
+/// lead, 2026-09-14) restored for Camera/Gallery picks, which previously
+/// auto-uploaded straight to a hardcoded `res` directory with no say in it.
+/// Checking "Remember my choice" skips this dialog on future picks for the
+/// same entityType (see _getRememberedDir/_setRememberedDir above).
+Future<PickedResource?> _showUploadDestinationDialog(
+  BuildContext context, {
+  required ApiClient api,
+  required String apiScope,
+  required String orgSlug,
+  required String? branchName,
+  required String entityType,
+  required String token,
+  required Uint8List bytes,
+  required String filename,
+}) async {
+  List<ResourceDirectory> dirs;
+  try {
+    dirs = await api.getDirectories(apiScope, token);
   } catch (e) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Upload failed: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Could not load directories: $e')));
     }
     return null;
   }
-}
+  if (!context.mounted) return null;
 
-// Builds the public URL prefix: '{org}' for global, '{org}/{branch}' for branch.
-String _resourceBase(String? orgSlug, String storeSlug) {
-  if (orgSlug == null || orgSlug == storeSlug) return storeSlug;
-  return '$orgSlug/$storeSlug';
+  final nameCtrl = TextEditingController(text: filename);
+  final newDirCtrl = TextEditingController();
+  String? selectedDir =
+      dirs.any((d) => d.name == 'res') ? 'res' : (dirs.isNotEmpty ? dirs.first.name : null);
+  // The dropdown always lists what's actually there — no memorizing directory
+  // names. The new-directory field is opt-in via the + button, never the
+  // default state, whether or not any directories exist yet (human lead,
+  // 2026-09-14: "admin isn't a wizard he won't memorize them").
+  bool showNewDirField = false;
+  bool remember = false;
+  bool uploading = false;
+  String? error;
+
+  final result = await showDialog<PickedResource>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setSt) => PopScope(
+        canPop: !uploading,
+        child: AlertDialog(
+          title: const Text('Save image'),
+          content: SizedBox(
+            width: 340,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.memory(bytes, width: 88, height: 88, fit: BoxFit.cover),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text('Destination directory',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: selectedDir,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          border: const OutlineInputBorder(),
+                          isDense: true,
+                          hintText: dirs.isEmpty ? 'No directories yet' : null,
+                        ),
+                        items: dirs
+                            .map((d) => DropdownMenuItem(value: d.name, child: Text(d.name)))
+                            .toList(),
+                        onChanged: (uploading || dirs.isEmpty)
+                            ? null
+                            : (v) => setSt(() => selectedDir = v),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton.filledTonal(
+                      tooltip: showNewDirField ? 'Cancel new directory' : 'New directory',
+                      icon: Icon(showNewDirField ? Icons.close : Icons.add),
+                      onPressed:
+                          uploading ? null : () => setSt(() => showNewDirField = !showNewDirField),
+                    ),
+                  ],
+                ),
+                if (showNewDirField) ...[
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: newDirCtrl,
+                    enabled: !uploading,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                        labelText: 'New directory name', border: OutlineInputBorder(), isDense: true),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                TextField(
+                  controller: nameCtrl,
+                  enabled: !uploading,
+                  decoration: const InputDecoration(
+                      labelText: 'Image name', border: OutlineInputBorder(), isDense: true),
+                ),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  dense: true,
+                  value: remember,
+                  onChanged: uploading ? null : (v) => setSt(() => remember = v ?? false),
+                  title: const Text('Remember my choice', style: TextStyle(fontSize: 13)),
+                ),
+                if (error != null) ...[
+                  const SizedBox(height: 4),
+                  Text(error!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+                ],
+                if (uploading) ...[
+                  const SizedBox(height: 12),
+                  const LinearProgressIndicator(),
+                ],
+              ],
+            ),
+          ),
+          actions: uploading
+              ? null
+              : [
+                  TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                  FilledButton(
+                    onPressed: () async {
+                      final usingNewDir = showNewDirField && newDirCtrl.text.trim().isNotEmpty;
+                      final dirName = usingNewDir ? newDirCtrl.text.trim() : (selectedDir ?? '');
+                      if (dirName.isEmpty) {
+                        setSt(() => error = 'Select or create a directory');
+                        return;
+                      }
+                      final finalName =
+                          nameCtrl.text.trim().isEmpty ? filename : nameCtrl.text.trim();
+                      setSt(() {
+                        uploading = true;
+                        error = null;
+                      });
+                      try {
+                        if (usingNewDir) {
+                          try {
+                            await api.createDirectory(apiScope, dirName, token);
+                          } catch (_) { /* already exists — ignore */ }
+                        }
+                        final asset = await api.uploadAsset(apiScope, dirName, bytes, finalName,
+                            mimeForFilename(finalName), token);
+                        final base = resourceBaseFor(orgSlug, branchName);
+                        await _setRememberedDir(entityType, remember ? dirName : null);
+                        if (ctx.mounted) {
+                          Navigator.pop(
+                              ctx,
+                              PickedResource(
+                                  resourceId: asset.resourceId,
+                                  publicUrl: asset.publicUrl(base, dirName)));
+                        }
+                      } catch (e) {
+                        setSt(() {
+                          uploading = false;
+                          error = e.toString();
+                        });
+                      }
+                    },
+                    child: const Text('Save'),
+                  ),
+                ],
+        ),
+      ),
+    ),
+  );
+  nameCtrl.dispose();
+  newDirCtrl.dispose();
+  return result;
 }
 
 enum _ImgSource { camera, gallery, files }
@@ -198,16 +436,16 @@ Future<(Uint8List, String)?> _pickFromCamera() async {
 
 Future<PickedResource?> showResourcePickerModal(
     BuildContext context, {
-    required String storeSlug,
+    required String orgSlug,
     required String token,
-    String? orgSlug,
+    String? branchName, // null = organization-level (global) scope
     bool imagesOnly = false,
   }) {
   return showDialog<PickedResource>(
     context: context,
     builder: (_) => ResourcePickerModal(
-      storeSlug: storeSlug,
       orgSlug: orgSlug,
+      branchName: branchName,
       token: token,
       imagesOnly: imagesOnly,
     ),
@@ -215,15 +453,15 @@ Future<PickedResource?> showResourcePickerModal(
 }
 
 class ResourcePickerModal extends StatefulWidget {
-  final String storeSlug;
-  final String? orgSlug;
+  final String orgSlug;
+  final String? branchName; // null = organization-level (global) scope
   final String token;
   final bool imagesOnly;
 
   const ResourcePickerModal({
     super.key,
-    required this.storeSlug,
-    this.orgSlug,
+    required this.orgSlug,
+    this.branchName,
     required this.token,
     this.imagesOnly = false,
   });
@@ -242,6 +480,8 @@ class _ResourcePickerModalState extends State<ResourcePickerModal> {
 
   final _api = ApiClient();
 
+  String get _apiScope => apiScopeFor(widget.orgSlug, widget.branchName);
+
   @override
   void initState() {
     super.initState();
@@ -250,10 +490,18 @@ class _ResourcePickerModalState extends State<ResourcePickerModal> {
 
   Future<void> _loadDirs() async {
     try {
-      final dirs = await _api.getDirectories(widget.storeSlug, widget.token);
+      final dirs = await _api.getDirectories(_apiScope, widget.token);
       if (!mounted) return;
       setState(() { _dirs = dirs; _loadingDirs = false; });
-      if (dirs.isNotEmpty) _selectDir(dirs.first);
+      if (dirs.isEmpty) return;
+      // Land back on whatever directory was last browsed in this scope —
+      // shares state with the standalone Files Manager screen (same key),
+      // instead of always resetting to the first directory.
+      final lastName = await _getLastBrowsedDir(_apiScope);
+      if (!mounted) return;
+      final match = lastName == null ? const <ResourceDirectory>[]
+          : dirs.where((d) => d.name == lastName).toList();
+      await _selectDir(match.isNotEmpty ? match.first : dirs.first);
     } catch (e) {
       if (!mounted) return;
       setState(() { _error = e.toString(); _loadingDirs = false; });
@@ -262,8 +510,9 @@ class _ResourcePickerModalState extends State<ResourcePickerModal> {
 
   Future<void> _selectDir(ResourceDirectory dir) async {
     setState(() { _selectedDir = dir; _assets = null; _loadingAssets = true; });
+    _setLastBrowsedDir(_apiScope, dir.name);
     try {
-      final assets = await _api.getAssets(widget.storeSlug, dir.name, widget.token);
+      final assets = await _api.getAssets(_apiScope, dir.name, widget.token);
       if (!mounted) return;
       setState(() { _assets = assets; _loadingAssets = false; });
     } catch (e) {
@@ -273,7 +522,7 @@ class _ResourcePickerModalState extends State<ResourcePickerModal> {
   }
 
   void _pick(ResourceAsset asset) {
-    final base = _resourceBase(widget.orgSlug, widget.storeSlug);
+    final base = resourceBaseFor(widget.orgSlug, widget.branchName);
     Navigator.of(context).pop(PickedResource(
       resourceId: asset.resourceId,
       publicUrl: asset.publicUrl(base, _selectedDir!.name),
@@ -342,7 +591,7 @@ class _ResourcePickerModalState extends State<ResourcePickerModal> {
                           final name = nameCtrl.text.trim().isEmpty
                               ? pf.name : nameCtrl.text.trim();
                           await _api.uploadAsset(
-                              widget.storeSlug, dir.name,
+                              _apiScope, dir.name,
                               Uint8List.fromList(bytes), name,
                               mimeForFilename(name), widget.token);
                           if (ctx.mounted) Navigator.pop(ctx, true);

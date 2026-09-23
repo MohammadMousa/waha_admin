@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
+import '../utils/chart_ticks.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/waha_date_picker.dart';
 
@@ -951,10 +952,11 @@ class _SeriesChart extends StatelessWidget {
       final v = (e['value'] as num?)?.toDouble() ?? 0;
       return v > a ? v : a;
     });
-    final maxY = maxV > 0 ? maxV * 1.3 : 10.0;
+    final ticks = niceAxisTicks(maxV);
+    final maxY = ticks.maxY;
     final useK = maxV >= 1000;
 
-    final interval =
+    final bottomInterval =
         (data.length / 6).ceilToDouble().clamp(1.0, double.infinity);
 
     final titles = FlTitlesData(
@@ -962,6 +964,7 @@ class _SeriesChart extends StatelessWidget {
         sideTitles: SideTitles(
           showTitles: true,
           reservedSize: 52,
+          interval: ticks.step,
           getTitlesWidget: (v, _) {
             // Consistent format: always k if max >= 1000, always int otherwise
             final label = useK
@@ -976,7 +979,7 @@ class _SeriesChart extends StatelessWidget {
         sideTitles: SideTitles(
           showTitles: true,
           reservedSize: 32,
-          interval: interval,
+          interval: bottomInterval,
           getTitlesWidget: (v, _) {
             final i = v.toInt();
             if (i < 0 || i >= data.length) return const SizedBox.shrink();
@@ -995,6 +998,7 @@ class _SeriesChart extends StatelessWidget {
 
     final gridData = FlGridData(
       drawVerticalLine: false,
+      horizontalInterval: ticks.step,
       getDrawingHorizontalLine: (_) =>
           FlLine(color: Colors.grey.withValues(alpha: 0.12), strokeWidth: 1),
     );
@@ -1027,7 +1031,12 @@ class _SeriesChart extends StatelessWidget {
     }).toList();
 
     return LineChart(LineChartData(
+      minY: 0,
       maxY: maxY,
+      // Spline smoothing can overshoot past 0 on a sharp spike-then-drop;
+      // clip to bounds and cap curve overshoot so this non-negative metric
+      // never visually dips below the axis (human lead, 2026-09-22).
+      clipData: const FlClipData.all(),
       titlesData: titles,
       gridData: gridData,
       borderData: borderData,
@@ -1035,6 +1044,8 @@ class _SeriesChart extends StatelessWidget {
         LineChartBarData(
           spots: spots,
           isCurved: true,
+          curveSmoothness: 0.15,
+          preventCurveOverShooting: true,
           color: const Color(0xFF7C7CED),
           barWidth: 2,
           dotData: FlDotData(show: data.length <= 12),

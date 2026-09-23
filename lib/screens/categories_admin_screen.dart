@@ -18,13 +18,17 @@ class CategoriesAdminScreen extends StatefulWidget {
 }
 
 class _CategoriesAdminScreenState extends State<CategoriesAdminScreen> {
-  // Root store slug used for the resource picker; adjust if your root differs.
-  static const _kRootStoreId   = 1;
-  static const _kRootStoreSlug = 'waha';
+  // Root store id categories are always scoped to.
+  static const _kRootStoreId = 1;
 
   List<Category>? _categories;
+  List<Store>? _stores;
   bool _loading = true;
   String? _error;
+
+  // Org-wide asset bucket for the image picker — real org slug, same
+  // mechanism landing pages use for global (no-branch) resource scope.
+  String? get _orgSlug => _stores?.firstOrNull?.orgSlug;
 
   @override
   void initState() {
@@ -37,9 +41,14 @@ class _CategoriesAdminScreenState extends State<CategoriesAdminScreen> {
     final token = context.read<AuthState>().token;
     if (token == null) { _logout(); return; }
     try {
-      final cats = await ApiClient().getCategories(
-          storeId: _kRootStoreId, token: token);
-      if (mounted) setState(() { _categories = cats; _loading = false; });
+      final results = await Future.wait([
+        ApiClient().getCategories(storeId: _kRootStoreId, token: token),
+        ApiClient().getAdminStores(token).catchError((_) => <Store>[]),
+      ]);
+      if (!mounted) return;
+      final cats = results[0] as List<Category>;
+      final stores = results[1] as List<Store>;
+      setState(() { _categories = cats; _stores = stores; _loading = false; });
     } on ApiException catch (e) {
       if (e.statusCode == 401) { _logout(); return; }
       if (mounted) setState(() { _error = e.message; _loading = false; });
@@ -52,24 +61,32 @@ class _CategoriesAdminScreenState extends State<CategoriesAdminScreen> {
   }
 
   void _openEdit(Category cat) {
+    final orgSlug = _orgSlug;
+    if (orgSlug == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No organization found for this account')),
+      );
+      return;
+    }
     Navigator.of(context)
         .pushNamed(Routes.categoryEdit, arguments: {
-          'store': const Store(
-            id: _kRootStoreId,
-            name: _kRootStoreSlug,
-          ),
+          'storeSlug': orgSlug,
           'category': cat,
         })
         .then((_) => _load());
   }
 
   void _openCreate() {
+    final orgSlug = _orgSlug;
+    if (orgSlug == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No organization found for this account')),
+      );
+      return;
+    }
     Navigator.of(context)
         .pushNamed(Routes.categoryEdit, arguments: {
-          'store': const Store(
-            id: _kRootStoreId,
-            name: _kRootStoreSlug,
-          ),
+          'storeSlug': orgSlug,
           'category': Category(id: -1, name: {}),
         })
         .then((_) => _load());

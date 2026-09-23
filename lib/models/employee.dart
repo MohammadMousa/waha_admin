@@ -17,6 +17,9 @@ class Employee {
   final int? storeId;
   final String? storeName;
   final List<int> branchIds;
+  final DateTime? lockedUntil;
+
+  bool get isLocked => lockedUntil != null && lockedUntil!.isAfter(DateTime.now().toUtc());
 
   const Employee({
     required this.id,
@@ -37,6 +40,7 @@ class Employee {
     this.storeId,
     this.storeName,
     this.branchIds = const [],
+    this.lockedUntil,
   });
 
   factory Employee.fromJson(Map<String, dynamic> j) => Employee(
@@ -61,6 +65,9 @@ class Employee {
                 ?.map((b) => ((b as Map<String, dynamic>)['id'] as num).toInt())
                 .toList() ??
             const [],
+        lockedUntil: j['lockedUntil'] == null
+            ? null
+            : DateTime.tryParse(j['lockedUntil'] as String),
       );
 
   String get displayName {

@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../config/app_config.dart';
@@ -12,6 +13,7 @@ import '../models/store.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
+import '../utils/resource_scope.dart';
 import '../widgets/admin_sidebar.dart';
 import 'package:provider/provider.dart';
 
@@ -19,8 +21,9 @@ enum _AssetLayout { list, listThumb, grid }
 enum _PreviewLayout { fullscreen, fitHeight, fitWidth }
 
 class ResourceExplorerScreen extends StatefulWidget {
-  final Store store;
-  const ResourceExplorerScreen({super.key, required this.store});
+  /// null = organization-level (global) scope.
+  final Store? store;
+  const ResourceExplorerScreen({super.key, this.store});
 
   @override
   State<ResourceExplorerScreen> createState() => _ResourceExplorerScreenState();
@@ -37,32 +40,98 @@ class _ResourceExplorerScreenState extends State<ResourceExplorerScreen> {
   final Map<int, _AssetLayout> _layoutPrefs = {};
   _AssetLayout get _layout => _layoutPrefs[_selectedDir?.id] ?? _AssetLayout.list;
 
-  String get _storeSlug => widget.store.name;
-  String get _resourceBase => widget.store.resourceBase;
+  // Last directory + scroll position, per scope — so reopening Files Manager
+  // lands back where the user left it instead of resetting every time
+  // (human lead, 2026-09-17).
+  final ScrollController _scrollController = ScrollController();
+
+  // Only needed when widget.store == null (global scope) — a real store
+  // already carries its own orgSlug.
+  String? _fetchedOrgSlug;
+  String get _orgSlug => widget.store?.orgSlug ?? _fetchedOrgSlug ?? '';
+
+  String get _storeSlug => apiScopeFor(_orgSlug, widget.store?.name);
+  String get _resourceBase => resourceBaseFor(_orgSlug, widget.store?.name);
 
   @override
   void initState() {
     super.initState();
-    _loadDirs();
+    if (widget.store == null) {
+      _loadOrgSlugThenDirs();
+    } else {
+      _loadDirs();
+    }
+  }
+
+  @override
+  void dispose() {
+    _saveScrollOffset();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   String get _token => context.read<AuthState>().token ?? '';
+
+  Future<String?> _getLastDir() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('filesManager.lastDir.$_storeSlug');
+  }
+
+  Future<void> _setLastDir(String dirName) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('filesManager.lastDir.$_storeSlug', dirName);
+  }
+
+  String _scrollKey(int dirId) => 'filesManager.scrollOffset.$_storeSlug.$dirId.${_layout.name}';
+
+  void _saveScrollOffset() {
+    final dir = _selectedDir;
+    if (dir == null || !_scrollController.hasClients) return;
+    SharedPreferences.getInstance()
+        .then((p) => p.setDouble(_scrollKey(dir.id), _scrollController.offset));
+  }
+
+  Future<void> _restoreScrollOffset(int dirId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final offset = prefs.getDouble(_scrollKey(dirId));
+    if (offset == null || offset <= 0) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController
+            .jumpTo(offset.clamp(0, _scrollController.position.maxScrollExtent));
+      }
+    });
+  }
+
+  Future<void> _loadOrgSlugThenDirs() async {
+    try {
+      final stores = await ApiClient().getAdminStores(_token);
+      _fetchedOrgSlug = stores.firstOrNull?.orgSlug;
+    } catch (_) { /* falls through to _loadDirs, which will surface the error */ }
+    if (mounted) await _loadDirs();
+  }
 
   Future<void> _loadDirs() async {
     setState(() { _loadingDirs = true; _error = null; });
     try {
       final dirs = await ApiClient().getDirectories(_storeSlug, _token);
-      if (mounted) {
-        setState(() { _dirs = dirs; _loadingDirs = false; });
-        if (_selectedDir != null) {
-          final still = dirs.where((d) => d.id == _selectedDir!.id);
-          if (still.isNotEmpty) {
-            _selectedDir = still.first;
-          } else {
-            _selectedDir = null;
-            _assets = [];
-          }
+      if (!mounted) return;
+      setState(() { _dirs = dirs; _loadingDirs = false; });
+      if (_selectedDir != null) {
+        final still = dirs.where((d) => d.id == _selectedDir!.id);
+        if (still.isNotEmpty) {
+          _selectedDir = still.first;
+        } else {
+          _selectedDir = null;
+          _assets = [];
         }
+      } else {
+        // First load — jump straight back to wherever the user left off,
+        // instead of leaving nothing selected.
+        final lastDirName = await _getLastDir();
+        if (!mounted || lastDirName == null) return;
+        final match = dirs.where((d) => d.name == lastDirName);
+        if (match.isNotEmpty) await _selectDir(match.first);
       }
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loadingDirs = false; });
@@ -70,10 +139,14 @@ class _ResourceExplorerScreenState extends State<ResourceExplorerScreen> {
   }
 
   Future<void> _selectDir(ResourceDirectory dir) async {
+    _saveScrollOffset();
     setState(() { _selectedDir = dir; _loadingAssets = true; _assets = []; });
+    _setLastDir(dir.name);
     try {
       final assets = await ApiClient().getAssets(_storeSlug, dir.name, _token);
-      if (mounted) setState(() { _assets = assets; _loadingAssets = false; });
+      if (!mounted) return;
+      setState(() { _assets = assets; _loadingAssets = false; });
+      await _restoreScrollOffset(dir.id);
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loadingAssets = false; });
     }
@@ -275,7 +348,7 @@ class _ResourceExplorerScreenState extends State<ResourceExplorerScreen> {
   }
 
   // Determine which sidebar route to highlight
-  String get _currentRoute => widget.store.id == 1
+  String get _currentRoute => widget.store == null
       ? Routes.resourceExplorerGlobal
       : Routes.resourceExplorer;
 
@@ -301,6 +374,7 @@ class _ResourceExplorerScreenState extends State<ResourceExplorerScreen> {
               onDelete: _delete, onCopyUrl: _copyUrl, onMove: _move, onRename: _rename,
               onPreviewKiosk: _previewKiosk, onDuplicate: _duplicateAsset,
               resourceBase: _resourceBase, layout: _layout, onLayoutChange: _setLayout,
+              scrollController: _scrollController, onScrollEnd: _saveScrollOffset,
             )),
           ]);
 
@@ -330,7 +404,7 @@ class _ResourceExplorerScreenState extends State<ResourceExplorerScreen> {
                                     .textTheme
                                     .headlineSmall
                                     ?.copyWith(fontWeight: FontWeight.w700)),
-                            Text(widget.store.label(),
+                            Text(widget.store?.label() ?? 'Global',
                                 style: TextStyle(fontSize: 13, color: scheme.outline)),
                           ],
                         ),
@@ -425,6 +499,8 @@ class _AssetPanel extends StatelessWidget {
   final String resourceBase;
   final _AssetLayout layout;
   final ValueChanged<_AssetLayout> onLayoutChange;
+  final ScrollController scrollController;
+  final VoidCallback onScrollEnd;
 
   const _AssetPanel({
     required this.dir, required this.assets, required this.loading,
@@ -432,6 +508,7 @@ class _AssetPanel extends StatelessWidget {
     required this.onDelete, required this.onCopyUrl, required this.onMove,
     required this.onRename, required this.onPreviewKiosk, required this.onDuplicate,
     required this.resourceBase, required this.layout, required this.onLayoutChange,
+    required this.scrollController, required this.onScrollEnd,
   });
 
   @override
@@ -478,17 +555,24 @@ class _AssetPanel extends StatelessWidget {
               : assets.isEmpty
                   ? Center(child: Text('No files in ${dir!.name}',
                       style: TextStyle(color: scheme.outline)))
-                  : switch (layout) {
-                      _AssetLayout.list      => _buildList(context),
-                      _AssetLayout.listThumb => _buildListThumb(context),
-                      _AssetLayout.grid      => _buildGrid(context),
-                    },
+                  : NotificationListener<ScrollEndNotification>(
+                      onNotification: (_) {
+                        onScrollEnd();
+                        return false;
+                      },
+                      child: switch (layout) {
+                        _AssetLayout.list      => _buildList(context),
+                        _AssetLayout.listThumb => _buildListThumb(context),
+                        _AssetLayout.grid      => _buildGrid(context),
+                      },
+                    ),
         ),
       ],
     );
   }
 
   Widget _buildList(BuildContext context) => ListView.builder(
+    controller: scrollController,
     itemCount: assets.length,
     itemBuilder: (_, i) => _AssetRow(
       asset: assets[i], dir: dir!, resourceBase: resourceBase, showThumb: false,
@@ -502,6 +586,7 @@ class _AssetPanel extends StatelessWidget {
   );
 
   Widget _buildListThumb(BuildContext context) => ListView.builder(
+    controller: scrollController,
     itemCount: assets.length,
     itemBuilder: (_, i) => _AssetRow(
       asset: assets[i], dir: dir!, resourceBase: resourceBase, showThumb: true,
@@ -515,6 +600,7 @@ class _AssetPanel extends StatelessWidget {
   );
 
   Widget _buildGrid(BuildContext context) => GridView.builder(
+    controller: scrollController,
     padding: const EdgeInsets.all(12),
     gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
       maxCrossAxisExtent: 160,

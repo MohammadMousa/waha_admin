@@ -1,6 +1,8 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
+import '../utils/chart_ticks.dart';
+
 class RevenueChart extends StatelessWidget {
   final List<Map<String, dynamic>> series;
   const RevenueChart({super.key, required this.series});
@@ -15,10 +17,17 @@ class RevenueChart extends StatelessWidget {
       return FlSpot(e.key.toDouble(), v);
     }).toList();
 
-    final maxY = spots.map((s) => s.y).fold(0.0, (a, b) => a > b ? a : b);
+    final rawMaxY = spots.map((s) => s.y).fold(0.0, (a, b) => a > b ? a : b);
+    final ticks = niceAxisTicks(rawMaxY);
 
     return LineChart(
       LineChartData(
+        minY: 0,
+        maxY: ticks.maxY,
+        // See orders_chart.dart — spline smoothing can overshoot past 0 on a
+        // sharp spike-then-drop; clip to bounds and cap curve overshoot so
+        // this non-negative metric never visually dips below the axis.
+        clipData: const FlClipData.all(),
         lineTouchData: LineTouchData(
           touchTooltipData: LineTouchTooltipData(
             getTooltipColor: (_) => const Color(0xFF2D3748),
@@ -31,7 +40,7 @@ class RevenueChart extends StatelessWidget {
         gridData: FlGridData(
           show: true,
           drawVerticalLine: false,
-          horizontalInterval: maxY > 0 ? maxY / 4 : 1,
+          horizontalInterval: ticks.step,
           getDrawingHorizontalLine: (v) => FlLine(
             color: Colors.grey.withValues(alpha: 0.15),
             strokeWidth: 1,
@@ -42,6 +51,7 @@ class RevenueChart extends StatelessWidget {
             sideTitles: SideTitles(
               showTitles: true,
               reservedSize: 52,
+              interval: ticks.step,
               getTitlesWidget: (v, _) => Text(
                 v >= 1000 ? '${(v / 1000).toStringAsFixed(1)}k' : v.toStringAsFixed(0),
                 style: const TextStyle(fontSize: 10, color: Colors.grey),
@@ -73,6 +83,8 @@ class RevenueChart extends StatelessWidget {
           LineChartBarData(
             spots: spots,
             isCurved: true,
+            curveSmoothness: 0.15,
+            preventCurveOverShooting: true,
             color: Colors.green,
             barWidth: 2.5,
             dotData: const FlDotData(show: false),

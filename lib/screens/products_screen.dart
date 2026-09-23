@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/category.dart';
+import '../models/store.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
@@ -13,8 +14,6 @@ import '../widgets/waha_filter_controls.dart';
 
 // Global parent store id — products are always scoped to this.
 const _kRootStoreId = 1;
-// Slug used for the resource picker (image upload).
-const _kRootStoreSlug = 'waha';
 
 class ProductsScreen extends StatefulWidget {
   const ProductsScreen({super.key});
@@ -35,6 +34,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
   bool _loading = true;
   bool _loadingProducts = false;
   String? _error;
+
+  List<Store>? _stores;
+  // Org-wide asset bucket for the image picker — real org slug, same
+  // mechanism landing pages use for global (no-branch) resource scope.
+  String? get _orgSlug => _stores?.firstOrNull?.orgSlug;
 
   final _searchCtrl = TextEditingController();
   Timer? _searchTimer;
@@ -72,14 +76,17 @@ class _ProductsScreenState extends State<ProductsScreen> {
           size: 24,
           token: token,
         ),
+        ApiClient().getAdminStores(token).catchError((_) => <Store>[]),
       ]);
       if (!mounted) return;
       final cats = results[0] as List<Category>;
       final data  = results[1] as Map<String, dynamic>;
+      final stores = results[2] as List<Store>;
       setState(() {
         _categories = cats;
         _products   = (data['products'] as List? ?? []).cast<Map<String, dynamic>>();
         _hasMore    = data['hasMore'] == true;
+        _stores     = stores;
         _loading    = false;
       });
     } on ApiException catch (e) {
@@ -140,19 +147,33 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 
   void _openCreate() {
+    final orgSlug = _orgSlug;
+    if (orgSlug == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No organization found for this account')),
+      );
+      return;
+    }
     Navigator.of(context)
         .pushNamed(Routes.productEdit, arguments: {
           'productId': null,
-          'storeSlug': _kRootStoreSlug,
+          'storeSlug': orgSlug,
         })
         .then((_) => _loadPage(_page));
   }
 
   void _openEdit(Map<String, dynamic> p) {
+    final orgSlug = _orgSlug;
+    if (orgSlug == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No organization found for this account')),
+      );
+      return;
+    }
     Navigator.of(context)
         .pushNamed(Routes.productEdit, arguments: {
           'productId': p['id'] as int,
-          'storeSlug': _kRootStoreSlug,
+          'storeSlug': orgSlug,
         })
         .then((_) => _loadPage(_page));
   }

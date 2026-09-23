@@ -1,6 +1,8 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
+import '../utils/chart_ticks.dart';
+
 class OrdersChart extends StatelessWidget {
   final List<Map<String, dynamic>> series;
   const OrdersChart({super.key, required this.series});
@@ -15,10 +17,19 @@ class OrdersChart extends StatelessWidget {
       return FlSpot(e.key.toDouble(), v);
     }).toList();
 
-    final maxY = spots.map((s) => s.y).fold(0.0, (a, b) => a > b ? a : b);
+    final rawMaxY = spots.map((s) => s.y).fold(0.0, (a, b) => a > b ? a : b);
+    final ticks = niceAxisTicks(rawMaxY);
 
     return LineChart(
       LineChartData(
+        minY: 0,
+        maxY: ticks.maxY,
+        // The default Catmull-Rom smoothing can overshoot past 0 on a sharp
+        // spike-then-drop (e.g. one big order day next to near-zero days) —
+        // clip drawing to the chart bounds and cap the curve's own overshoot
+        // so a non-negative metric never visually dips below the axis
+        // (human lead, 2026-09-22).
+        clipData: const FlClipData.all(),
         lineTouchData: LineTouchData(
           touchTooltipData: LineTouchTooltipData(
             getTooltipColor: (_) => scheme.inverseSurface,
@@ -31,7 +42,7 @@ class OrdersChart extends StatelessWidget {
         gridData: FlGridData(
           show: true,
           drawVerticalLine: false,
-          horizontalInterval: maxY > 0 ? maxY / 4 : 1,
+          horizontalInterval: ticks.step,
           getDrawingHorizontalLine: (v) => FlLine(
             color: Colors.grey.withValues(alpha: 0.15),
             strokeWidth: 1,
@@ -42,6 +53,7 @@ class OrdersChart extends StatelessWidget {
             sideTitles: SideTitles(
               showTitles: true,
               reservedSize: 40,
+              interval: ticks.step,
               getTitlesWidget: (v, _) => Text(
                 v.toStringAsFixed(0),
                 style: const TextStyle(fontSize: 10, color: Colors.grey),
@@ -73,6 +85,8 @@ class OrdersChart extends StatelessWidget {
           LineChartBarData(
             spots: spots,
             isCurved: true,
+            curveSmoothness: 0.15,
+            preventCurveOverShooting: true,
             color: scheme.primary,
             barWidth: 2.5,
             dotData: const FlDotData(show: false),

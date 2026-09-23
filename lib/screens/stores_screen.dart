@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../config/app_config.dart';
 import '../models/store.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
@@ -95,14 +96,17 @@ class _StoresScreenState extends State<StoresScreen> {
                                   return Card(
                                     margin: const EdgeInsets.only(bottom: 10),
                                     child: ListTile(
-                                      leading: CircleAvatar(
-                                        backgroundColor: scheme.primaryContainer,
-                                        child: Text(
-                                          s.name.isNotEmpty ? s.name[0].toUpperCase() : '?',
-                                          style: TextStyle(color: scheme.onPrimaryContainer,
-                                              fontWeight: FontWeight.w700),
-                                        ),
-                                      ),
+                                      leading: s.imageResourceId != null
+                                          ? ClipOval(
+                                              child: Image.network(
+                                                '${AppConfig.apiBaseUrl}/api/resources/${s.imageResourceId}',
+                                                width: 40,
+                                                height: 40,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, __, ___) => _StoreAvatarIcon(scheme: scheme),
+                                              ),
+                                            )
+                                          : _StoreAvatarIcon(scheme: scheme),
                                       title: Text(s.label(), style: const TextStyle(fontWeight: FontWeight.w600)),
                                       subtitle: Text(s.name,
                                           style: TextStyle(fontSize: 12, color: scheme.outline)),
@@ -152,6 +156,17 @@ class _StoresScreenState extends State<StoresScreen> {
       ),
     );
   }
+}
+
+class _StoreAvatarIcon extends StatelessWidget {
+  final ColorScheme scheme;
+  const _StoreAvatarIcon({required this.scheme});
+
+  @override
+  Widget build(BuildContext context) => CircleAvatar(
+        backgroundColor: scheme.primaryContainer,
+        child: Icon(Icons.storefront_outlined, color: scheme.onPrimaryContainer),
+      );
 }
 
 class _StoreActionBtn extends StatelessWidget {

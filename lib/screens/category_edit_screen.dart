@@ -46,7 +46,7 @@ class _CategoryEditScreenState extends State<CategoryEditScreen> {
     final token = context.read<AuthState>().token;
     if (token == null) return;
     final result = await showImageSourcePicker(context,
-        storeSlug: widget.storeSlug, token: token);
+        orgSlug: widget.storeSlug, token: token, entityType: 'category');
     if (result == null || !mounted) return;
     setState(() {
       _imageResourceId = result.resourceId;

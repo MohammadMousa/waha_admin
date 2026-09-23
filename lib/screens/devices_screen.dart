@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../models/device.dart';
@@ -6,6 +7,7 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
+import '../widgets/reset_pin_dialog.dart';
 
 class DevicesScreen extends StatefulWidget {
   const DevicesScreen({super.key});
@@ -49,6 +51,19 @@ class _DevicesScreenState extends State<DevicesScreen> {
     if (token == null) return;
     try {
       await ApiClient().patchDevice(d.id, {'enabled': !d.enabled}, token: token);
+      _load();
+    } on ApiException catch (err) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err.message)));
+    }
+  }
+
+  Future<void> _resetPin(Device d) async {
+    final token = context.read<AuthState>().token;
+    if (token == null) return;
+    final newPin = await showResetPinDialog(context, name: d.displayName);
+    if (newPin == null || !mounted) return;
+    try {
+      await ApiClient().patchDevice(d.id, {'pinCode': newPin}, token: token);
       _load();
     } on ApiException catch (err) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err.message)));
@@ -136,6 +151,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
                                           .pushNamed(Routes.deviceEdit, arguments: _devices![i])
                                           .then((_) => _load()),
                                       onToggle: () => _toggleEnabled(_devices![i]),
+                                      onResetPin: () => _resetPin(_devices![i]),
                                       onDelete: () => _delete(_devices![i]),
                                     ),
                                   ),
@@ -154,12 +170,14 @@ class _DeviceCard extends StatelessWidget {
   final Device device;
   final VoidCallback onEdit;
   final VoidCallback onToggle;
+  final VoidCallback onResetPin;
   final VoidCallback onDelete;
 
   const _DeviceCard({
     required this.device,
     required this.onEdit,
     required this.onToggle,
+    required this.onResetPin,
     required this.onDelete,
   });
 
@@ -191,6 +209,12 @@ class _DeviceCard extends StatelessWidget {
                       const SizedBox(width: 6),
                       _Badge('Disabled', Colors.grey),
                     ],
+                    if (d.isLocked) ...[
+                      const SizedBox(width: 6),
+                      _Badge(
+                          'Locked until ${DateFormat('h:mm a').format(d.lockedUntil!.toLocal())}',
+                          Colors.red),
+                    ],
                   ]),
                   if (d.displayName != d.username) ...[
                     const SizedBox(height: 2),
@@ -211,11 +235,13 @@ class _DeviceCard extends StatelessWidget {
               onSelected: (v) {
                 if (v == 'edit') onEdit();
                 if (v == 'toggle') onToggle();
+                if (v == 'resetPin') onResetPin();
                 if (v == 'delete') onDelete();
               },
               itemBuilder: (_) => [
                 const PopupMenuItem(value: 'edit', child: Text('Edit')),
                 PopupMenuItem(value: 'toggle', child: Text(d.enabled ? 'Disable' : 'Enable')),
+                const PopupMenuItem(value: 'resetPin', child: Text('Reset PIN')),
                 const PopupMenuItem(value: 'delete',
                     child: Text('Delete', style: TextStyle(color: Colors.red))),
               ],

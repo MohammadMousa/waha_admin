@@ -60,6 +60,17 @@ class ApiClient {
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
 
+  Future<void> changeOwnPassword(
+      String currentPassword, String newPassword, {required String token}) async {
+    final resp = await _http.patch(
+      _uri('/api/auth/me/password'),
+      headers: _headers(token: token),
+      body: jsonEncode({'currentPassword': currentPassword, 'newPassword': newPassword}),
+    );
+    if (resp.statusCode == 200) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
   // ── Dashboard ─────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> getDashboardKpis(String token, {int? storeId}) async {
@@ -431,6 +442,31 @@ class ApiClient {
   Future<void> addProductGalleryImage(int productId, int resourceId, {required String token}) async {
     final resp = await _http.post(_uri('/api/products/$productId/images'),
         headers: _headers(token: token), body: jsonEncode({'resourceId': resourceId}));
+    if (resp.statusCode == 200) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<List<Map<String, dynamic>>> getProductBarcodes(int productId, {required String token}) async {
+    final resp = await _http.get(_uri('/api/products/$productId/barcodes'),
+        headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      return (jsonDecode(utf8.decode(resp.bodyBytes)) as List)
+          .cast<Map<String, dynamic>>();
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<void> addProductBarcode(int productId, String barcode, {required String token}) async {
+    final resp = await _http.post(_uri('/api/products/$productId/barcodes'),
+        headers: _headers(token: token), body: jsonEncode({'barcode': barcode}));
+    if (resp.statusCode == 200) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<void> removeProductBarcode(int productId, String barcode, {required String token}) async {
+    final resp = await _http.delete(
+        _uri('/api/products/$productId/barcodes/${Uri.encodeComponent(barcode)}'),
+        headers: _headers(token: token));
     if (resp.statusCode == 200) return;
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }

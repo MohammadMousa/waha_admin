@@ -92,7 +92,7 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
     if (token == null) return;
     final storeSlug = widget.store?.name ?? 'root';
     final result = await showImageSourcePicker(context,
-        storeSlug: storeSlug, token: token);
+        orgSlug: storeSlug, token: token, entityType: 'store');
     if (result == null || !mounted) return;
     setState(() => _imageResourceId = result.resourceId);
   }

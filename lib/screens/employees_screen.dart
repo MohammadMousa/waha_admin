@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../models/employee.dart';
@@ -6,6 +7,7 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
+import '../widgets/reset_pin_dialog.dart';
 
 class EmployeesScreen extends StatefulWidget {
   const EmployeesScreen({super.key});
@@ -49,6 +51,19 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     if (token == null) return;
     try {
       await ApiClient().patchEmployee(e.id, {'enabled': !e.enabled}, token: token);
+      _load();
+    } on ApiException catch (err) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err.message)));
+    }
+  }
+
+  Future<void> _resetPin(Employee e) async {
+    final token = context.read<AuthState>().token;
+    if (token == null) return;
+    final newPin = await showResetPinDialog(context, name: e.displayName);
+    if (newPin == null || !mounted) return;
+    try {
+      await ApiClient().patchEmployee(e.id, {'pinCode': newPin}, token: token);
       _load();
     } on ApiException catch (err) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err.message)));
@@ -136,6 +151,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                                           .pushNamed(Routes.employeeEdit, arguments: _employees![i])
                                           .then((_) => _load()),
                                       onToggle: () => _toggleEnabled(_employees![i]),
+                                      onResetPin: () => _resetPin(_employees![i]),
                                       onDelete: () => _delete(_employees![i]),
                                     ),
                                   ),
@@ -154,12 +170,14 @@ class _EmployeeCard extends StatelessWidget {
   final Employee employee;
   final VoidCallback onEdit;
   final VoidCallback onToggle;
+  final VoidCallback onResetPin;
   final VoidCallback onDelete;
 
   const _EmployeeCard({
     required this.employee,
     required this.onEdit,
     required this.onToggle,
+    required this.onResetPin,
     required this.onDelete,
   });
 
@@ -190,6 +208,12 @@ class _EmployeeCard extends StatelessWidget {
                       const SizedBox(width: 6),
                       _Badge('Disabled', Colors.grey),
                     ],
+                    if (e.isLocked) ...[
+                      const SizedBox(width: 6),
+                      _Badge(
+                          'Locked until ${DateFormat('h:mm a').format(e.lockedUntil!.toLocal())}',
+                          Colors.red),
+                    ],
                   ]),
                   if (e.displayName != e.username) ...[
                     const SizedBox(height: 2),
@@ -213,11 +237,13 @@ class _EmployeeCard extends StatelessWidget {
               onSelected: (v) {
                 if (v == 'edit') onEdit();
                 if (v == 'toggle') onToggle();
+                if (v == 'resetPin') onResetPin();
                 if (v == 'delete') onDelete();
               },
               itemBuilder: (_) => [
                 const PopupMenuItem(value: 'edit', child: Text('Edit')),
                 PopupMenuItem(value: 'toggle', child: Text(e.enabled ? 'Disable' : 'Enable')),
+                const PopupMenuItem(value: 'resetPin', child: Text('Reset PIN')),
                 const PopupMenuItem(value: 'delete',
                     child: Text('Delete', style: TextStyle(color: Colors.red))),
               ],

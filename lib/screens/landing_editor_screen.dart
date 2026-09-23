@@ -10,16 +10,20 @@ import '../models/store.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
+import '../utils/resource_scope.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/resource_picker_modal.dart';
 
 class LandingEditorScreen extends StatefulWidget {
-  final Store store;
+  /// null = organization-level (global) scope.
+  final Store? store;
+  final String orgSlug;
   /// Which landing page to edit (e.g. 'KIOSK_LANDING', 'SHOPPING_LANDING').
   final String pageKey;
   const LandingEditorScreen({
     super.key,
     required this.store,
+    required this.orgSlug,
     this.pageKey = 'KIOSK_LANDING',
   });
 
@@ -40,8 +44,8 @@ class _LandingEditorScreenState extends State<LandingEditorScreen> {
 
   static const _pagesDir = 'pages';
 
-  String get _storeSlug    => widget.store.name;
-  String get _resourceBase => widget.store.resourceBase;
+  String get _storeSlug    => apiScopeFor(widget.orgSlug, widget.store?.name);
+  String get _resourceBase => resourceBaseFor(widget.orgSlug, widget.store?.name);
   String get _filename     => '${widget.pageKey}.html';
 
   @override
@@ -82,7 +86,9 @@ class _LandingEditorScreenState extends State<LandingEditorScreen> {
     for (final m in slideRe.allMatches(html)) {
       final rid = int.tryParse(m.group(1)!);
       final src = m.group(2)!;
-      if (rid != null) _slides.add(_Slide(resourceId: rid, publicUrl: src));
+      // Re-derive against the current resourceBase — heals slides saved under
+      // a stale org/store identifier the moment this page is reopened.
+      if (rid != null) _slides.add(_Slide(resourceId: rid, publicUrl: healResourceUrl(src, _resourceBase)));
     }
   }
 
@@ -90,7 +96,8 @@ class _LandingEditorScreenState extends State<LandingEditorScreen> {
     final token = context.read<AuthState>().token;
     if (token == null) return;
     final picked = await showImageSourcePicker(context,
-        storeSlug: _storeSlug, orgSlug: widget.store.orgSlug, token: token);
+        orgSlug: widget.orgSlug, branchName: widget.store?.name, token: token,
+        entityType: 'landing');
     if (picked == null || !mounted) return;
     setState(() => _slides.add(_Slide(
       resourceId: picked.resourceId,
@@ -256,7 +263,7 @@ $slideHtml
                           style: Theme.of(context).textTheme.titleLarge
                               ?.copyWith(fontWeight: FontWeight.w700)),
                       const SizedBox(width: 8),
-                      Text('— ${widget.store.label()}',
+                      Text('— ${widget.store?.label() ?? 'Global'}',
                           style: TextStyle(color: scheme.outline, fontSize: 14)),
                       const Spacer(),
                       if (!_initializing)

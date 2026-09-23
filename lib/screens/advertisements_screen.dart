@@ -11,6 +11,7 @@ import '../models/store.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
+import '../utils/resource_scope.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/resource_picker_modal.dart';
 
@@ -37,15 +38,16 @@ class _AdvertisementsScreenState extends State<AdvertisementsScreen> {
   static const _pagesDir = 'pages';
   static const _filename  = 'KIOSK_LANDING.html';
 
-  Store? get _globalStore => _stores?.where((s) => s.id == 1).firstOrNull;
+  String? get _orgSlug => _stores?.firstOrNull?.orgSlug;
 
-  // Public URL prefix: delegates to store.resourceBase.
-  String? get _resourceBase => (_selectedStore ?? _globalStore)?.resourceBase;
+  // Public URL prefix — '{org}' for global (no branch selected), '{org}/{branch}' otherwise.
+  String? get _resourceBase =>
+      _orgSlug == null ? null : resourceBaseFor(_orgSlug!, _selectedStore?.name);
 
-  // Store name used for admin API endpoints (always the leaf store, no org prefix).
-  String? get _activeSlug => (_selectedStore ?? _globalStore)?.name;
-
-  String? get _orgSlug => _globalStore?.orgSlug ?? _globalStore?.name;
+  // {store} segment for the admin resource API — a real branch name, or the
+  // org slug itself to mean "global".
+  String? get _activeSlug =>
+      _orgSlug == null ? null : apiScopeFor(_orgSlug!, _selectedStore?.name);
 
   @override
   void initState() {
@@ -94,11 +96,15 @@ class _AdvertisementsScreenState extends State<AdvertisementsScreen> {
 
   void _parseHtml(String html) {
     final re = RegExp(r'<div class="slide" data-rid="(\d+)"(?:\s+data-label="([^"]*)")?[^>]*><img src="([^"]+)"');
+    final base = _resourceBase;
     for (final m in re.allMatches(html)) {
       final rid    = int.tryParse(m.group(1)!);
       final label  = m.group(2) ?? '';
       final srcUrl = m.group(3) ?? '';
-      if (rid != null) _slides.add(_Slide(resourceId: rid, label: label, publicUrl: srcUrl));
+      // Re-derive against the current resourceBase — heals slides saved under
+      // a stale org/store identifier the moment this page is reloaded.
+      final healed = base == null ? srcUrl : healResourceUrl(srcUrl, base);
+      if (rid != null) _slides.add(_Slide(resourceId: rid, label: label, publicUrl: healed));
     }
   }
 
@@ -111,11 +117,12 @@ class _AdvertisementsScreenState extends State<AdvertisementsScreen> {
 
   Future<void> _addSlide() async {
     final token = context.read<AuthState>().token;
-    final slug  = _activeSlug;
     final org   = _orgSlug;
-    if (token == null || slug == null || org == null) return;
+    if (token == null || org == null) return;
 
-    final picked = await showImageSourcePicker(context, storeSlug: slug, orgSlug: org, token: token);
+    final picked = await showImageSourcePicker(context,
+        orgSlug: org, branchName: _selectedStore?.name, token: token,
+        entityType: 'advertisement');
     if (picked == null || !mounted) return;
 
     final defaultLabel = _defaultLabelFromUrl(picked.publicUrl);
@@ -307,7 +314,7 @@ $slideHtml
   }
 
   Widget _buildTopBar(ColorScheme scheme) {
-    final branches = (_stores ?? []).where((s) => s.id != 1).toList();
+    final branches = _stores ?? [];
     final busy = _loadingSlides || _saving;
 
     return Container(
@@ -361,15 +368,21 @@ $slideHtml
               borderRadius: BorderRadius.circular(8),
             ),
             child: DropdownButtonHideUnderline(
-              child: DropdownButton<Store>(
+              child: DropdownButton<Store?>(
                 value: _selectedStore,
-                hint: Text('Select Branch', style: TextStyle(fontSize: 13, color: scheme.outline)),
                 isDense: true,
                 style: TextStyle(fontSize: 13, color: scheme.onSurface),
-                items: branches.map((s) => DropdownMenuItem<Store>(
-                  value: s,
-                  child: Text(s.label()),
-                )).toList(),
+                items: [
+                  DropdownMenuItem<Store?>(
+                    value: null,
+                    child: Text('Select Branch',
+                        style: TextStyle(fontSize: 13, color: scheme.outline)),
+                  ),
+                  ...branches.map((s) => DropdownMenuItem<Store?>(
+                    value: s,
+                    child: Text(s.label()),
+                  )),
+                ],
                 onChanged: busy ? null : (s) {
                   setState(() => _selectedStore = s);
                   _loadSlides();

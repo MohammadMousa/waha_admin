@@ -1,5 +1,6 @@
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -10,6 +11,7 @@ import '../models/store.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
+import '../utils/resource_scope.dart';
 import '../widgets/admin_sidebar.dart';
 
 class LandingPagesScreen extends StatefulWidget {
@@ -77,11 +79,11 @@ class _LandingPagesScreenState extends State<LandingPagesScreen> {
     }
   }
 
-  Store? get _globalStore => _stores?.where((s) => s.id == 1).firstOrNull;
+  String? get _orgSlug => _stores?.firstOrNull?.orgSlug;
 
-  // Public URL prefix: delegates to store.resourceBase.
+  // Public URL prefix — '{org}' for global (no branch selected), '{org}/{branch}' otherwise.
   String get _resourceBase =>
-      (_selectedStore ?? _globalStore)?.resourceBase ?? 'global';
+      _orgSlug == null ? '' : resourceBaseFor(_orgSlug!, _selectedStore?.name);
 
   void _selectStore(Store? store) {
     setState(() => _selectedStore = store);
@@ -91,9 +93,10 @@ class _LandingPagesScreenState extends State<LandingPagesScreen> {
   Future<void> _loadPages() async {
     setState(() { _pageStatus = {}; _loadingPages = true; });
     final token = context.read<AuthState>().token!;
-    // Pass the explicit store ID so the backend scope matches the dropdown selection.
-    // Passing storeId=1 for global scope ensures session store doesn't leak into the query.
-    final scopeStoreId = _selectedStore?.id ?? 1;
+    // Pass the explicit store ID so the backend scope matches the dropdown
+    // selection. null (no branch selected) means "global" — the backend
+    // resolves the org straight from the caller's own session.
+    final scopeStoreId = _selectedStore?.id;
     final results = await Future.wait(
       _pageKeys.map((key) => ApiClient()
           .getLandingPage(key, token, storeId: scopeStoreId)
@@ -141,8 +144,8 @@ class _LandingPagesScreenState extends State<LandingPagesScreen> {
   }
 
   Future<void> _duplicatePage(String key) async {
-    final store = _selectedStore ?? _globalStore;
-    if (store == null) return;
+    final org = _orgSlug;
+    if (org == null) return;
     final token = context.read<AuthState>().token;
     if (token == null) return;
     try {
@@ -156,8 +159,15 @@ class _LandingPagesScreenState extends State<LandingPagesScreen> {
       }
       final copyKey = '${key}_COPY';
       final copyFilename = '$copyKey.html';
+      final apiScope = apiScopeFor(org, _selectedStore?.name);
+      // Heal any embedded /resource/... references saved under a stale
+      // org/store identifier before propagating them into the copy.
+      final healedHtml = utf8.decode(resp.bodyBytes).replaceAllMapped(
+        RegExp(r'''((?:src|href)\s*=\s*["'])([^"']+)(["'])'''),
+        (m) => '${m[1]}${healResourceUrl(m[2]!, _resourceBase)}${m[3]}',
+      );
       await ApiClient().uploadAsset(
-          store.name, 'pages', resp.bodyBytes, copyFilename, 'text/html', token,
+          apiScope, 'pages', utf8.encode(healedHtml), copyFilename, 'text/html', token,
           nameOverride: copyFilename);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -258,14 +268,13 @@ class _LandingPagesScreenState extends State<LandingPagesScreen> {
           loading: _loadingPages,
           storeName: _selectedStore?.label() ?? 'Global',
           onEdit: () {
-            // Local page → edit on the selected branch.
-            // Global page → edit on the global store (id=1), regardless of dropdown.
-            final editorStore = (isLocal && _selectedStore != null)
-                ? _selectedStore!
-                : (_stores?.where((s) => s.id == 1).firstOrNull ?? _selectedStore!);
+            // Local page → edit on the selected branch. Global page (or no
+            // branch selected) → edit at the organization level (store: null).
+            final editorStore = isLocal ? _selectedStore : null;
             Navigator.of(context)
                 .pushNamed(Routes.landingEditor, arguments: {
                   'store': editorStore,
+                  'orgSlug': _orgSlug,
                   'pageKey': key,
                 })
                 .then((_) => _loadPages());
@@ -288,7 +297,6 @@ class _BranchDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final branches = stores.where((s) => s.id != 1).toList();
     return Container(
       height: 36,
       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -297,15 +305,21 @@ class _BranchDropdown extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: DropdownButtonHideUnderline(
-        child: DropdownButton<Store>(
+        child: DropdownButton<Store?>(
           value: selected,
-          hint: Text('Pick Branch', style: TextStyle(fontSize: 13, color: scheme.outline)),
           isDense: true,
           style: TextStyle(fontSize: 13, color: scheme.onSurface),
-          items: branches.map((s) => DropdownMenuItem<Store>(
-            value: s,
-            child: Text(s.label()),
-          )).toList(),
+          items: [
+            DropdownMenuItem<Store?>(
+              value: null,
+              child: Text('Select Branch',
+                  style: TextStyle(fontSize: 13, color: scheme.outline)),
+            ),
+            ...stores.map((s) => DropdownMenuItem<Store?>(
+              value: s,
+              child: Text(s.label()),
+            )),
+          ],
           onChanged: onSelect,
         ),
       ),

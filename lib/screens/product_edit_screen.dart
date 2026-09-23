@@ -34,6 +34,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
   final _descEnCtrl   = TextEditingController();
   final _priceCtrl    = TextEditingController();
   final _tagInputCtrl = TextEditingController();
+  final _newBarcodeCtrl = TextEditingController();
 
   int?  _imageResourceId;
   bool  _removeAvatar = false;
@@ -43,6 +44,12 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
   int?  _categoryId;
   bool  _active = true;
   List<Map<String, dynamic>> _categories = [];
+
+  String? _primaryBarcode;
+  List<Map<String, dynamic>> _alternateBarcodes = [];
+  bool _addingBarcode = false;
+  bool _barcodeBusy = false;
+  String? _barcodeError;
 
   bool get _isCreate => widget.productId == null;
 
@@ -60,6 +67,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     _descEnCtrl.dispose();
     _priceCtrl.dispose();
     _tagInputCtrl.dispose();
+    _newBarcodeCtrl.dispose();
     super.dispose();
   }
 
@@ -79,9 +87,17 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
           ApiClient().getReportCategories(token),
         ]);
         if (!mounted) return;
-        final product = results[0] as Map<String, dynamic>;
-        final cats    = (results[1] as List).cast<Map<String, dynamic>>();
-        final price   = product['price'];
+        final product  = results[0] as Map<String, dynamic>;
+        final cats     = (results[1] as List).cast<Map<String, dynamic>>();
+        // Fetched separately — a not-yet-deployed barcodes endpoint (backend
+        // notes a container rebuild is required) shouldn't block the rest of
+        // the form from loading.
+        List<Map<String, dynamic>> barcodes = [];
+        try {
+          barcodes = await ApiClient().getProductBarcodes(widget.productId!, token: token);
+        } catch (_) {}
+        if (!mounted) return;
+        final price = product['price'];
         setState(() {
           _nameArCtrl.text = _str(product['name'], 'ar');
           _nameEnCtrl.text = _str(product['name'], 'en');
@@ -94,6 +110,8 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
           _categoryId = product['categoryId'] as int?;
           _active     = product['active'] != false;
           _categories = cats;
+          _primaryBarcode    = product['barcode'] as String?;
+          _alternateBarcodes = barcodes.where((b) => b['isPrimary'] != true).toList();
           _loading    = false;
         });
       }
@@ -124,7 +142,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     final token = context.read<AuthState>().token;
     if (token == null) return;
     final result = await showImageSourcePicker(context,
-        storeSlug: widget.storeSlug, token: token);
+        orgSlug: widget.storeSlug, token: token, entityType: 'product');
     if (result == null || !mounted) return;
     setState(() { _imageResourceId = result.resourceId; _removeAvatar = false; });
   }
@@ -133,7 +151,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     final token = context.read<AuthState>().token;
     if (token == null) return;
     final result = await showImageSourcePicker(context,
-        storeSlug: widget.storeSlug, token: token);
+        orgSlug: widget.storeSlug, token: token, entityType: 'product');
     if (result == null || !mounted) return;
     setState(() => _galleryIds.add(result.resourceId));
   }
@@ -142,6 +160,76 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     final tag = _tagInputCtrl.text.trim();
     if (tag.isEmpty || _tags.contains(tag)) return;
     setState(() { _tags.add(tag); _tagInputCtrl.clear(); });
+  }
+
+  Future<void> _refreshBarcodes() async {
+    final token = context.read<AuthState>().token;
+    if (token == null || widget.productId == null) return;
+    final barcodes = await ApiClient().getProductBarcodes(widget.productId!, token: token);
+    if (!mounted) return;
+    setState(() => _alternateBarcodes = barcodes.where((b) => b['isPrimary'] != true).toList());
+  }
+
+  Future<void> _addBarcode() async {
+    final barcode = _newBarcodeCtrl.text.trim();
+    if (barcode.isEmpty) return;
+    // Create mode: no product id yet to attach barcodes to — stage locally
+    // and push them to the server right after the product itself is
+    // created (see _save()), same pattern _galleryIds already uses.
+    if (_isCreate) {
+      if (_alternateBarcodes.any((b) => b['barcode'] == barcode)) {
+        setState(() => _barcodeError = 'Already added.');
+        return;
+      }
+      setState(() {
+        _alternateBarcodes = [..._alternateBarcodes, {'barcode': barcode, 'isPrimary': false}];
+        _newBarcodeCtrl.clear();
+        _addingBarcode = false;
+        _barcodeError = null;
+      });
+      return;
+    }
+    final token = context.read<AuthState>().token;
+    if (token == null || widget.productId == null) return;
+    setState(() { _barcodeBusy = true; _barcodeError = null; });
+    try {
+      await ApiClient().addProductBarcode(widget.productId!, barcode, token: token);
+      await _refreshBarcodes();
+      if (!mounted) return;
+      _newBarcodeCtrl.clear();
+      setState(() { _addingBarcode = false; _barcodeBusy = false; });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _barcodeError = e.statusCode == 409
+            ? 'This barcode is already registered to another product.'
+            : e.message;
+        _barcodeBusy = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _barcodeError = e.toString(); _barcodeBusy = false; });
+    }
+  }
+
+  Future<void> _removeBarcode(String barcode) async {
+    if (_isCreate) {
+      setState(() =>
+          _alternateBarcodes = _alternateBarcodes.where((b) => b['barcode'] != barcode).toList());
+      return;
+    }
+    final token = context.read<AuthState>().token;
+    if (token == null || widget.productId == null) return;
+    setState(() => _barcodeBusy = true);
+    try {
+      await ApiClient().removeProductBarcode(widget.productId!, barcode, token: token);
+      await _refreshBarcodes();
+      if (!mounted) return;
+      setState(() => _barcodeBusy = false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _barcodeError = e.toString(); _barcodeBusy = false; });
+    }
   }
 
   Future<void> _save() async {
@@ -165,6 +253,9 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
       int productId;
       if (_isCreate) {
         productId = await api.createProduct(body, token: token);
+        for (final b in _alternateBarcodes) {
+          await api.addProductBarcode(productId, b['barcode'].toString(), token: token);
+        }
       } else {
         await api.patchProduct(widget.productId!, body, token: token);
         productId = widget.productId!;
@@ -548,6 +639,117 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                                             .toList(),
                                       ),
                                     ),
+
+                                  const SizedBox(height: 20),
+                                  Text('Barcodes',
+                                      style:
+                                          Theme.of(context).textTheme.titleSmall),
+                                  const SizedBox(height: 8),
+                                  if (!_isCreate) ...[
+                                    Text('Primary Barcode',
+                                        style: TextStyle(
+                                            fontSize: 12, color: scheme.outline)),
+                                    const SizedBox(height: 4),
+                                    InputDecorator(
+                                      decoration: const InputDecoration(
+                                          border: OutlineInputBorder(),
+                                          isDense: true,
+                                          filled: true),
+                                      child: Text(_primaryBarcode ?? '—'),
+                                    ),
+                                    const SizedBox(height: 16),
+                                  ],
+                                  Text('Additional Barcodes',
+                                      style: TextStyle(
+                                          fontSize: 12, color: scheme.outline)),
+                                  const SizedBox(height: 8),
+                                  if (_alternateBarcodes.isEmpty)
+                                      Padding(
+                                        padding:
+                                            const EdgeInsets.only(bottom: 8),
+                                        child: Text('No additional barcodes',
+                                            style: TextStyle(
+                                                color: scheme.outline,
+                                                fontSize: 13)),
+                                      )
+                                    else
+                                      ..._alternateBarcodes.map((b) => Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 4),
+                                            child: Row(
+                                              children: [
+                                                Expanded(
+                                                    child: Text(
+                                                        b['barcode']
+                                                            .toString())),
+                                                TextButton(
+                                                  onPressed: _barcodeBusy
+                                                      ? null
+                                                      : () => _removeBarcode(
+                                                          b['barcode']
+                                                              .toString()),
+                                                  child: const Text('Remove'),
+                                                ),
+                                              ],
+                                            ),
+                                          )),
+                                    const SizedBox(height: 4),
+                                    if (_addingBarcode)
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: TextField(
+                                              controller: _newBarcodeCtrl,
+                                              autofocus: true,
+                                              onSubmitted: (_) => _addBarcode(),
+                                              decoration: const InputDecoration(
+                                                  labelText: 'Barcode',
+                                                  border: OutlineInputBorder(),
+                                                  isDense: true),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          FilledButton.tonal(
+                                            onPressed:
+                                                _barcodeBusy ? null : _addBarcode,
+                                            child: _barcodeBusy
+                                                ? const SizedBox(
+                                                    width: 16,
+                                                    height: 16,
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                            strokeWidth: 2))
+                                                : const Text('Add'),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          IconButton(
+                                            icon: const Icon(Icons.close),
+                                            onPressed: _barcodeBusy
+                                                ? null
+                                                : () => setState(() {
+                                                      _addingBarcode = false;
+                                                      _barcodeError = null;
+                                                      _newBarcodeCtrl.clear();
+                                                    }),
+                                          ),
+                                        ],
+                                      )
+                                    else
+                                      TextButton.icon(
+                                        onPressed: () =>
+                                            setState(() => _addingBarcode = true),
+                                        icon: const Icon(Icons.add, size: 18),
+                                        label: const Text('Add Barcode'),
+                                      ),
+                                    if (_barcodeError != null)
+                                      Padding(
+                                        padding:
+                                            const EdgeInsets.only(top: 4),
+                                        child: Text(_barcodeError!,
+                                            style: const TextStyle(
+                                                color: Colors.red,
+                                                fontSize: 12)),
+                                      ),
 
                                   if (_error != null) ...[
                                     const SizedBox(height: 16),

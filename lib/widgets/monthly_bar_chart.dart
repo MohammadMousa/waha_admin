@@ -1,6 +1,8 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
+import '../utils/chart_ticks.dart';
+
 class MonthlyBarChart extends StatelessWidget {
   final List<Map<String, dynamic>> series;
   const MonthlyBarChart({super.key, required this.series});
@@ -13,17 +15,15 @@ class MonthlyBarChart extends StatelessWidget {
         .map((e) => (e['value'] as num?)?.toDouble() ?? 0)
         .fold(0.0, (a, b) => a > b ? a : b);
 
-    // 40% headroom so the top bar never crowds the max label
-    final maxY = maxVal > 0 ? maxVal * 1.4 : 10.0;
-    final interval = maxVal > 0 ? maxVal / 4 : 2.5;
+    final ticks = niceAxisTicks(maxVal);
 
     return BarChart(
       BarChartData(
-        maxY: maxY,
+        maxY: ticks.maxY,
         gridData: FlGridData(
           show: true,
           drawVerticalLine: false,
-          horizontalInterval: interval,
+          horizontalInterval: ticks.step,
           getDrawingHorizontalLine: (v) {
             // Make the zero line more visible
             if (v == 0) {
@@ -43,10 +43,8 @@ class MonthlyBarChart extends StatelessWidget {
             sideTitles: SideTitles(
               showTitles: true,
               reservedSize: 52,
-              interval: interval,
+              interval: ticks.step,
               getTitlesWidget: (v, meta) {
-                // Skip the top label if it's above the data max (avoids overlap)
-                if (v > maxVal * 1.05 && v != 0) return const SizedBox.shrink();
                 final label = v >= 1000
                     ? '${(v / 1000).toStringAsFixed(1)}k'
                     : v.toStringAsFixed(0);

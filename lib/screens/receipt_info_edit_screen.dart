@@ -77,7 +77,7 @@ class _ReceiptInfoEditScreenState extends State<ReceiptInfoEditScreen> {
     final token = context.read<AuthState>().token;
     if (token == null) return;
     final result = await showImageSourcePicker(context,
-        storeSlug: widget.store.name, token: token);
+        orgSlug: widget.store.name, token: token, entityType: 'receipt');
     if (result == null || !mounted) return;
     setState(() {
       _logoResourceId = result.resourceId;
