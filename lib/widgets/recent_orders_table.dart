@@ -36,7 +36,7 @@ class RecentOrdersTable extends StatelessWidget {
     final raw = o['created_at'];
     if (raw == null) return '—';
     try {
-      return _dateFmt.format(DateTime.parse(raw.toString()));
+      return _dateFmt.format(DateTime.parse(raw.toString()).toLocal());
     } catch (_) {
       return raw.toString();
     }
