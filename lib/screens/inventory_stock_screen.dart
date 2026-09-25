@@ -14,6 +14,7 @@ import '../widgets/admin_sidebar.dart';
 import '../widgets/product_search_field.dart';
 import '../widgets/waha_filter_controls.dart';
 import '../widgets/waha_pagination_bar.dart';
+import '../utils/number_format.dart';
 
 class InventoryStockScreen extends StatefulWidget {
   const InventoryStockScreen({super.key});
@@ -435,12 +436,12 @@ class _InventoryStockScreenState extends State<InventoryStockScreen> {
                           return DataRow(cells: [
                             DataCell(SizedBox(width: 140, child: Text(_rowBranchName(row), overflow: TextOverflow.ellipsis))),
                             DataCell(SizedBox(width: 180, child: Text(_rowProductName(row), overflow: TextOverflow.ellipsis))),
-                            DataCell(Center(child: Text('${row['quantity'] ?? 0}'))),
+                            DataCell(Center(child: Text(fmtCount(row['quantity'])))),
                           ]);
                         }
                         return DataRow(cells: [
                           DataCell(SizedBox(width: 220, child: Text(_rowProductName(row), overflow: TextOverflow.ellipsis))),
-                          DataCell(Center(child: Text('${row['total_quantity'] ?? 0}'))),
+                          DataCell(Center(child: Text(fmtCount(row['total_quantity'])))),
                         ]);
                       }).toList(),
                     ),
@@ -455,7 +456,7 @@ class _InventoryStockScreenState extends State<InventoryStockScreen> {
             child: Row(
               children: [
                 Text(
-                  _totalCount == 0 ? 'No entries' : 'Showing $from–$to of $_totalCount entries',
+                  _totalCount == 0 ? 'No entries' : 'Showing ${fmtCount(from)}–${fmtCount(to)} of ${fmtCount(_totalCount)} entries',
                   style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
                 ),
                 const Spacer(),

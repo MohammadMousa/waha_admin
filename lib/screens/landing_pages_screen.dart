@@ -13,6 +13,7 @@ import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../utils/resource_scope.dart';
 import '../widgets/admin_sidebar.dart';
+import '../widgets/error_dialog.dart';
 
 class LandingPagesScreen extends StatefulWidget {
   const LandingPagesScreen({super.key});
@@ -153,8 +154,7 @@ class _LandingPagesScreenState extends State<LandingPagesScreen> {
       final resp = await http.get(Uri.parse(url));
       if (!mounted) return;
       if (resp.statusCode != 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No content to duplicate')));
+        showErrorDialog(context, 'No content to duplicate');
         return;
       }
       final copyKey = '${key}_COPY';
@@ -174,8 +174,7 @@ class _LandingPagesScreenState extends State<LandingPagesScreen> {
           SnackBar(content: Text('Duplicated as ${_customLabels[key] ?? _pageLabels[key]!} copy')));
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Duplicate failed: $e')));
+        showErrorDialog(context, 'Duplicate failed: $e');
       }
     }
   }

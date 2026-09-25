@@ -11,6 +11,7 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
+import '../utils/number_format.dart';
 
 class IntegrationLogsScreen extends StatefulWidget {
   const IntegrationLogsScreen({super.key});
@@ -420,7 +421,7 @@ td{padding:5px 8px;border-bottom:1px solid #eee}
                 Text(
                   _totalCount == 0
                       ? 'No entries'
-                      : 'Showing $from–$to of $_totalCount entries',
+                      : 'Showing ${fmtCount(from)}–${fmtCount(to)} of ${fmtCount(_totalCount)} entries',
                   style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
                 ),
                 const Spacer(),

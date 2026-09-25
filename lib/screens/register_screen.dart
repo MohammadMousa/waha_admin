@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../router/routes.dart';
 import '../services/api_client.dart';
+import '../widgets/error_dialog.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -48,6 +49,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_error != null) {
+      showErrorDialogLater(context, _error!);
+      _error = null;
+    }
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: const Text('Register Account')),
@@ -109,17 +114,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ),
                           ),
                         ),
-                        if (_error != null) ...[
-                          const SizedBox(height: 12),
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                                color: scheme.errorContainer,
-                                borderRadius: BorderRadius.circular(8)),
-                            child: Text(_error!,
-                                style: TextStyle(color: scheme.onErrorContainer)),
-                          ),
-                        ],
+
                         const SizedBox(height: 20),
                         FilledButton(
                           onPressed: _submitting ? null : _submit,

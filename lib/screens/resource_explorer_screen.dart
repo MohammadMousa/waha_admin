@@ -16,6 +16,7 @@ import '../state/auth_state.dart';
 import '../utils/resource_scope.dart';
 import '../widgets/admin_sidebar.dart';
 import 'package:provider/provider.dart';
+import '../widgets/error_dialog.dart';
 
 enum _AssetLayout { list, listThumb, grid }
 enum _PreviewLayout { fullscreen, fitHeight, fitWidth }
@@ -161,8 +162,7 @@ class _ResourceExplorerScreenState extends State<ResourceExplorerScreen> {
       await _loadDirs();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red));
+        showErrorDialog(context, 'Failed: $e');
       }
     }
   }
@@ -183,8 +183,7 @@ class _ResourceExplorerScreenState extends State<ResourceExplorerScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _loadingAssets = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Upload failed: $e'), backgroundColor: Colors.red));
+        showErrorDialog(context, 'Upload failed: $e');
       }
     }
   }
@@ -207,11 +206,9 @@ class _ResourceExplorerScreenState extends State<ResourceExplorerScreen> {
       } catch (_) {}
     }
     if (mounted) {
-      final messenger = ScaffoldMessenger.of(context);
       await _selectDir(dir);
       if (uploaded < result.files.length) {
-        messenger.showSnackBar(
-          SnackBar(content: Text('Uploaded $uploaded/${result.files.length} files')));
+        showErrorDialog(context, 'Uploaded $uploaded/${result.files.length} files - some uploads failed.');
       }
     }
   }
@@ -219,15 +216,13 @@ class _ResourceExplorerScreenState extends State<ResourceExplorerScreen> {
   Future<void> _rename(ResourceAsset asset) async {
     final dir = _selectedDir;
     if (dir == null) return;
-    final messenger = ScaffoldMessenger.of(context);
     final newName = await _showNameDialog(context, title: 'Rename', hint: asset.name);
     if (newName == null || newName.isEmpty || newName == asset.name) return;
     try {
       await ApiClient().renameAsset(_storeSlug, dir.name, asset.name, newName, _token);
       if (mounted) await _selectDir(dir);
     } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('Rename failed: $e'), backgroundColor: Colors.red));
+      if (mounted) showErrorDialog(context, 'Rename failed: $e');
     }
   }
 
@@ -235,8 +230,7 @@ class _ResourceExplorerScreenState extends State<ResourceExplorerScreen> {
     final dir = _selectedDir;
     if (dir == null) return;
     if (_dirs.length < 2) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No other directories to move to')));
+      showErrorDialog(context, 'No other directories to move to');
       return;
     }
     final targets = _dirs.where((d) => d.id != dir.id).toList();
@@ -265,8 +259,7 @@ class _ResourceExplorerScreenState extends State<ResourceExplorerScreen> {
           SnackBar(content: Text('Moved "${asset.name}" to ${picked.name}')));
       }
     } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('Move failed: $e'), backgroundColor: Colors.red));
+      if (mounted) showErrorDialog(context, 'Move failed: $e');
     }
   }
 
@@ -294,8 +287,7 @@ class _ResourceExplorerScreenState extends State<ResourceExplorerScreen> {
       if (mounted) await _selectDir(dir);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Delete failed: $e'), backgroundColor: Colors.red));
+        showErrorDialog(context, 'Delete failed: $e');
       }
     }
   }
@@ -315,7 +307,7 @@ class _ResourceExplorerScreenState extends State<ResourceExplorerScreen> {
     try {
       final resp = await http.get(Uri.parse(url)); // public resource
       if (resp.statusCode != 200) {
-        messenger.showSnackBar(const SnackBar(content: Text('Could not fetch file to duplicate')));
+        showErrorDialog(context, 'Could not fetch file to duplicate');
         return;
       }
       final parts = asset.name.split('.');
@@ -328,7 +320,7 @@ class _ResourceExplorerScreenState extends State<ResourceExplorerScreen> {
         messenger.showSnackBar(SnackBar(content: Text('Duplicated as $copyName')));
       }
     } catch (e) {
-      if (mounted) messenger.showSnackBar(SnackBar(content: Text('Duplicate failed: $e')));
+      if (mounted) showErrorDialog(context, 'Duplicate failed: $e');
     }
   }
 

@@ -9,6 +9,7 @@ import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/resource_picker_modal.dart';
+import '../widgets/error_dialog.dart';
 
 const _kAssignablePosRoles = ['CASHIER', 'OPERATOR', 'BRANCH_ADMIN'];
 const _kGenders = ['MALE', 'FEMALE'];
@@ -135,9 +136,7 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
     if (token == null) return;
     final orgSlug = _orgSlug;
     if (orgSlug == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No organization found for this account')),
-      );
+      showErrorDialog(context, 'No organization found for this account');
       return;
     }
     final result = await showImageSourcePicker(
@@ -260,6 +259,10 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_error != null) {
+      showErrorDialogLater(context, _error!);
+      _error = null;
+    }
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -584,22 +587,7 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
                                       prefixIcon: Icon(Icons.notes_outlined),
                                     ),
                                   ),
-                                  if (_error != null) ...[
-                                    const SizedBox(height: 16),
-                                    Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: scheme.errorContainer,
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        _error!,
-                                        style: TextStyle(
-                                          color: scheme.onErrorContainer,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+
                                   const SizedBox(height: 40),
                                 ],
                               ),

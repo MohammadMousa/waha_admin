@@ -7,6 +7,7 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
+import '../widgets/error_dialog.dart';
 
 // Accounts (the `users` table) is platform/organization level only now —
 // SUPER_ADMIN (system-wide, no organization) or ORGANIZATION_OWNER (scoped
@@ -158,6 +159,10 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_error != null) {
+      showErrorDialogLater(context, _error!);
+      _error = null;
+    }
     final scheme = Theme.of(context).colorScheme;
     final roles = <String>{
       ..._kAccountRoles,
@@ -377,22 +382,7 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
                                       prefixIcon: Icon(Icons.phone_outlined),
                                     ),
                                   ),
-                                  if (_error != null) ...[
-                                    const SizedBox(height: 16),
-                                    Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: scheme.errorContainer,
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        _error!,
-                                        style: TextStyle(
-                                          color: scheme.onErrorContainer,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+
                                   const SizedBox(height: 40),
                                 ],
                               ),

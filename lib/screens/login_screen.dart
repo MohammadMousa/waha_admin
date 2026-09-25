@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
+import '../widgets/error_dialog.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -58,6 +59,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_error != null) {
+      showErrorDialogLater(context, _error!);
+      _error = null;
+    }
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -123,11 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
-                  if (_error != null) ...[
-                    const SizedBox(height: 12),
-                    Text(_error!,
-                        style: TextStyle(color: scheme.error, fontSize: 13)),
-                  ],
+
                   const SizedBox(height: 24),
                   FilledButton(
                     onPressed: _loading ? null : _login,

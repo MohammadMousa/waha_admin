@@ -7,7 +7,9 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
-import '../widgets/product_image.dart';
+import '../widgets/error_dialog.dart';
+import '../widgets/category_card.dart';
+import '../widgets/framed_card.dart';
 
 /// Global categories screen — always shows categories for the root store (id=1).
 class CategoriesAdminScreen extends StatefulWidget {
@@ -63,9 +65,7 @@ class _CategoriesAdminScreenState extends State<CategoriesAdminScreen> {
   void _openEdit(Category cat) {
     final orgSlug = _orgSlug;
     if (orgSlug == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No organization found for this account')),
-      );
+      showErrorDialog(context, 'No organization found for this account');
       return;
     }
     Navigator.of(context)
@@ -79,9 +79,7 @@ class _CategoriesAdminScreenState extends State<CategoriesAdminScreen> {
   void _openCreate() {
     final orgSlug = _orgSlug;
     if (orgSlug == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No organization found for this account')),
-      );
+      showErrorDialog(context, 'No organization found for this account');
       return;
     }
     Navigator.of(context)
@@ -160,85 +158,18 @@ class _CategoriesAdminScreenState extends State<CategoriesAdminScreen> {
 
     return RefreshIndicator(
       onRefresh: _load,
-      child: GridView.builder(
+      child: CardGrid(
         padding: const EdgeInsets.all(16),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisExtent: 72,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-        ),
         itemCount: _categories!.length,
         itemBuilder: (_, i) {
           final cat = _categories![i];
-          final nameEn = (cat.name['en'] ?? cat.name['ar'] ?? '').toString();
-          final nameAr = (cat.name['ar'] ?? '').toString();
-          return Card(
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: () => _openEdit(cat),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                child: Row(
-                  children: [
-                    _CategoryThumb(imageResourceId: cat.imageResourceId),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(nameEn,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                          if (nameAr.isNotEmpty)
-                            Text(nameAr,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                textDirection: TextDirection.rtl,
-                                style: TextStyle(fontSize: 11, color: scheme.outline)),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.edit_outlined, size: 18),
-                      tooltip: 'Edit',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      onPressed: () => _openEdit(cat),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          return CategoryCard(
+            nameEn: (cat.name['en'] ?? cat.name['ar'] ?? '').toString(),
+            nameAr: (cat.name['ar'] ?? '').toString(),
+            imageResourceId: cat.imageResourceId,
+            onTap: () => _openEdit(cat),
           );
         },
-      ),
-    );
-  }
-}
-
-class _CategoryThumb extends StatelessWidget {
-  final int? imageResourceId;
-  const _CategoryThumb({this.imageResourceId});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: SizedBox(
-        width: 48,
-        height: 48,
-        child: imageResourceId != null
-            ? ProductImage(
-                imageResourceId: imageResourceId, fit: BoxFit.cover)
-            : Container(
-                color: scheme.surfaceContainerHighest,
-                child: Icon(Icons.category_outlined,
-                    color: scheme.onSurfaceVariant, size: 24),
-              ),
       ),
     );
   }

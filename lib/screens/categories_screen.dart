@@ -7,7 +7,8 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
-import '../widgets/product_image.dart';
+import '../widgets/category_card.dart';
+import '../widgets/framed_card.dart';
 
 class CategoriesScreen extends StatefulWidget {
   final Store store;
@@ -92,20 +93,14 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         ),
       );
     } else {
-      body = GridView.builder(
+      body = CardGrid(
         padding: const EdgeInsets.all(16),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          childAspectRatio: 1.1,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-        ),
         itemCount: _categories!.length,
         itemBuilder: (context, i) {
           final cat = _categories![i];
-          final name = (cat.name['en'] ?? cat.name['ar'] ?? '').toString();
-          return _CategoryCard(
-            name: name,
+          return CategoryCard(
+            nameEn: (cat.name['en'] ?? cat.name['ar'] ?? '').toString(),
+            nameAr: (cat.name['ar'] ?? '').toString(),
             imageResourceId: cat.imageResourceId,
             onTap: () => _openEdit(cat),
           );
@@ -154,72 +149,6 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _CategoryCard extends StatelessWidget {
-  final String name;
-  final int? imageResourceId;
-  final VoidCallback onTap;
-
-  const _CategoryCard({
-    required this.name,
-    required this.imageResourceId,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            ProductImage(imageResourceId: imageResourceId, fit: BoxFit.cover),
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Colors.black.withValues(alpha: 0.6)],
-                ),
-              ),
-            ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(Icons.edit_outlined, size: 18, color: Colors.white),
-              ),
-            ),
-            Positioned(
-              bottom: 12,
-              left: 12,
-              right: 12,
-              child: Text(
-                name,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  shadows: [Shadow(blurRadius: 4, color: Colors.black54)],
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -11,6 +11,7 @@ import '../config/app_config.dart';
 import '../models/resource.dart';
 import '../services/api_client.dart';
 import '../utils/resource_scope.dart';
+import 'error_dialog.dart';
 
 // Per-entity-type "remember my choice" destination directory, set by the
 // upload-destination dialog below. Scoped by entityType only (not by
@@ -170,8 +171,7 @@ Future<PickedResource?> showImageSourcePicker(
       await _setRememberedDir(entityType, null);
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+        showErrorDialog(context, 'Upload failed: $e');
       }
       return null;
     }
@@ -213,8 +213,7 @@ Future<PickedResource?> _showUploadDestinationDialog(
     dirs = await api.getDirectories(apiScope, token);
   } catch (e) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Could not load directories: $e')));
+      showErrorDialog(context, 'Could not load directories: $e');
     }
     return null;
   }

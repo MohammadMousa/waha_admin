@@ -13,6 +13,7 @@ import '../state/auth_state.dart';
 import '../utils/resource_scope.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/resource_picker_modal.dart';
+import '../widgets/error_dialog.dart';
 
 class LandingEditorScreen extends StatefulWidget {
   /// null = organization-level (global) scope.
@@ -235,6 +236,10 @@ $slideHtml
 
   @override
   Widget build(BuildContext context) {
+    if (_error != null) {
+      showErrorDialogLater(context, _error!);
+      _error = null;
+    }
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -375,18 +380,7 @@ $slideHtml
                                     onSlideSecChanged: (v) => setState(() => _slideSec = v),
                                   ),
 
-                                  if (_error != null) ...[
-                                    const SizedBox(height: 16),
-                                    Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                          color: scheme.errorContainer,
-                                          borderRadius: BorderRadius.circular(8)),
-                                      child: Text(_error!,
-                                          style: TextStyle(color: scheme.onErrorContainer,
-                                              fontSize: 13)),
-                                    ),
-                                  ],
+
                                   if (_savedMessage != null) ...[
                                     const SizedBox(height: 16),
                                     Container(

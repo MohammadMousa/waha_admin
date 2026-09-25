@@ -8,6 +8,7 @@ import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/resource_picker_modal.dart';
+import '../widgets/error_dialog.dart';
 
 class ReceiptInfoEditScreen extends StatefulWidget {
   final Store store;
@@ -118,6 +119,10 @@ class _ReceiptInfoEditScreenState extends State<ReceiptInfoEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_error != null) {
+      showErrorDialogLater(context, _error!);
+      _error = null;
+    }
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
@@ -222,10 +227,7 @@ class _ReceiptInfoEditScreenState extends State<ReceiptInfoEditScreen> {
                             _Field(ctrl: _unpaidTitleCtrl, label: 'Unpaid invoice title'),
                             const SizedBox(height: 10),
                             _Field(ctrl: _paidTitleCtrl, label: 'Paid invoice title'),
-                            if (_error != null) ...[
-                              const SizedBox(height: 16),
-                              Text(_error!, style: TextStyle(color: scheme.error, fontSize: 13)),
-                            ],
+
                             const SizedBox(height: 32),
                           ],
                         ),

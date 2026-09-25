@@ -7,6 +7,7 @@ import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/product_image.dart';
 import '../widgets/resource_picker_modal.dart';
+import '../widgets/error_dialog.dart';
 
 class ProductEditScreen extends StatefulWidget {
   /// null = create mode, non-null = edit mode
@@ -285,6 +286,14 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_error != null) {
+      showErrorDialogLater(context, _error!);
+      _error = null;
+    }
+    if (_barcodeError != null) {
+      showErrorDialogLater(context, _barcodeError!);
+      _barcodeError = null;
+    }
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
@@ -741,22 +750,9 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                                         icon: const Icon(Icons.add, size: 18),
                                         label: const Text('Add Barcode'),
                                       ),
-                                    if (_barcodeError != null)
-                                      Padding(
-                                        padding:
-                                            const EdgeInsets.only(top: 4),
-                                        child: Text(_barcodeError!,
-                                            style: const TextStyle(
-                                                color: Colors.red,
-                                                fontSize: 12)),
-                                      ),
 
-                                  if (_error != null) ...[
-                                    const SizedBox(height: 16),
-                                    Text(_error!,
-                                        style: const TextStyle(
-                                            color: Colors.red, fontSize: 13)),
-                                  ],
+
+
                                   const SizedBox(height: 40),
                                 ],
                               ),

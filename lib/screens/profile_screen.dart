@@ -6,6 +6,7 @@ import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../utils/role_labels.dart';
 import '../widgets/admin_sidebar.dart';
+import '../widgets/error_dialog.dart';
 
 // No backend GET /me was delivered alongside the password-change endpoint
 // (see to_Frontend_AI_On_Auth_Task [1]) — the identity shown here is the
@@ -92,6 +93,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_error != null) {
+      showErrorDialogLater(context, _error!);
+      _error = null;
+    }
     final scheme = Theme.of(context).colorScheme;
     final auth = context.watch<AuthState>();
 
@@ -229,11 +234,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         ),
                                       ),
                                     ),
-                                    if (_error != null) ...[
-                                      const SizedBox(height: 10),
-                                      Text(_error!,
-                                          style: const TextStyle(color: Colors.red, fontSize: 13)),
-                                    ],
+
                                     const SizedBox(height: 16),
                                     Row(
                                       children: [

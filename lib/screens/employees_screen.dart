@@ -8,6 +8,8 @@ import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/reset_pin_dialog.dart';
+import '../widgets/error_dialog.dart';
+import '../widgets/framed_card.dart';
 
 class EmployeesScreen extends StatefulWidget {
   const EmployeesScreen({super.key});
@@ -53,7 +55,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
       await ApiClient().patchEmployee(e.id, {'enabled': !e.enabled}, token: token);
       _load();
     } on ApiException catch (err) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err.message)));
+      if (mounted) showErrorDialog(context, err.message);
     }
   }
 
@@ -66,7 +68,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
       await ApiClient().patchEmployee(e.id, {'pinCode': newPin}, token: token);
       _load();
     } on ApiException catch (err) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err.message)));
+      if (mounted) showErrorDialog(context, err.message);
     }
   }
 
@@ -93,7 +95,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
       await ApiClient().deleteEmployee(e.id, token: token);
       _load();
     } on ApiException catch (err) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err.message)));
+      if (mounted) showErrorDialog(context, err.message);
     }
   }
 
@@ -142,8 +144,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                               ? const Center(child: Text('No employees found.'))
                               : RefreshIndicator(
                                   onRefresh: _load,
-                                  child: ListView.builder(
-                                    padding: const EdgeInsets.fromLTRB(24, 4, 24, 100),
+                                  child: CardGrid(
                                     itemCount: _employees!.length,
                                     itemBuilder: (_, i) => _EmployeeCard(
                                       employee: _employees![i],
@@ -153,7 +154,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                                       onToggle: () => _toggleEnabled(_employees![i]),
                                       onResetPin: () => _resetPin(_employees![i]),
                                       onDelete: () => _delete(_employees![i]),
-                                    ),
+                                      )
                                   ),
                                 ),
                 ),
@@ -185,11 +186,8 @@ class _EmployeeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final e = employee;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
+    return FramedCard(
+      child: Row(
           children: [
             CircleAvatar(
               radius: 24,
@@ -202,15 +200,13 @@ class _EmployeeCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(children: [
+                  Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
                     Text(e.displayName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
                     if (!e.enabled) ...[
-                      const SizedBox(width: 6),
-                      _Badge('Disabled', Colors.grey),
+                        _Badge('Disabled', Colors.grey),
                     ],
                     if (e.isLocked) ...[
-                      const SizedBox(width: 6),
-                      _Badge(
+                        _Badge(
                           'Locked until ${DateFormat('h:mm a').format(e.lockedUntil!.toLocal())}',
                           Colors.red),
                     ],
@@ -250,7 +246,6 @@ class _EmployeeCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
     );
   }
 }

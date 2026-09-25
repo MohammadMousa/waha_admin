@@ -5,6 +5,8 @@ import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../utils/number_format.dart';
+
 class RecentOrdersTable extends StatelessWidget {
   final List<Map<String, dynamic>> orders;
   const RecentOrdersTable({super.key, required this.orders});
@@ -49,7 +51,7 @@ class RecentOrdersTable extends StatelessWidget {
             _displayId(o),
             '"${_branchName(o)}"',
             _date(o),
-            _fmt(o['total']),
+            fmtMoney(o['total']),
             o['currency'] ?? 'SAR',
             o['status'] ?? '',
           ].join(',')),
@@ -124,7 +126,7 @@ class RecentOrdersTable extends StatelessWidget {
                         id: _displayId(o),
                         branch: _branchName(o),
                         date: _date(o),
-                        total: '${_fmt(o['total'])} ${o['currency'] ?? 'SAR'}',
+                        total: '${fmtMoney(o['total'])} ${o['currency'] ?? 'SAR'}',
                         status: '${o['status'] ?? ''}',
                         isHeader: false,
                         scheme: scheme,
@@ -197,10 +199,6 @@ class RecentOrdersTable extends StatelessWidget {
         maxLines: 1,
       );
 
-  String _fmt(dynamic v) {
-    if (v == null) return '0.00';
-    return (v as num).toDouble().toStringAsFixed(2);
-  }
 }
 
 class _StatusBadge extends StatelessWidget {

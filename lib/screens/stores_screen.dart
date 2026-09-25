@@ -7,6 +7,7 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
+import '../widgets/framed_card.dart';
 
 class StoresScreen extends StatefulWidget {
   const StoresScreen({super.key});
@@ -88,61 +89,73 @@ class _StoresScreenState extends State<StoresScreen> {
                           Expanded(
                             child: RefreshIndicator(
                               onRefresh: _load,
-                              child: ListView.builder(
-                                padding: const EdgeInsets.all(24),
+                              child: CardGrid(
                                 itemCount: _stores?.length ?? 0,
                                 itemBuilder: (_, i) {
                                   final s = _stores![i];
-                                  return Card(
-                                    margin: const EdgeInsets.only(bottom: 10),
-                                    child: ListTile(
-                                      leading: s.imageResourceId != null
-                                          ? ClipOval(
-                                              child: Image.network(
-                                                '${AppConfig.apiBaseUrl}/api/resources/${s.imageResourceId}',
-                                                width: 40,
-                                                height: 40,
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (_, __, ___) => _StoreAvatarIcon(scheme: scheme),
+                                  return FramedCard(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            s.imageResourceId != null
+                                                ? ClipOval(
+                                                    child: Image.network(
+                                                      '${AppConfig.apiBaseUrl}/api/resources/${s.imageResourceId}',
+                                                      width: 40,
+                                                      height: 40,
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder: (_, __, ___) => _StoreAvatarIcon(scheme: scheme),
+                                                    ),
+                                                  )
+                                                : _StoreAvatarIcon(scheme: scheme),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(s.label(),
+                                                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                                                  Text(s.name,
+                                                      style: TextStyle(fontSize: 12, color: scheme.outline)),
+                                                ],
                                               ),
-                                            )
-                                          : _StoreAvatarIcon(scheme: scheme),
-                                      title: Text(s.label(), style: const TextStyle(fontWeight: FontWeight.w600)),
-                                      subtitle: Text(s.name,
-                                          style: TextStyle(fontSize: 12, color: scheme.outline)),
-                                      trailing: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          _StoreActionBtn(
-                                            label: 'Categories',
-                                            icon: Icons.category_outlined,
-                                            onTap: () => Navigator.of(context)
-                                                .pushNamed(Routes.categories, arguments: s),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          _StoreActionBtn(
-                                            label: 'Payment',
-                                            icon: Icons.payment_outlined,
-                                            onTap: () => Navigator.of(context)
-                                                .pushNamed(Routes.paymentMethods, arguments: s),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          _StoreActionBtn(
-                                            label: 'Landing',
-                                            icon: Icons.web_outlined,
-                                            onTap: () => Navigator.of(context)
-                                                .pushNamed(Routes.landingEditor, arguments: s),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          IconButton(
-                                            icon: const Icon(Icons.edit_outlined),
-                                            tooltip: 'Edit store',
-                                            onPressed: () => Navigator.of(context)
-                                                .pushNamed(Routes.storeEdit, arguments: s)
-                                                .then((r) { if (r == true && mounted) _load(); }),
-                                          ),
-                                        ],
-                                      ),
+                                            ),
+                                            IconButton(
+                                              icon: const Icon(Icons.edit_outlined),
+                                              tooltip: 'Edit store',
+                                              onPressed: () => Navigator.of(context)
+                                                  .pushNamed(Routes.storeEdit, arguments: s)
+                                                  .then((r) { if (r == true && mounted) _load(); }),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            _StoreActionBtn(
+                                              label: 'Categories',
+                                              icon: Icons.category_outlined,
+                                              onTap: () => Navigator.of(context)
+                                                  .pushNamed(Routes.categories, arguments: s),
+                                            ),
+                                            _StoreActionBtn(
+                                              label: 'Payment',
+                                              icon: Icons.payment_outlined,
+                                              onTap: () => Navigator.of(context)
+                                                  .pushNamed(Routes.paymentMethods, arguments: s),
+                                            ),
+                                            _StoreActionBtn(
+                                              label: 'Landing',
+                                              icon: Icons.web_outlined,
+                                              onTap: () => Navigator.of(context)
+                                                  .pushNamed(Routes.landingEditor, arguments: s),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ),
                                   );
                                 },

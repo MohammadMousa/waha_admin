@@ -8,9 +8,11 @@ import '../models/store.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
+import '../utils/number_format.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/product_image.dart';
 import '../widgets/waha_filter_controls.dart';
+import '../widgets/error_dialog.dart';
 
 // Global parent store id — products are always scoped to this.
 const _kRootStoreId = 1;
@@ -149,9 +151,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
   void _openCreate() {
     final orgSlug = _orgSlug;
     if (orgSlug == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No organization found for this account')),
-      );
+      showErrorDialog(context, 'No organization found for this account');
       return;
     }
     Navigator.of(context)
@@ -165,9 +165,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
   void _openEdit(Map<String, dynamic> p) {
     final orgSlug = _orgSlug;
     if (orgSlug == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No organization found for this account')),
-      );
+      showErrorDialog(context, 'No organization found for this account');
       return;
     }
     Navigator.of(context)
@@ -416,7 +414,7 @@ class _ProductCard extends StatelessWidget {
                   ],
                 ),
                 if (price != null)
-                  Text('SAR $price',
+                  Text('SAR ${fmtMoney(price)}',
                       style: TextStyle(
                           fontSize: 11,
                           color: scheme.primary,

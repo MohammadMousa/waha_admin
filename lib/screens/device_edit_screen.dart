@@ -8,6 +8,7 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
+import '../widgets/error_dialog.dart';
 
 const _kDeviceTypes = ['KIOSK'];
 
@@ -146,6 +147,10 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_error != null) {
+      showErrorDialogLater(context, _error!);
+      _error = null;
+    }
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -432,22 +437,7 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
                               prefixIcon: Icon(Icons.label_outline),
                             ),
                           ),
-                          if (_error != null) ...[
-                            const SizedBox(height: 16),
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: scheme.errorContainer,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                _error!,
-                                style: TextStyle(
-                                  color: scheme.onErrorContainer,
-                                ),
-                              ),
-                            ),
-                          ],
+
                           const SizedBox(height: 40),
                         ],
                       ),

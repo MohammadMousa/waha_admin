@@ -8,6 +8,7 @@ import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/resource_picker_modal.dart';
+import '../widgets/error_dialog.dart';
 
 class CategoryEditScreen extends StatefulWidget {
   final Category category;
@@ -77,6 +78,10 @@ class _CategoryEditScreenState extends State<CategoryEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_error != null) {
+      showErrorDialogLater(context, _error!);
+      _error = null;
+    }
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
@@ -170,10 +175,7 @@ class _CategoryEditScreenState extends State<CategoryEditScreen> {
                               decoration: const InputDecoration(
                                   labelText: 'English', border: OutlineInputBorder()),
                             ),
-                            if (_error != null) ...[
-                              const SizedBox(height: 16),
-                              Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
-                            ],
+
                             const SizedBox(height: 40),
                           ],
                         ),

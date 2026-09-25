@@ -17,6 +17,7 @@ import '../widgets/product_search_field.dart';
 import '../widgets/waha_date_picker.dart';
 import '../widgets/waha_filter_controls.dart';
 import '../widgets/waha_pagination_bar.dart';
+import '../utils/number_format.dart';
 
 /// Matches [ApiClient.getInventoryTransfers] / [ApiClient.getInventoryReturns]
 /// exactly, so either can be passed in as [InventoryOperationsScreen.fetcher].
@@ -491,7 +492,7 @@ class _InventoryOperationsScreenState extends State<InventoryOperationsScreen> {
                           DataCell(Text(dt)),
                           DataCell(SizedBox(width: 140, child: Text(_rowBranchName(row), overflow: TextOverflow.ellipsis))),
                           DataCell(SizedBox(width: 160, child: Text(_rowProductName(row), overflow: TextOverflow.ellipsis))),
-                          DataCell(Center(child: Text('${row['quantity'] ?? 0}'))),
+                          DataCell(Center(child: Text(fmtCount(row['quantity'])))),
                           DataCell(Text(_rowEmployeeName(row))),
                         ]);
                       }).toList(),
@@ -507,7 +508,7 @@ class _InventoryOperationsScreenState extends State<InventoryOperationsScreen> {
             child: Row(
               children: [
                 Text(
-                  _totalCount == 0 ? 'No entries' : 'Showing $from–$to of $_totalCount entries',
+                  _totalCount == 0 ? 'No entries' : 'Showing ${fmtCount(from)}–${fmtCount(to)} of ${fmtCount(_totalCount)} entries',
                   style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
                 ),
                 const Spacer(),

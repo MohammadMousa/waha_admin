@@ -15,6 +15,7 @@ import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/waha_date_picker.dart';
 import '../widgets/waha_filter_controls.dart';
+import '../utils/number_format.dart';
 
 class ProductsSalesScreen extends StatefulWidget {
   const ProductsSalesScreen({super.key});
@@ -229,7 +230,7 @@ class _ProductsSalesScreenState extends State<ProductsSalesScreen> {
           '<td>${r['barcode'] ?? ''}</td>'
           '<td>${_displayName(r['category_name'])}</td>'
           '<td>${_parseBranchName(r)}</td>'
-          '<td>${r['qty_sold'] ?? 0}</td>'
+          '<td>${fmtCount(r['qty_sold'])}</td>'
           '<td>${_fmtNum(r['unit_price'])}</td>'
           '<td>${_fmtNum(r['total'])}</td>'
           '</tr>').join();
@@ -439,7 +440,7 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
           const SizedBox(width: 24),
           _SummaryTile(Icons.inventory_2_outlined,  '${s['total_products'] ?? 0}',  'Number of products'),
           _SummaryTile(Icons.storefront_outlined,   '${s['total_branches'] ?? 0}',  'Number of branches'),
-          _SummaryTile(Icons.shopping_cart_outlined, '${s['total_qty_sold'] ?? 0}', 'Total Qty sold'),
+          _SummaryTile(Icons.shopping_cart_outlined, fmtCount(s['total_qty_sold']), 'Total Qty sold'),
           _SummaryTile(Icons.attach_money_outlined,  _fmtNum(s['total_sales']),     'Total Sales'),
         ],
       ),
@@ -484,7 +485,7 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
                         DataCell(Text('${row['barcode'] ?? ''}')),
                         DataCell(SizedBox(width: 140, child: Text(_displayName(row['category_name']), overflow: TextOverflow.ellipsis))),
                         DataCell(SizedBox(width: 160, child: Text(_parseBranchName(row), overflow: TextOverflow.ellipsis))),
-                        DataCell(Text('${row['qty_sold'] ?? 0}', textAlign: TextAlign.right)),
+                        DataCell(Text(fmtCount(row['qty_sold']), textAlign: TextAlign.right)),
                         DataCell(Text(_fmtNum(row['unit_price']), textAlign: TextAlign.right)),
                         DataCell(Text(_fmtNum(row['total']),      textAlign: TextAlign.right)),
                       ])).toList(),
@@ -502,7 +503,7 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
                 Text(
                   _totalCount == 0
                       ? 'No entries'
-                      : 'Showing $from–$to of $_totalCount entries',
+                      : 'Showing ${fmtCount(from)}–${fmtCount(to)} of ${fmtCount(_totalCount)} entries',
                   style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
                 ),
                 const Spacer(),

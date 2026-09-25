@@ -6,6 +6,7 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
+import '../widgets/error_dialog.dart';
 
 class AccountsScreen extends StatefulWidget {
   const AccountsScreen({super.key});
@@ -55,7 +56,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
       await ApiClient().patchAdminAccount(u.id, {'enabled': !u.enabled}, token: token);
       _load();
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted) showErrorDialog(context, e.message);
     }
   }
 
@@ -82,7 +83,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
       await ApiClient().deleteAdminAccount(u.id, token: token);
       _load();
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted) showErrorDialog(context, e.message);
     }
   }
 

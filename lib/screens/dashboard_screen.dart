@@ -10,6 +10,7 @@ import '../widgets/kpi_card.dart';
 import '../widgets/revenue_chart.dart';
 import '../widgets/orders_chart.dart';
 import '../widgets/monthly_bar_chart.dart';
+import '../utils/number_format.dart';
 import '../widgets/recent_orders_table.dart';
 import '../widgets/waha_filter_controls.dart';
 
@@ -319,24 +320,24 @@ class _KpiRow extends StatelessWidget {
           final cards = [
             KpiCard(
               label: 'TODAY REVENUE',
-              value: 'SAR ${_fmt(kpis['todayRevenue'])}',
+              value: 'SAR ${fmtMoney(kpis['todayRevenue'])}',
               pctChange:  (kpis['todayRevenuePct']  as num?)?.toDouble(),
               sparkline:  revSpark,
             ),
             KpiCard(
               label: 'TOTAL REVENUE',
-              value: 'SAR ${_fmt(kpis['totalRevenue'])}',
+              value: 'SAR ${fmtMoney(kpis['totalRevenue'])}',
               icon: Icons.shopping_bag_outlined,
             ),
             KpiCard(
               label: 'TODAY ORDERS',
-              value: '${kpis['todayOrders'] ?? 0}',
+              value: fmtCount(kpis['todayOrders']),
               pctChange: (kpis['todayOrdersPct'] as num?)?.toDouble(),
               sparkline: ordSpark,
             ),
             KpiCard(
               label: 'TOTAL ORDERS',
-              value: '${kpis['totalOrders'] ?? 0}',
+              value: fmtCount(kpis['totalOrders']),
               icon: Icons.shopping_bag_outlined,
             ),
           ];
@@ -359,11 +360,6 @@ class _KpiRow extends StatelessWidget {
         },
       );
 
-  String _fmt(dynamic v) {
-    if (v == null) return '0.00';
-    final d = (v as num).toDouble();
-    return d.toStringAsFixed(2);
-  }
 }
 
 // ── Overview card ─────────────────────────────────────────────────────────────
@@ -394,21 +390,21 @@ class _OverviewCard extends StatelessWidget {
             const SizedBox(height: 20),
             _OverviewRow(
               icon: Icons.tablet_outlined,
-              value: '${kpis['totalKiosks'] ?? 0}',
+              value: fmtCount(kpis['totalKiosks']),
               label: 'Total installed Kiosks',
               scheme: scheme,
             ),
             const SizedBox(height: 20),
             _OverviewRow(
               icon: Icons.track_changes_outlined,
-              value: _fmt(kpis['avgRevenuePerKiosk']),
+              value: fmtMoney(kpis['avgRevenuePerKiosk']),
               label: 'Average Revenue Per Kiosk',
               scheme: scheme,
             ),
             const SizedBox(height: 20),
             _OverviewRow(
               icon: Icons.track_changes_outlined,
-              value: _fmtOrders(kpis['avgOrdersPerKiosk']),
+              value: fmtAvg(kpis['avgOrdersPerKiosk']),
               label: 'Avg Num of Orders / Kiosk',
               scheme: scheme,
             ),
@@ -418,16 +414,7 @@ class _OverviewCard extends StatelessWidget {
     );
   }
 
-  String _fmt(dynamic v) {
-    if (v == null) return '0.00';
-    return (v as num).toDouble().toStringAsFixed(2);
-  }
 
-  String _fmtOrders(dynamic v) {
-    if (v == null) return '0';
-    final d = (v as num).toDouble();
-    return d == d.roundToDouble() ? '${d.round()}' : d.toStringAsFixed(1);
-  }
 }
 
 class _OverviewRow extends StatelessWidget {

@@ -8,6 +8,8 @@ import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/reset_pin_dialog.dart';
+import '../widgets/error_dialog.dart';
+import '../widgets/framed_card.dart';
 
 class DevicesScreen extends StatefulWidget {
   const DevicesScreen({super.key});
@@ -53,7 +55,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
       await ApiClient().patchDevice(d.id, {'enabled': !d.enabled}, token: token);
       _load();
     } on ApiException catch (err) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err.message)));
+      if (mounted) showErrorDialog(context, err.message);
     }
   }
 
@@ -66,7 +68,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
       await ApiClient().patchDevice(d.id, {'pinCode': newPin}, token: token);
       _load();
     } on ApiException catch (err) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err.message)));
+      if (mounted) showErrorDialog(context, err.message);
     }
   }
 
@@ -93,7 +95,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
       await ApiClient().deleteDevice(d.id, token: token);
       _load();
     } on ApiException catch (err) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err.message)));
+      if (mounted) showErrorDialog(context, err.message);
     }
   }
 
@@ -142,8 +144,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
                               ? const Center(child: Text('No devices found.'))
                               : RefreshIndicator(
                                   onRefresh: _load,
-                                  child: ListView.builder(
-                                    padding: const EdgeInsets.fromLTRB(24, 4, 24, 100),
+                                  child: CardGrid(
                                     itemCount: _devices!.length,
                                     itemBuilder: (_, i) => _DeviceCard(
                                       device: _devices![i],
@@ -153,7 +154,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
                                       onToggle: () => _toggleEnabled(_devices![i]),
                                       onResetPin: () => _resetPin(_devices![i]),
                                       onDelete: () => _delete(_devices![i]),
-                                    ),
+                                      )
                                   ),
                                 ),
                 ),
@@ -185,11 +186,8 @@ class _DeviceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final d = device;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
+    return FramedCard(
+      child: Row(
           children: [
             CircleAvatar(
               radius: 24,
@@ -201,17 +199,14 @@ class _DeviceCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(children: [
+                  Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
                     Text(d.displayName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-                    const SizedBox(width: 8),
                     _Badge(d.deviceType, Colors.deepPurple),
                     if (!d.enabled) ...[
-                      const SizedBox(width: 6),
-                      _Badge('Disabled', Colors.grey),
+                        _Badge('Disabled', Colors.grey),
                     ],
                     if (d.isLocked) ...[
-                      const SizedBox(width: 6),
-                      _Badge(
+                        _Badge(
                           'Locked until ${DateFormat('h:mm a').format(d.lockedUntil!.toLocal())}',
                           Colors.red),
                     ],
@@ -248,7 +243,6 @@ class _DeviceCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
     );
   }
 }

@@ -16,6 +16,7 @@ import '../widgets/admin_sidebar.dart';
 import '../widgets/waha_date_picker.dart';
 import '../widgets/waha_filter_controls.dart';
 import '../widgets/waha_pagination_bar.dart';
+import '../utils/number_format.dart';
 
 class InventoryVisitsScreen extends StatefulWidget {
   const InventoryVisitsScreen({super.key});
@@ -497,7 +498,7 @@ class _InventoryVisitsScreenState extends State<InventoryVisitsScreen> {
             child: Row(
               children: [
                 Text(
-                  _totalCount == 0 ? 'No entries' : 'Showing $from–$to of $_totalCount entries',
+                  _totalCount == 0 ? 'No entries' : 'Showing ${fmtCount(from)}–${fmtCount(to)} of ${fmtCount(_totalCount)} entries',
                   style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
                 ),
                 const Spacer(),

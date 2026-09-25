@@ -6,6 +6,7 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../utils/chart_ticks.dart';
+import '../widgets/error_dialog.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/waha_date_picker.dart';
 
@@ -143,10 +144,7 @@ class _ChartsScreenState extends State<ChartsScreen> {
     final picked = await showWahaDateRangePicker(context, initial: g.range);
     if (picked == null || !mounted) return;
     if (maxDays > 0 && picked.end.difference(picked.start).inDays > maxDays) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Range cannot exceed $maxDays days for this group'),
-        backgroundColor: Theme.of(context).colorScheme.error,
-      ));
+      showErrorDialog(context, 'Range cannot exceed $maxDays days for this group');
       return;
     }
     setState(() => g.range = picked);

@@ -7,6 +7,7 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
+import '../widgets/error_dialog.dart';
 
 class PaymentMethodsScreen extends StatefulWidget {
   final Store store;
@@ -65,8 +66,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
     } catch (e) {
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red));
+      showErrorDialog(context, 'Failed: $e');
     }
   }
 

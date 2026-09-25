@@ -9,6 +9,7 @@ import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/product_image.dart';
 import '../widgets/resource_picker_modal.dart';
+import '../widgets/error_dialog.dart';
 
 class StoreEditScreen extends StatefulWidget {
   final Store? store;
@@ -140,6 +141,10 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_error != null) {
+      showErrorDialogLater(context, _error!);
+      _error = null;
+    }
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
@@ -308,17 +313,7 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
                                     onChanged: (v) => setState(() => _isPublic = v),
                                   ),
 
-                                  if (_error != null) ...[
-                                    const SizedBox(height: 16),
-                                    Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                          color: scheme.errorContainer,
-                                          borderRadius: BorderRadius.circular(8)),
-                                      child: Text(_error!,
-                                          style: TextStyle(color: scheme.onErrorContainer)),
-                                    ),
-                                  ],
+
                                   const SizedBox(height: 40),
                                 ],
                               ),
