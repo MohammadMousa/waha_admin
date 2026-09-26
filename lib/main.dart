@@ -11,6 +11,7 @@ import 'screens/account_edit_screen.dart';
 import 'screens/accounts_screen.dart';
 import 'screens/advertisements_screen.dart';
 import 'screens/device_edit_screen.dart';
+import 'screens/device_logs_screen.dart';
 import 'screens/devices_screen.dart';
 import 'screens/employee_edit_screen.dart';
 import 'screens/employees_screen.dart';
@@ -40,9 +41,11 @@ import 'screens/charts_screen.dart';
 import 'screens/store_edit_screen.dart';
 import 'screens/stores_screen.dart';
 import 'state/auth_state.dart';
+import 'services/app_info.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppInfo.init();
   runApp(
     ChangeNotifierProvider(
       create: (_) => AuthState(),
@@ -71,6 +74,10 @@ class WahaAdminApp extends StatelessWidget {
           case Routes.dashboard:
             return MaterialPageRoute(
                 builder: (_) => const DashboardScreen(), settings: settings);
+
+          case Routes.deviceLogs:
+            return MaterialPageRoute(
+                builder: (_) => const DeviceLogsScreen(), settings: settings);
 
           case Routes.profile:
             return MaterialPageRoute(

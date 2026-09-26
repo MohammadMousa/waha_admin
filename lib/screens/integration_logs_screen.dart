@@ -37,8 +37,8 @@ class _IntegrationLogsScreenState extends State<IntegrationLogsScreen> {
 
   static final _dtFmt = DateFormat('yyyy-MM-dd HH:mm');
   static const _statuses = [null, 'PENDING', 'DONE', 'FAILED', 'SYNCED', 'COMPLETED'];
-  static const _types    = [null, 'ORDER', 'PRODUCT', 'CATEGORY'];
-  static const _cols = ['#ID', 'Type', 'Entity ID', 'Operation', 'Status', 'Attempts', 'Date', 'Error'];
+  static const _types    = [null, 'ORDER', 'PRODUCT', 'CATEGORY', 'CATALOG_PULL'];
+  static const _cols = ['#ID', 'Type', 'Entity ID', 'Operation', 'Status', 'Attempts', 'Date', 'Details'];
 
   @override
   void initState() {
@@ -369,6 +369,11 @@ td{padding:5px 8px;border-bottom:1px solid #eee}
                                       row['created_at'].toString()).toLocal())
                                   : '—';
                               final hasError = (row['last_error']?.toString() ?? '').isNotEmpty;
+                              // last_error also carries the result text of a successful
+                              // pull; only FAILED rows are shown in the error colour.
+                              final tone = row['status'] == 'FAILED'
+                                  ? scheme.error
+                                  : scheme.onSurfaceVariant;
                               return DataRow(cells: [
                                 DataCell(Text('${row['id'] ?? ''}')),
                                 DataCell(Text('${row['entity_type'] ?? ''}')),
@@ -389,7 +394,7 @@ td{padding:5px 8px;border-bottom:1px solid #eee}
                                         row['last_error']?.toString() ?? '',
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
-                                            fontSize: 11, color: scheme.error),
+                                            fontSize: 11, color: tone),
                                       ),
                                     ),
                                     const SizedBox(width: 4),
@@ -399,7 +404,7 @@ td{padding:5px 8px;border-bottom:1px solid #eee}
                                       child: Padding(
                                         padding: const EdgeInsets.all(4),
                                         child: Icon(Icons.open_in_new,
-                                            size: 14, color: scheme.error),
+                                            size: 14, color: tone),
                                       ),
                                     ),
                                   ] else

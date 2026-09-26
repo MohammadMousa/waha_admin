@@ -1,10 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
-import '../widgets/error_dialog.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -19,15 +20,38 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscure = true;
   bool _loading = false;
   String? _error;
+  Timer? _lockTimer;
+  int _lockSeconds = 0;
+  String _lockMessage = 'Account temporarily locked.';
+
+  bool get _locked => _lockSeconds > 0;
+
+  void _startLock(int seconds) {
+    _lockTimer?.cancel();
+    setState(() => _lockSeconds = seconds);
+    _lockTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) { t.cancel(); return; }
+      setState(() {
+        _lockSeconds--;
+        if (_lockSeconds <= 0) _error = null;
+      });
+      if (_lockSeconds <= 0) t.cancel();
+    });
+  }
+
+  String get _countdown =>
+      '${(_lockSeconds ~/ 60).toString().padLeft(2, '0')}:${(_lockSeconds % 60).toString().padLeft(2, '0')}';
 
   @override
   void dispose() {
+    _lockTimer?.cancel();
     _username.dispose();
     _password.dispose();
     super.dispose();
   }
 
   Future<void> _login() async {
+    if (_locked) return;
     if (_username.text.trim().isEmpty || _password.text.isEmpty) {
       setState(() => _error = 'Username and password are required.');
       return;
@@ -51,7 +75,16 @@ class _LoginScreenState extends State<LoginScreen> {
         nav.pushReplacementNamed(Routes.dashboard);
       }
     } on ApiException catch (e) {
-      if (mounted) setState(() { _error = e.message; _loading = false; });
+      if (!mounted) return;
+      final secs = e.retryAfterSeconds;
+      setState(() {
+        _loading = false;
+        _error = (secs != null && secs > 0) ? null : e.message;
+      });
+      if (secs != null && secs > 0) {
+        _lockMessage = e.message;
+        _startLock(secs);
+      }
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
     }
@@ -59,10 +92,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_error != null) {
-      showErrorDialogLater(context, _error!);
-      _error = null;
-    }
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -102,6 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 32),
                   TextField(
                     controller: _username,
+                    enabled: !_locked,
                     autofocus: true,
                     textInputAction: TextInputAction.next,
                     decoration: const InputDecoration(
@@ -113,6 +143,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: _password,
+                    enabled: !_locked,
                     obscureText: _obscure,
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => _login(),
@@ -128,10 +159,26 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
-
+                  if (_locked || _error != null) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: scheme.errorContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _locked
+                            ? '$_lockMessage Try again in $_countdown'
+                            : _error!,
+                        style: TextStyle(
+                            color: scheme.onErrorContainer, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   FilledButton(
-                    onPressed: _loading ? null : _login,
+                    onPressed: (_loading || _locked) ? null : _login,
                     style: FilledButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16)),
                     child: _loading

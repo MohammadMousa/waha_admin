@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../router/routes.dart';
 import '../state/auth_state.dart';
 import '../utils/role_labels.dart';
+import 'about_dialog.dart';
 
 class AdminSidebar extends StatelessWidget {
   final String currentRoute;
@@ -172,6 +173,14 @@ class AdminSidebar extends StatelessWidget {
                     current: currentRoute,
                     indent: true,
                   ),
+                if (canManageDevices)
+                  _NavItem(
+                    icon: Icons.receipt_long_outlined,
+                    label: 'Device Logs',
+                    route: Routes.deviceLogs,
+                    current: currentRoute,
+                    indent: true,
+                  ),
                 _NavItem(
                   icon: Icons.payment_outlined,
                   label: 'Payment Methods',
@@ -243,6 +252,12 @@ class AdminSidebar extends StatelessWidget {
           ),
 
           Divider(height: 1, color: scheme.outlineVariant),
+          ListTile(
+            leading: const Icon(Icons.info_outline, size: 20),
+            title: const Text('About', style: TextStyle(fontSize: 14)),
+            dense: true,
+            onTap: () => showAboutInfoDialog(context),
+          ),
           ListTile(
             leading: const Icon(Icons.logout_outlined, size: 20),
             title: const Text('Sign Out', style: TextStyle(fontSize: 14)),

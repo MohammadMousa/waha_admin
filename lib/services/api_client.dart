@@ -23,7 +23,9 @@ const kMaxApiPageSize = 100;
 class ApiException implements Exception {
   final int statusCode;
   final String message;
-  const ApiException(this.statusCode, this.message);
+  /// Set on a login lockout (429/423): seconds until the account unlocks.
+  final int? retryAfterSeconds;
+  const ApiException(this.statusCode, this.message, {this.retryAfterSeconds});
   @override
   String toString() => message;
 }
@@ -57,7 +59,37 @@ class ApiClient {
       body: jsonEncode({'username': username, 'password': password}),
     );
     if (resp.statusCode == 200) return jsonDecode(resp.body) as Map<String, dynamic>;
-    throw ApiException(resp.statusCode, _extractMessage(resp));
+    throw _loginError(resp);
+  }
+
+  // 401 INVALID_CREDENTIALS carries attempts_remaining; 429/423 ACCOUNT_LOCKED
+  // carries retry_after_seconds (also the Retry-After header).
+  ApiException _loginError(http.Response resp) {
+    try {
+      final body = jsonDecode(resp.body) as Map<String, dynamic>;
+      final code = body['code'];
+      if (code == 'INVALID_CREDENTIALS') {
+        final left = (body['attempts_remaining'] as num?)?.toInt();
+        return ApiException(
+            resp.statusCode,
+            left == null
+                ? 'Invalid credentials.'
+                : 'Invalid credentials. $left ${left == 1 ? 'attempt' : 'attempts'} remaining before temporary lock.');
+      }
+      if (code == 'ACCOUNT_LOCKED' || code == 'TOO_MANY_REQUESTS' || resp.statusCode == 429 || resp.statusCode == 423) {
+        final secs = (body['retry_after_seconds'] as num?)?.toInt() ??
+            int.tryParse(resp.headers['retry-after'] ?? '');
+        return ApiException(
+            resp.statusCode,
+            code == 'TOO_MANY_REQUESTS'
+                ? (body['message'] as String? ?? 'Too many requests — please try again later.')
+                : 'Account temporarily locked.',
+            retryAfterSeconds: secs);
+      }
+      return ApiException(resp.statusCode, body['message'] as String? ?? 'Login failed (${resp.statusCode})');
+    } catch (_) {
+      return ApiException(resp.statusCode, 'Login failed (${resp.statusCode})');
+    }
   }
 
   Future<void> changeOwnPassword(
@@ -68,6 +100,52 @@ class ApiClient {
       body: jsonEncode({'currentPassword': currentPassword, 'newPassword': newPassword}),
     );
     if (resp.statusCode == 200) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  // ── Device logs (admin, organization-filtered, MANAGE_DEVICES) ─────────────
+
+  Future<Map<String, dynamic>> getDeviceLogs(
+    String token, {
+    int page = 0,
+    int size = 20,
+    int? deviceId,
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    final uri = _uri('/api/logs').replace(queryParameters: {
+      'page': '$page',
+      'size': '$size',
+      'sort': 'createdAt,desc',
+      if (deviceId != null) 'deviceId': '$deviceId',
+      if (from != null) 'from': from.toUtc().toIso8601String(),
+      if (to != null) 'to': to.toUtc().toIso8601String(),
+    });
+    final resp = await _http.get(uri, headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  /// Raw log text (admin token required — never a public URL).
+  Future<String> getDeviceLogText(int id, {required String token}) async {
+    final resp = await _http.get(_uri('/api/logs/$id'), headers: _headers(token: token));
+    if (resp.statusCode == 200) return utf8.decode(resp.bodyBytes);
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  /// Returns how many logs were actually deleted.
+  Future<int> deleteDeviceLogs(List<int> ids, {required String token}) async {
+    final resp = await _http.post(
+      _uri('/api/logs/delete'),
+      headers: _headers(token: token),
+      body: jsonEncode({'ids': ids}),
+    );
+    if (resp.statusCode == 200) {
+      final body = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+      return (body['deleted'] as num?)?.toInt() ?? 0;
+    }
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
 

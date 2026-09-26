@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -5,6 +7,8 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
+import '../utils/number_format.dart';
+import '../widgets/error_dialog.dart';
 
 class OdooAdminScreen extends StatefulWidget {
   const OdooAdminScreen({super.key});
@@ -30,6 +34,7 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
   String? _lastCatSync;
   String? _lastProdSync;
   Map<String, dynamic>? _queue;
+  List<Map<String, dynamic>> _history = [];
   String? _error;
   String? _successMsg;
 
@@ -73,6 +78,12 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
         if (_username         != null && _username!.isNotEmpty)         _userCtrl.text     = _username!;
         if (_customerOverride != null && _customerOverride!.isNotEmpty) _overrideCtrl.text = _customerOverride!;
       });
+      final logs = await ApiClient().getIntegrationLogs(
+          token, entityType: 'CATALOG_PULL', page: 0, size: 20);
+      if (mounted) {
+        setState(() => _history =
+            (logs['items'] as List? ?? []).cast<Map<String, dynamic>>().map(_toHistory).toList());
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -160,6 +171,10 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_error != null) {
+      showErrorDialogLater(context, _error!);
+      _error = null;
+    }
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
@@ -203,13 +218,11 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  if (_error != null)
-                    _Banner(message: _error!, color: scheme.errorContainer,
-                            textColor: scheme.onErrorContainer),
-                  if (_successMsg != null)
+                  if (_successMsg != null) ...[
                     _Banner(message: _successMsg!, color: Colors.green.shade50,
                             textColor: Colors.green.shade900),
-                  if (_error != null || _successMsg != null) const SizedBox(height: 12),
+                    const SizedBox(height: 12),
+                  ],
 
                   if (!_inherited) ...[
                     Text('Connection', style: Theme.of(context).textTheme.titleMedium
@@ -310,6 +323,10 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
                       enabled: _configured && !_loading,
                       onPull: _pullProducts,
                     ),
+                    const SizedBox(height: 24),
+                    const Divider(),
+                    const SizedBox(height: 16),
+                    _SyncHistorySection(history: _history),
                   ],
 
                   if (_queue != null) ...[
@@ -505,4 +522,152 @@ class _Chip extends StatelessWidget {
       ]),
     ),
   );
+}
+
+// ── Automatic pull + history ──────────────────────────────────────────────────
+
+String _fmtLocal(dynamic iso) {
+  if (iso == null) return '—';
+  try {
+    final dt = DateTime.parse(iso.toString()).toLocal();
+    String p(int n) => n.toString().padLeft(2, '0');
+    return '${dt.year}-${p(dt.month)}-${p(dt.day)} ${p(dt.hour)}:${p(dt.minute)}';
+  } catch (_) {
+    return iso.toString();
+  }
+}
+
+// A CATALOG_PULL row of GET /api/admin/integrations/logs -> the fields the
+// history UI shows. payload = {triggeredBy, categoriesPulled, productsPulled};
+// created_at has no zone (server time is UTC).
+Map<String, dynamic> _toHistory(Map<String, dynamic> r) {
+  var payload = r['payload'];
+  if (payload is String) {
+    try { payload = jsonDecode(payload); } catch (_) { payload = null; }
+  }
+  final p = payload is Map ? payload : const {};
+  String? utc(dynamic v) {
+    if (v == null) return null;
+    final t = v.toString();
+    return RegExp(r'(Z|[+-]\d\d:?\d\d)$').hasMatch(t) ? t : '${t}Z';
+  }
+  return {
+    'triggeredBy': p['triggeredBy'],
+    'startedAt': utc(r['created_at']),
+    'categoriesPulled': p['categoriesPulled'] ?? 0,
+    'productsPulled': p['productsPulled'] ?? 0,
+    'status': r['status'],
+    'errorMessage': r['last_error'],
+  };
+}
+
+class _SyncHistorySection extends StatelessWidget {
+  final List<Map<String, dynamic>> history;
+  const _SyncHistorySection({required this.history});
+
+  Color _statusColor(String? s) => switch (s) {
+        'DONE' => Colors.green.shade700,
+        'FAILED' => Colors.red.shade700,
+        _ => Colors.orange.shade700,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final last = history.isEmpty ? null : history.first;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Automatic pull', style: Theme.of(context).textTheme.titleMedium
+            ?.copyWith(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 4),
+        Text('Categories and products are pulled automatically every day at 06:00 UTC.',
+            style: TextStyle(color: scheme.outline, fontSize: 13)),
+        const SizedBox(height: 12),
+        Card(
+          elevation: 0,
+          color: scheme.surfaceContainerHighest,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: last == null
+                ? Text('No sync requests yet.', style: TextStyle(color: scheme.outline))
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Last sync request: ${_fmtLocal(last['startedAt'])} '
+                          '(${last['triggeredBy'] == 'SCHEDULED' ? 'scheduled' : 'manual'}, '
+                          '${(last['status'] ?? '').toString().toLowerCase()})',
+                          style: const TextStyle(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 4),
+                      Text('Pulled: ${fmtCount(last['categoriesPulled'])} categories, '
+                          '${fmtCount(last['productsPulled'])} products',
+                          style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+                      if ((last['errorMessage'] ?? '').toString().isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text('${last['errorMessage']}',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: last['status'] == 'FAILED'
+                                      ? scheme.error
+                                      : scheme.onSurfaceVariant)),
+                        ),
+                    ],
+                  ),
+          ),
+        ),
+        if (history.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Text('Sync history', style: Theme.of(context).textTheme.titleSmall
+              ?.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: scheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: scheme.outlineVariant),
+            ),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                columnSpacing: 24,
+                headingRowColor: WidgetStatePropertyAll(scheme.surfaceContainerHighest),
+                columns: const [
+                  DataColumn(label: Text('Started', style: TextStyle(fontWeight: FontWeight.w600))),
+                  DataColumn(label: Text('Trigger', style: TextStyle(fontWeight: FontWeight.w600))),
+                  DataColumn(numeric: true, label: Text('Categories', style: TextStyle(fontWeight: FontWeight.w600))),
+                  DataColumn(numeric: true, label: Text('Products', style: TextStyle(fontWeight: FontWeight.w600))),
+                  DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.w600))),
+                  DataColumn(label: Text('Details', style: TextStyle(fontWeight: FontWeight.w600))),
+                ],
+                rows: history.map((r) => DataRow(cells: [
+                      DataCell(Text(_fmtLocal(r['startedAt']))),
+                      DataCell(Text(r['triggeredBy'] == 'SCHEDULED' ? 'Scheduled' : 'Manual')),
+                      DataCell(Text(fmtCount(r['categoriesPulled']))),
+                      DataCell(Text(fmtCount(r['productsPulled']))),
+                      DataCell(Text('${r['status'] ?? ''}',
+                          style: TextStyle(
+                              color: _statusColor(r['status']?.toString()),
+                              fontWeight: FontWeight.w600))),
+                      DataCell(SizedBox(
+                        width: 260,
+                        child: Tooltip(
+                          message: '${r['errorMessage'] ?? ''}',
+                          child: Text('${r['errorMessage'] ?? ''}',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: r['status'] == 'FAILED'
+                                      ? scheme.error
+                                      : scheme.onSurfaceVariant)),
+                        ),
+                      )),
+                    ])).toList(),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
 }

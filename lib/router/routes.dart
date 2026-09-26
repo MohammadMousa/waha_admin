@@ -14,6 +14,7 @@ class Routes {
   static const employeeEdit    = '/employees/edit';
   static const devices         = '/devices';
   static const deviceEdit      = '/devices/edit';
+  static const deviceLogs      = '/devices/logs';
   static const register        = '/register';
 
   // Catalog

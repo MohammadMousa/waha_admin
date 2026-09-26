@@ -36,6 +36,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
   final _priceCtrl    = TextEditingController();
   final _tagInputCtrl = TextEditingController();
   final _newBarcodeCtrl = TextEditingController();
+  final _primaryBarcodeCtrl = TextEditingController();
 
   int?  _imageResourceId;
   bool  _removeAvatar = false;
@@ -69,6 +70,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     _priceCtrl.dispose();
     _tagInputCtrl.dispose();
     _newBarcodeCtrl.dispose();
+    _primaryBarcodeCtrl.dispose();
     super.dispose();
   }
 
@@ -178,7 +180,8 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     // and push them to the server right after the product itself is
     // created (see _save()), same pattern _galleryIds already uses.
     if (_isCreate) {
-      if (_alternateBarcodes.any((b) => b['barcode'] == barcode)) {
+      if (barcode == _primaryBarcodeCtrl.text.trim() ||
+          _alternateBarcodes.any((b) => b['barcode'] == barcode)) {
         setState(() => _barcodeError = 'Already added.');
         return;
       }
@@ -240,7 +243,19 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     final api = ApiClient();
     try {
       final priceVal = double.tryParse(_priceCtrl.text.trim()) ?? 0.0;
+      final primary = _primaryBarcodeCtrl.text.trim();
+      if (_isCreate) {
+        if (primary.isEmpty) {
+          setState(() { _error = 'Primary barcode is required.'; _saving = false; });
+          return;
+        }
+        if (_alternateBarcodes.any((b) => b['barcode'] == primary)) {
+          setState(() { _error = 'Primary barcode is also listed as an additional barcode.'; _saving = false; });
+          return;
+        }
+      }
       final body = <String, dynamic>{
+        if (_isCreate) 'barcode': primary,
         'name':        {'ar': _nameArCtrl.text.trim(), 'en': _nameEnCtrl.text.trim()},
         'description': {'ar': _descArCtrl.text.trim(), 'en': _descEnCtrl.text.trim()},
         'price':       priceVal,
@@ -654,6 +669,16 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                                       style:
                                           Theme.of(context).textTheme.titleSmall),
                                   const SizedBox(height: 8),
+                                  if (_isCreate) ...[
+                                    TextField(
+                                      controller: _primaryBarcodeCtrl,
+                                      decoration: const InputDecoration(
+                                          labelText: 'Primary Barcode *',
+                                          border: OutlineInputBorder(),
+                                          isDense: true),
+                                    ),
+                                    const SizedBox(height: 16),
+                                  ],
                                   if (!_isCreate) ...[
                                     Text('Primary Barcode',
                                         style: TextStyle(
