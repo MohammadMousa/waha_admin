@@ -581,7 +581,8 @@ class _SyncHistorySection extends StatelessWidget {
         Text('Automatic pull', style: Theme.of(context).textTheme.titleMedium
             ?.copyWith(fontWeight: FontWeight.w700)),
         const SizedBox(height: 4),
-        Text('Categories and products are pulled automatically every day at 06:00 UTC.',
+        Text(
+            'Categories and products are pulled automatically every day at 06:00 KSA.',
             style: TextStyle(color: scheme.outline, fontSize: 13)),
         const SizedBox(height: 12),
         Card(

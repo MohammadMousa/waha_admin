@@ -149,6 +149,53 @@ class ApiClient {
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
 
+  // ── Organization properties (MANAGE_STORES, org derived from session) ──────
+
+  Future<List<Map<String, dynamic>>> getOrganizationProperties(String token) async {
+    final resp = await _http.get(
+        _uri('/api/admin/organization/properties'), headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      final body = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+      return (body['items'] as List? ?? []).cast<Map<String, dynamic>>();
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  /// Known keys with type/description/constraints, for the "add property"
+  /// picker — free-form keys are still allowed beyond this list.
+  Future<List<Map<String, dynamic>>> getOrganizationPropertyKeys(String token) async {
+    final resp = await _http.get(
+        _uri('/api/admin/organization/properties/keys'), headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      final body = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+      return (body['knownKeys'] as List? ?? []).cast<Map<String, dynamic>>();
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  /// Upserts one or more org properties (only the keys being changed).
+  Future<List<Map<String, dynamic>>> putOrganizationProperties(
+      String token, Map<String, String> changes) async {
+    final resp = await _http.put(
+      _uri('/api/admin/organization/properties'),
+      headers: _headers(token: token),
+      body: jsonEncode(changes),
+    );
+    if (resp.statusCode == 200) {
+      final body = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+      return (body['items'] as List? ?? []).cast<Map<String, dynamic>>();
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<void> deleteOrganizationProperty(String token, String key) async {
+    final resp = await _http.delete(
+        _uri('/api/admin/organization/properties/${Uri.encodeComponent(key)}'),
+        headers: _headers(token: token));
+    if (resp.statusCode == 204 || resp.statusCode == 200) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
   // ── Dashboard ─────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> getDashboardKpis(String token, {int? storeId}) async {

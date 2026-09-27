@@ -112,7 +112,10 @@ class _LandingPagesScreenState extends State<LandingPagesScreen> {
   }
 
   void _previewPage(String key) {
-    final url = '${AppConfig.apiBaseUrl}/resource/$_resourceBase/pages/$key.html';
+    // Cache-bust: this URL never changes after Save, so the browser would
+    // otherwise keep serving the page (and its images) from cache forever.
+    final url = '${AppConfig.apiBaseUrl}/resource/$_resourceBase/pages/$key.html'
+        '?t=${DateTime.now().millisecondsSinceEpoch}';
     html.window.open(url, '_blank', 'width=450,height=800,resizable=yes');
   }
 

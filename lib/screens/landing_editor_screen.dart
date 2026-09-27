@@ -58,8 +58,12 @@ class _LandingEditorScreenState extends State<LandingEditorScreen> {
   Future<void> _loadExisting() async {
     try {
       final token = context.read<AuthState>().token;
+      // Cache-bust: without this, the browser can serve a stale cached copy
+      // of this exact URL, so re-opening this screen shows an old version
+      // even though the server file was already updated by the last save.
       final uri = Uri.parse(
-          '${AppConfig.apiBaseUrl}/resource/$_resourceBase/$_pagesDir/$_filename');
+          '${AppConfig.apiBaseUrl}/resource/$_resourceBase/$_pagesDir/$_filename'
+          '?t=${DateTime.now().millisecondsSinceEpoch}');
       final resp = await http.get(uri);
       if (resp.statusCode == 200) {
         final htmlBody = utf8.decode(resp.bodyBytes);
@@ -86,7 +90,9 @@ class _LandingEditorScreenState extends State<LandingEditorScreen> {
     final slideRe = RegExp(r'<div class="slide" data-rid="(\d+)"[^>]*><img src="([^"]+)"');
     for (final m in slideRe.allMatches(html)) {
       final rid = int.tryParse(m.group(1)!);
-      final src = m.group(2)!;
+      // Strip any `?v=` cache-buster this screen wrote on a previous save,
+      // so it isn't carried forward and stacked on the next one.
+      final src = m.group(2)!.split('?').first;
       // Re-derive against the current resourceBase — heals slides saved under
       // a stale org/store identifier the moment this page is reopened.
       if (rid != null) _slides.add(_Slide(resourceId: rid, publicUrl: healResourceUrl(src, _resourceBase)));
@@ -115,9 +121,13 @@ class _LandingEditorScreenState extends State<LandingEditorScreen> {
   String _buildHtml() {
     final mode = _fullscreen ? 'fullscreen' : 'embedded';
     final slideHtml = _slides.map((s) {
-      final src = s.publicUrl.isNotEmpty
+      final path = s.publicUrl.isNotEmpty
           ? _toRelativePath(s.publicUrl)
           : '/api/resources/${s.resourceId}';
+      // Cache-bust with the resource id: a replaced image keeps the same
+      // filename/path on the server, so without this the browser (and the
+      // kiosk) would keep showing the old cached bytes after Save.
+      final src = '$path?v=${s.resourceId}';
       return '  <div class="slide" data-rid="${s.resourceId}"><img src="$src" loading="eager" alt=""></div>';
     }).join('\n');
 

@@ -161,14 +161,19 @@ td{padding:5px 8px;border-bottom:1px solid #eee}
 
   void _showError(BuildContext ctx, Map<String, dynamic> row) {
     final scheme = Theme.of(ctx).colorScheme;
-    final fullError = row['last_error']?.toString() ?? '(no error recorded)';
+    // last_error also carries the result text of a successful pull (see the
+    // "Details" column) — only a FAILED row is actually an error.
+    final isFailed = row['status'] == 'FAILED';
+    final tone = isFailed ? scheme.error : scheme.primary;
+    final fullText = row['last_error']?.toString() ?? '(no details recorded)';
     showDialog(
       context: ctx,
       builder: (dialogCtx) => AlertDialog(
         title: Row(children: [
-          Icon(Icons.error_outline, color: scheme.error, size: 20),
+          Icon(isFailed ? Icons.error_outline : Icons.info_outline, color: tone, size: 20),
           const SizedBox(width: 8),
-          Text('Error — #${row['id']}', style: const TextStyle(fontSize: 16)),
+          Text('${isFailed ? 'Error' : 'Details'} — #${row['id']}',
+              style: const TextStyle(fontSize: 16)),
         ]),
         content: SizedBox(
           width: 560,
@@ -184,13 +189,13 @@ td{padding:5px 8px;border-bottom:1px solid #eee}
                 constraints: const BoxConstraints(maxHeight: 320),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: scheme.errorContainer.withValues(alpha: 0.3),
+                  color: tone.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: scheme.error.withValues(alpha: 0.3)),
+                  border: Border.all(color: tone.withValues(alpha: 0.3)),
                 ),
                 child: SingleChildScrollView(
                   child: SelectableText(
-                    fullError,
+                    fullText,
                     style: TextStyle(fontSize: 13, color: scheme.onSurface,
                         fontFamily: 'monospace'),
                   ),
@@ -204,14 +209,15 @@ td{padding:5px 8px;border-bottom:1px solid #eee}
             icon: const Icon(Icons.download_outlined, size: 16),
             label: const Text('Save .txt'),
             onPressed: () {
-              _download('error_${row['id']}.txt', fullError, 'text/plain;charset=utf-8;');
+              _download('${isFailed ? 'error' : 'details'}_${row['id']}.txt', fullText,
+                  'text/plain;charset=utf-8;');
             },
           ),
           TextButton.icon(
             icon: const Icon(Icons.copy_outlined, size: 16),
             label: const Text('Copy'),
             onPressed: () {
-              Clipboard.setData(ClipboardData(text: fullError));
+              Clipboard.setData(ClipboardData(text: fullText));
               Navigator.pop(dialogCtx);
               ScaffoldMessenger.of(ctx).showSnackBar(
                 const SnackBar(content: Text('Copied to clipboard')));
@@ -359,8 +365,14 @@ td{padding:5px 8px;border-bottom:1px solid #eee}
                             dataRowMaxHeight: 52,
                             columns: List.generate(_cols.length, (i) => DataColumn(
                               numeric: i == 5,
-                              label: Text(_cols[i],
-                                  style: const TextStyle(fontWeight: FontWeight.w600)),
+                              // DataColumn's own numeric right-alignment doesn't
+                              // reliably match the cell's, so anchor both to the
+                              // same edge explicitly (was visibly misaligned).
+                              label: Align(
+                                alignment: i == 5 ? Alignment.centerRight : Alignment.centerLeft,
+                                child: Text(_cols[i],
+                                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                              ),
                               onSort: (c, a) => _sort(c, a),
                             )),
                             rows: _items.map((row) {
@@ -383,8 +395,10 @@ td{padding:5px 8px;border-bottom:1px solid #eee}
                                         style: const TextStyle(fontSize: 12)))),
                                 DataCell(Text('${row['operation'] ?? '—'}')),
                                 DataCell(_LogStatusChip(row['status']?.toString())),
-                                DataCell(Text('${row['attempts'] ?? 0}',
-                                    textAlign: TextAlign.right)),
+                                DataCell(Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Text('${row['attempts'] ?? 0}'),
+                                )),
                                 DataCell(Text(dt, style: const TextStyle(fontSize: 12))),
                                 DataCell(Row(children: [
                                   if (hasError) ...[

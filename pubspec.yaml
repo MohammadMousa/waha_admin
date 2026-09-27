@@ -1,7 +1,7 @@
 name: waha_admin
 description: "Waha Admin Dashboard"
 publish_to: 'none'
-version: 1.0.3+20260927
+version: 1.0.5+20260927
 
 environment:
   sdk: ^3.12.2

@@ -89,7 +89,6 @@ Future<ProductViewSettings?> showProductViewSettingsDialog(
             onPressed: () => setSt(() { name = 12; price = 11; cols = 0; image = 90; }),
             child: const Text('Reset'),
           ),
-          const Spacer(),
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           FilledButton(
             onPressed: () => Navigator.pop(ctx,

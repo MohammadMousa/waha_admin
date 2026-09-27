@@ -28,6 +28,7 @@ import 'screens/inventory_operations_screen.dart';
 import 'screens/inventory_stock_screen.dart';
 import 'screens/inventory_visits_screen.dart';
 import 'screens/odoo_admin_screen.dart';
+import 'screens/organization_properties_screen.dart';
 import 'screens/profile_screen.dart';
 import 'services/api_client.dart';
 import 'screens/payment_methods_screen.dart';
@@ -74,6 +75,10 @@ class WahaAdminApp extends StatelessWidget {
           case Routes.dashboard:
             return MaterialPageRoute(
                 builder: (_) => const DashboardScreen(), settings: settings);
+
+          case Routes.organizationProperties:
+            return MaterialPageRoute(
+                builder: (_) => const OrganizationPropertiesScreen(), settings: settings);
 
           case Routes.deviceLogs:
             return MaterialPageRoute(

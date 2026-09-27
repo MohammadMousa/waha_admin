@@ -20,6 +20,7 @@ class AdminSidebar extends StatelessWidget {
     final canManageUsers = auth.hasPermission('MANAGE_USERS');
     final canManageEmployees = auth.hasPermission('MANAGE_EMPLOYEES');
     final canManageDevices = auth.hasPermission('MANAGE_DEVICES');
+    final canManageStores = auth.hasPermission('MANAGE_STORES');
 
     return Container(
       width: 220,
@@ -149,6 +150,14 @@ class AdminSidebar extends StatelessWidget {
                   current: currentRoute,
                   indent: true,
                 ),
+                if (canManageStores)
+                  _NavItem(
+                    icon: Icons.tune,
+                    label: 'Organization Settings',
+                    route: Routes.organizationProperties,
+                    current: currentRoute,
+                    indent: true,
+                  ),
                 if (canManageUsers)
                   _NavItem(
                     icon: Icons.people_outline,

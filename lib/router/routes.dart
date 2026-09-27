@@ -10,6 +10,7 @@ class Routes {
   static const storeEdit       = '/stores/edit';
   static const accounts        = '/accounts';
   static const accountEdit     = '/accounts/edit';
+  static const organizationProperties = '/organization/properties';
   static const employees       = '/employees';
   static const employeeEdit    = '/employees/edit';
   static const devices         = '/devices';

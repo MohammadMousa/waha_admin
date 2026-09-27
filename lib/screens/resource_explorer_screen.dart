@@ -295,7 +295,8 @@ class _ResourceExplorerScreenState extends State<ResourceExplorerScreen> {
   void _previewKiosk(ResourceAsset asset) {
     final dir = _selectedDir;
     if (dir == null) return;
-    final url = '${AppConfig.apiBaseUrl}${asset.publicUrl(_resourceBase, dir.name)}';
+    final url = '${AppConfig.apiBaseUrl}${asset.publicUrl(_resourceBase, dir.name)}'
+        '?t=${DateTime.now().millisecondsSinceEpoch}';
     html.window.open(url, '_blank', 'width=450,height=800,resizable=yes');
   }
 

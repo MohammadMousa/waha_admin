@@ -77,7 +77,11 @@ class _AdvertisementsScreenState extends State<AdvertisementsScreen> {
     }
     setState(() { _slides.clear(); _loadingSlides = true; _error = null; _successMsg = null; });
     try {
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/resource/$base/$_pagesDir/$_filename');
+      // Cache-bust: without this, the browser can serve a stale cached copy
+      // of this exact URL, so re-opening this screen shows an old version
+      // even though the server file was already updated by the last save.
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/resource/$base/$_pagesDir/$_filename'
+          '?t=${DateTime.now().millisecondsSinceEpoch}');
       final resp = await http.get(uri);
       if (!mounted) return;
       if (resp.statusCode == 200) {
@@ -100,7 +104,9 @@ class _AdvertisementsScreenState extends State<AdvertisementsScreen> {
     for (final m in re.allMatches(html)) {
       final rid    = int.tryParse(m.group(1)!);
       final label  = m.group(2) ?? '';
-      final srcUrl = m.group(3) ?? '';
+      // Strip any `?v=` cache-buster this screen wrote on a previous save,
+      // so it isn't carried forward and stacked on the next one.
+      final srcUrl = (m.group(3) ?? '').split('?').first;
       // Re-derive against the current resourceBase — heals slides saved under
       // a stale org/store identifier the moment this page is reloaded.
       final healed = base == null ? srcUrl : healResourceUrl(srcUrl, base);
@@ -186,7 +192,10 @@ class _AdvertisementsScreenState extends State<AdvertisementsScreen> {
       // Always save as root-relative so resolveAbsolutePaths() on the kiosk
       // rewrites to the live server origin. Handles both old (absolute) and
       // new (relative) publicUrl values gracefully.
-      final src = _toRelativePath(s.publicUrl);
+      // Cache-bust with the resource id: a replaced image keeps the same
+      // filename/path on the server, so without this the browser (and the
+      // kiosk) would keep showing the old cached bytes after Save.
+      final src = '${_toRelativePath(s.publicUrl)}?v=${s.resourceId}';
       final labelAttr = s.label.isNotEmpty ? ' data-label="${s.label}"' : '';
       return '  <div class="slide" data-rid="${s.resourceId}"$labelAttr><img src="$src" loading="eager" alt="${s.label}"></div>';
     }).join('\n');
@@ -271,7 +280,8 @@ $slideHtml
     if (!ok || !mounted) return;
     final base = _resourceBase;
     if (base == null) return;
-    final url = '${AppConfig.apiBaseUrl}/resource/$base/$_pagesDir/$_filename';
+    final url = '${AppConfig.apiBaseUrl}/resource/$base/$_pagesDir/$_filename'
+        '?t=${DateTime.now().millisecondsSinceEpoch}';
     html.window.open(url, '_blank', 'width=450,height=800,resizable=yes');
   }
 
