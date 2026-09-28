@@ -152,6 +152,24 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
     }
   }
 
+  Future<void> _forcePullProducts() async {
+    final token = _token;
+    if (token == null) return;
+    setState(() { _loading = true; _error = null; _successMsg = null; });
+    try {
+      final result = await ApiClient().oodooForceFullPullProducts(token);
+      await _loadStatus();
+      final added = result['added'] ?? 0;
+      final updated = result['updated'] ?? 0;
+      final skipped = result['skipped'] ?? 0;
+      setState(() => _successMsg = '${fmtCount(added)} added, ${fmtCount(updated)} updated, ${fmtCount(skipped)} skipped.');
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   Future<void> _pushOrders() async {
     final token = _token;
     if (token == null) return;
@@ -330,6 +348,7 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
                       lastSync: _lastProdSync,
                       enabled: _configured && !_loading,
                       onPull: _pullProducts,
+                      onForcePull: _forcePullProducts,
                     ),
                     const SizedBox(height: 24),
                     const Divider(),
@@ -436,8 +455,9 @@ class _SyncRow extends StatelessWidget {
   final String? lastSync;
   final bool enabled;
   final VoidCallback onPull;
+  final VoidCallback? onForcePull;
   const _SyncRow({required this.label, required this.icon, this.lastSync,
-                   required this.enabled, required this.onPull});
+                   required this.enabled, required this.onPull, this.onForcePull});
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -462,6 +482,17 @@ class _SyncRow extends StatelessWidget {
                 ],
               ),
             ),
+            if (onForcePull != null) ...[
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.deepOrange,
+                  side: const BorderSide(color: Colors.deepOrange),
+                ),
+                onPressed: enabled ? onForcePull : null,
+                child: const Text('Force Full Pull'),
+              ),
+              const SizedBox(width: 8),
+            ],
             FilledButton(
               onPressed: enabled ? onPull : null,
               child: const Text('Pull'),

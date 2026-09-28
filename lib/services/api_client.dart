@@ -895,6 +895,15 @@ class ApiClient {
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
 
+  Future<Map<String, dynamic>> oodooForceFullPullProducts(String token) async {
+    final resp = await _http.post(
+        _uri('/api/admin/odoo/pull/products/full'), headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      return jsonDecode(resp.body) as Map<String, dynamic>;
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
   Future<int> oodooPushOrders(String token, {int? storeId}) async {
     final uri = _uri('/api/admin/odoo/push/orders')
         .replace(queryParameters: storeId != null ? {'storeId': '$storeId'} : null);
