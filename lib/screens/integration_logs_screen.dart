@@ -11,6 +11,7 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
+import '../widgets/error_dialog.dart';
 import '../utils/number_format.dart';
 
 class IntegrationLogsScreen extends StatefulWidget {
@@ -160,74 +161,116 @@ td{padding:5px 8px;border-bottom:1px solid #eee}
   }
 
   void _showError(BuildContext ctx, Map<String, dynamic> row) {
-    final scheme = Theme.of(ctx).colorScheme;
-    // last_error also carries the result text of a successful pull (see the
-    // "Details" column) — only a FAILED row is actually an error.
-    final isFailed = row['status'] == 'FAILED';
-    final tone = isFailed ? scheme.error : scheme.primary;
-    final fullText = row['last_error']?.toString() ?? '(no details recorded)';
+    // Mutable across rebuilds — must live outside the StatefulBuilder's
+    // builder closure, not be redeclared inside it on every rebuild.
+    var status = row['status']?.toString();
+    var text = row['last_error']?.toString() ?? '(no details recorded)';
+    var retrying = false;
+    final canRetry = row['entity_type'] == 'ORDER';
     showDialog(
       context: ctx,
-      builder: (dialogCtx) => AlertDialog(
-        title: Row(children: [
-          Icon(isFailed ? Icons.error_outline : Icons.info_outline, color: tone, size: 20),
-          const SizedBox(width: 8),
-          Text('${isFailed ? 'Error' : 'Details'} — #${row['id']}',
-              style: const TextStyle(fontSize: 16)),
-        ]),
-        content: SizedBox(
-          width: 560,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (row['entity_type'] != null)
-                Text('${row['entity_type']} · ${row['entity_id']} · ${row['operation']}',
-                    style: TextStyle(fontSize: 12, color: scheme.outline)),
-              const SizedBox(height: 12),
-              Container(
-                constraints: const BoxConstraints(maxHeight: 320),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: tone.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: tone.withValues(alpha: 0.3)),
-                ),
-                child: SingleChildScrollView(
-                  child: SelectableText(
-                    fullText,
-                    style: TextStyle(fontSize: 13, color: scheme.onSurface,
-                        fontFamily: 'monospace'),
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (dialogCtx, setSt) {
+          final scheme = Theme.of(dialogCtx).colorScheme;
+          final isFailed = status == 'FAILED';
+          final tone = isFailed ? scheme.error : scheme.primary;
+
+          Future<void> retry() async {
+            final token = context.read<AuthState>().token;
+            if (token == null) return;
+            setSt(() => retrying = true);
+            try {
+              final result = await ApiClient()
+                  .retryOdooSyncPush(token, (row['id'] as num).toInt());
+              setSt(() {
+                status = result['status']?.toString();
+                text = status == 'DONE'
+                    ? 'Pushed to Odoo successfully.'
+                    : (result['error']?.toString() ?? text);
+                retrying = false;
+              });
+              _load(); // refresh the underlying table row
+            } on ApiException catch (e) {
+              setSt(() => retrying = false);
+              if (dialogCtx.mounted) await showErrorDialog(dialogCtx, e.message);
+            } catch (e) {
+              setSt(() => retrying = false);
+              if (dialogCtx.mounted) await showErrorDialog(dialogCtx, 'Retry failed: $e');
+            }
+          }
+
+          return AlertDialog(
+            title: Row(children: [
+              Icon(isFailed ? Icons.error_outline : Icons.info_outline, color: tone, size: 20),
+              const SizedBox(width: 8),
+              Text('${isFailed ? 'Error' : 'Details'} — #${row['id']}',
+                  style: const TextStyle(fontSize: 16)),
+            ]),
+            content: SizedBox(
+              width: 560,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (row['entity_type'] != null)
+                    Text('${row['entity_type']} · ${row['entity_id']} · ${row['operation']}',
+                        style: TextStyle(fontSize: 12, color: scheme.outline)),
+                  const SizedBox(height: 12),
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 320),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: tone.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: tone.withValues(alpha: 0.3)),
+                    ),
+                    child: SingleChildScrollView(
+                      child: SelectableText(
+                        text,
+                        style: TextStyle(fontSize: 13, color: scheme.onSurface,
+                            fontFamily: 'monospace'),
+                      ),
+                    ),
                   ),
+                  if (retrying) ...[
+                    const SizedBox(height: 12),
+                    const LinearProgressIndicator(),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              if (canRetry && isFailed)
+                TextButton.icon(
+                  icon: const Icon(Icons.replay, size: 16),
+                  label: const Text('Push Now'),
+                  onPressed: retrying ? null : retry,
                 ),
+              TextButton.icon(
+                icon: const Icon(Icons.download_outlined, size: 16),
+                label: const Text('Save .txt'),
+                onPressed: () {
+                  _download('${isFailed ? 'error' : 'details'}_${row['id']}.txt', text,
+                      'text/plain;charset=utf-8;');
+                },
+              ),
+              TextButton.icon(
+                icon: const Icon(Icons.copy_outlined, size: 16),
+                label: const Text('Copy'),
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: text));
+                  Navigator.pop(dialogCtx);
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Copied to clipboard')));
+                },
+              ),
+              FilledButton(
+                onPressed: retrying ? null : () => Navigator.pop(dialogCtx),
+                child: const Text('Close'),
               ),
             ],
-          ),
-        ),
-        actions: [
-          TextButton.icon(
-            icon: const Icon(Icons.download_outlined, size: 16),
-            label: const Text('Save .txt'),
-            onPressed: () {
-              _download('${isFailed ? 'error' : 'details'}_${row['id']}.txt', fullText,
-                  'text/plain;charset=utf-8;');
-            },
-          ),
-          TextButton.icon(
-            icon: const Icon(Icons.copy_outlined, size: 16),
-            label: const Text('Copy'),
-            onPressed: () {
-              Clipboard.setData(ClipboardData(text: fullText));
-              Navigator.pop(dialogCtx);
-              ScaffoldMessenger.of(ctx).showSnackBar(
-                const SnackBar(content: Text('Copied to clipboard')));
-            },
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogCtx),
-            child: const Text('Close'),
-          ),
-        ],
+          );
+        },
       ),
     );
   }

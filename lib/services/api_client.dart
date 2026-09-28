@@ -149,6 +149,46 @@ class ApiClient {
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
 
+  // ── Organization identity (name/slug/vatRate) — MANAGE_STORES ──────────────
+
+  Future<Map<String, dynamic>> getOrganizationInfo(String token) async {
+    final resp = await _http.get(
+        _uri('/api/admin/organization/info'), headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  /// changes may contain any subset of name/slug/vatRate (vatRate as a 0–1
+  /// decimal fraction, e.g. 0.15 for 15%).
+  Future<Map<String, dynamic>> patchOrganizationInfo(
+      String token, Map<String, dynamic> changes) async {
+    final resp = await _http.patch(
+      _uri('/api/admin/organization/info'),
+      headers: _headers(token: token),
+      body: jsonEncode(changes),
+    );
+    if (resp.statusCode == 200) {
+      return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  // ── Odoo order sync retry (one sync_queue row, MANAGE_STORES) ──────────────
+
+  /// Resets one FAILED order sync row and immediately re-pushes it to Odoo.
+  /// 200 -> {"id","status":"DONE"}; 502 -> {"id","status":"FAILED","error"}
+  /// (still a normal, decodable failure response, not a transport error).
+  Future<Map<String, dynamic>> retryOdooSyncPush(String token, int id) async {
+    final resp = await _http.post(
+        _uri('/api/admin/odoo/sync/$id/push'), headers: _headers(token: token));
+    if (resp.statusCode == 200 || resp.statusCode == 502) {
+      return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
   // ── Organization properties (MANAGE_STORES, org derived from session) ──────
 
   Future<List<Map<String, dynamic>>> getOrganizationProperties(String token) async {

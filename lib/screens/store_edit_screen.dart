@@ -25,7 +25,6 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
   late final TextEditingController _nameArCtrl;
   late final TextEditingController _nameEnCtrl;
   late final TextEditingController _slugCtrl;
-  late final TextEditingController _currencyCtrl;
 
   int? _imageResourceId;
   bool _active = true;
@@ -45,7 +44,6 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
     _nameArCtrl   = TextEditingController(text: s?.displayName?['ar'] ?? '');
     _nameEnCtrl   = TextEditingController(text: s?.displayName?['en'] ?? '');
     _slugCtrl     = TextEditingController(text: s?.name ?? '');
-    _currencyCtrl = TextEditingController(text: s?.currency ?? '');
     _imageResourceId = s?.imageResourceId;
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
@@ -55,7 +53,6 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
     _nameArCtrl.dispose();
     _nameEnCtrl.dispose();
     _slugCtrl.dispose();
-    _currencyCtrl.dispose();
     super.dispose();
   }
 
@@ -72,7 +69,6 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
         if (mounted && details != null) {
           setState(() {
             _slugCtrl.text     = details['name'] as String? ?? _slugCtrl.text;
-            _currencyCtrl.text = details['currency'] as String? ?? _currencyCtrl.text;
             _active   = details['active'] as bool? ?? true;
             _isPublic = details['publicFlag'] as bool? ?? true;
             final imgId = details['imageResourceId'];
@@ -110,8 +106,6 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
         final newId = await api.createStore({
           'name': slug,
           'displayName': {'ar': _nameArCtrl.text.trim(), 'en': _nameEnCtrl.text.trim()},
-          if (_currencyCtrl.text.trim().isNotEmpty)
-            'currency': _currencyCtrl.text.trim().toUpperCase(),
           if (_branchGroupId != null) 'branchGroupId': _branchGroupId,
         }, token: token);
         await api.patchStore(newId, {
@@ -127,8 +121,6 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
           if (slug.isNotEmpty) 'name': slug,
           if (_imageResourceId != null) 'imageResourceId': _imageResourceId,
         };
-        final currency = _currencyCtrl.text.trim();
-        if (currency.isNotEmpty) body['currency'] = currency.toUpperCase();
         await api.patchStore(widget.store!.id, body, token: token);
       }
       if (!mounted) return;
@@ -258,17 +250,6 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
                                     controller: _slugCtrl,
                                     decoration: const InputDecoration(
                                         labelText: 'Slug (e.g. main-store)',
-                                        border: OutlineInputBorder()),
-                                  ),
-                                  const SizedBox(height: 20),
-
-                                  Text('Currency', style: Theme.of(context).textTheme.titleSmall),
-                                  const SizedBox(height: 8),
-                                  TextField(
-                                    controller: _currencyCtrl,
-                                    textCapitalization: TextCapitalization.characters,
-                                    decoration: const InputDecoration(
-                                        labelText: 'ISO code (e.g. SAR, USD)',
                                         border: OutlineInputBorder()),
                                   ),
                                   const SizedBox(height: 20),

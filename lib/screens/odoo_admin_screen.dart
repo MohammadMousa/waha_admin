@@ -175,6 +175,18 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
       showErrorDialogLater(context, _error!);
       _error = null;
     }
+    if (_successMsg != null) {
+      final msg = _successMsg!;
+      _successMsg = null;
+      // A toast anchored to the Scaffold, not a banner buried wherever this
+      // section happens to scroll to — was appearing off-screen from the
+      // button (e.g. Push Now, far down the page) that triggered it.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        }
+      });
+    }
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
@@ -218,11 +230,7 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  if (_successMsg != null) ...[
-                    _Banner(message: _successMsg!, color: Colors.green.shade50,
-                            textColor: Colors.green.shade900),
-                    const SizedBox(height: 12),
-                  ],
+
 
                   if (!_inherited) ...[
                     Text('Connection', style: Theme.of(context).textTheme.titleMedium
@@ -346,7 +354,7 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
                                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                               : const Icon(Icons.upload_outlined, size: 18),
                           label: const Text('Push Now'),
-                          onPressed: _configured && !_loading && (_queue?['pending'] ?? 0) > 0
+                          onPressed: _configured && !_loading && (_queue?['ready'] ?? 0) > 0
                               ? _pushOrders : null,
                         ),
                       ],
@@ -422,20 +430,6 @@ class _StatusCard extends StatelessWidget {
   }
 }
 
-class _Banner extends StatelessWidget {
-  final String message;
-  final Color color;
-  final Color textColor;
-  const _Banner({required this.message, required this.color, required this.textColor});
-  @override
-  Widget build(BuildContext context) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(8)),
-    child: Text(message, style: TextStyle(color: textColor, fontSize: 13)),
-  );
-}
-
 class _SyncRow extends StatelessWidget {
   final String label;
   final IconData icon;
@@ -491,15 +485,25 @@ class _QueueStats extends StatelessWidget {
   final Map<String, dynamic> queue;
   const _QueueStats({required this.queue});
   @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      _Chip(label: 'Pending', value: '${queue['pending'] ?? 0}', color: Colors.orange),
-      const SizedBox(width: 8),
-      _Chip(label: 'Failed',  value: '${queue['failed']  ?? 0}', color: Colors.red),
-      const SizedBox(width: 8),
-      _Chip(label: 'Done',    value: '${queue['done']    ?? 0}', color: Colors.green),
-    ],
-  );
+  Widget build(BuildContext context) {
+    final pending = (queue['pending'] as num?)?.toInt() ?? 0;
+    final ready = (queue['ready'] as num?)?.toInt() ?? 0;
+    // "Pending" alone was confusing next to Push Now finding nothing to do —
+    // a PENDING row can still be inside its retry backoff window. Show both.
+    return Row(
+      children: [
+        _Chip(
+          label: pending > 0 ? 'Pending (${fmtCount(ready)} ready)' : 'Pending',
+          value: fmtCount(pending),
+          color: Colors.orange,
+        ),
+        const SizedBox(width: 8),
+        _Chip(label: 'Failed', value: fmtCount(queue['failed'] ?? 0), color: Colors.red),
+        const SizedBox(width: 8),
+        _Chip(label: 'Done', value: fmtCount(queue['done'] ?? 0), color: Colors.green),
+      ],
+    );
+  }
 }
 
 class _Chip extends StatelessWidget {

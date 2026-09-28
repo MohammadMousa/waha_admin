@@ -23,6 +23,7 @@ class OrganizationPropertiesScreen extends StatefulWidget {
 class _OrganizationPropertiesScreenState extends State<OrganizationPropertiesScreen> {
   List<Map<String, dynamic>> _items = [];
   List<Map<String, dynamic>> _knownKeys = [];
+  Map<String, dynamic>? _orgInfo;
   bool _loading = true;
   String? _error;
 
@@ -47,11 +48,13 @@ class _OrganizationPropertiesScreenState extends State<OrganizationPropertiesScr
       final results = await Future.wait([
         ApiClient().getOrganizationProperties(token),
         ApiClient().getOrganizationPropertyKeys(token),
+        ApiClient().getOrganizationInfo(token),
       ]);
       if (!mounted) return;
       setState(() {
-        _items = results[0];
-        _knownKeys = results[1];
+        _items = results[0] as List<Map<String, dynamic>>;
+        _knownKeys = results[1] as List<Map<String, dynamic>>;
+        _orgInfo = results[2] as Map<String, dynamic>;
         _loading = false;
       });
     } on ApiException catch (e) {
@@ -114,6 +117,62 @@ class _OrganizationPropertiesScreenState extends State<OrganizationPropertiesScr
     }
   }
 
+  Future<void> _editOrgField(String field) async {
+    final token = _token;
+    if (token == null || _orgInfo == null) return;
+    final result = await showOrgFieldEditorDialog(context, field: field, info: _orgInfo!);
+    if (result == null || !mounted) return;
+    try {
+      final updated = await ApiClient().patchOrganizationInfo(token, {field: result});
+      if (mounted) setState(() => _orgInfo = updated);
+    } on ApiException catch (e) {
+      if (mounted) await showErrorDialog(context, e.message);
+    } catch (e) {
+      if (mounted) await showErrorDialog(context, 'Save failed: $e');
+    }
+  }
+
+  List<Widget> _orgInfoRows(ColorScheme scheme) {
+    final info = _orgInfo!;
+    final vat = info['vatRate'];
+    final vatLabel = vat == null ? 'Not set' : '${((vat as num) * 100).toStringAsFixed(2)}%';
+    Widget row(String label, String value, String field) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: FramedCard(
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label,
+                          style: TextStyle(fontSize: 12, color: scheme.outline)),
+                      const SizedBox(height: 2),
+                      Text(value,
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, size: 20),
+                  tooltip: 'Edit',
+                  onPressed: () => _editOrgField(field),
+                ),
+              ],
+            ),
+          ),
+        );
+    return [
+      Text('Organization', style: Theme.of(context).textTheme.titleMedium
+          ?.copyWith(fontWeight: FontWeight.w700)),
+      const SizedBox(height: 8),
+      row('Name', '${info['name'] ?? '—'}', 'name'),
+      row('Slug', '${info['slug'] ?? '—'}', 'slug'),
+      row('Currency', '${info['currency'] ?? '—'}', 'currency'),
+      row('VAT Rate', vatLabel, 'vatRate'),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_error != null) {
@@ -132,35 +191,48 @@ class _OrganizationPropertiesScreenState extends State<OrganizationPropertiesScr
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-                  child: Row(
-                    children: [
-                      Text('Organization Settings',
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineSmall
-                              ?.copyWith(fontWeight: FontWeight.w700)),
-                      const Spacer(),
-                      FilledButton.icon(
-                        icon: const Icon(Icons.add, size: 18),
-                        label: const Text('Add Property'),
-                        onPressed: () => _addOrEdit(),
-                      ),
-                    ],
-                  ),
+                  child: Text('Organization Settings',
+                      style: Theme.of(context)
+                          .textTheme
+                          .headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w700)),
                 ),
                 Expanded(
                   child: _loading
                       ? const Center(child: CircularProgressIndicator())
-                      : _items.isEmpty
-                          ? Center(child: Text('No organization properties set',
-                              style: TextStyle(color: scheme.outline)))
-                          : RefreshIndicator(
-                              onRefresh: _load,
-                              child: ListView.builder(
-                                padding: const EdgeInsets.fromLTRB(24, 4, 24, 100),
-                                itemCount: _items.length,
-                                itemBuilder: (_, i) {
-                                  final item = _items[i];
+                      : RefreshIndicator(
+                          onRefresh: _load,
+                          child: ListView(
+                            padding: const EdgeInsets.fromLTRB(24, 4, 24, 100),
+                            children: [
+                              if (_orgInfo != null) ..._orgInfoRows(scheme),
+                              const SizedBox(height: 24),
+                              const Divider(),
+                              const SizedBox(height: 16),
+                              Row(
+                                children: [
+                                  Text('Properties',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(fontWeight: FontWeight.w700)),
+                                  const Spacer(),
+                                  FilledButton.icon(
+                                    icon: const Icon(Icons.add, size: 18),
+                                    label: const Text('Add Property'),
+                                    onPressed: () => _addOrEdit(),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              if (_items.isEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  child: Text('No organization properties set',
+                                      style: TextStyle(color: scheme.outline)),
+                                )
+                              else
+                                ..._items.map((item) {
                                   final key = item['key'].toString();
                                   final known = _knownFor(key);
                                   return Padding(
@@ -222,9 +294,10 @@ class _OrganizationPropertiesScreenState extends State<OrganizationPropertiesScr
                                       ),
                                     ),
                                   );
-                                },
-                              ),
-                            ),
+                                }),
+                            ],
+                          ),
+                        ),
                 ),
               ],
             ),
@@ -233,6 +306,122 @@ class _OrganizationPropertiesScreenState extends State<OrganizationPropertiesScr
       ),
     );
   }
+}
+
+// ── Organization field editor (name / slug / vatRate) ─────────────────────────
+
+const Map<String, String> _orgFieldLabels = {
+  'name': 'Organization Name',
+  'slug': 'Organization Slug',
+  'currency': 'Currency (ISO code)',
+  'vatRate': 'VAT Rate (%)',
+};
+
+const Map<String, String> _orgFieldWarnings = {
+  'slug': 'Changing the slug may break existing resource URLs and pages that '
+      'use this organization\'s path.',
+  'currency': 'Changing currency affects all stores and future orders.',
+  'vatRate': 'Changing tax rate affects all stores and future Odoo pushes.',
+};
+
+/// Returns the new value to PATCH (a String for name/slug, a 0-1 decimal
+/// fraction as a String for vatRate), or null if cancelled.
+Future<dynamic> showOrgFieldEditorDialog(
+  BuildContext context, {
+  required String field,
+  required Map<String, dynamic> info,
+}) {
+  final isVat = field == 'vatRate';
+  final isCurrency = field == 'currency';
+  final current = info[field];
+  final ctrl = TextEditingController(
+    text: isVat
+        ? (current == null ? '' : ((current as num) * 100).toStringAsFixed(2))
+        : (current?.toString() ?? ''),
+  );
+  String? error;
+  return showDialog<dynamic>(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setSt) {
+        return AlertDialog(
+          title: Text('Edit ${_orgFieldLabels[field] ?? field}'),
+          content: SizedBox(
+            width: 360,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_orgFieldWarnings[field] != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Theme.of(ctx).colorScheme.errorContainer.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.warning_amber_rounded,
+                            size: 18, color: Theme.of(ctx).colorScheme.error),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(_orgFieldWarnings[field]!,
+                              style: TextStyle(fontSize: 12, color: Theme.of(ctx).colorScheme.error)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                TextField(
+                  controller: ctrl,
+                  autofocus: true,
+                  keyboardType: isVat
+                      ? const TextInputType.numberWithOptions(decimal: true)
+                      : TextInputType.text,
+                  textCapitalization:
+                      isCurrency ? TextCapitalization.characters : TextCapitalization.none,
+                  decoration: InputDecoration(
+                    labelText: _orgFieldLabels[field] ?? field,
+                    suffixText: isVat ? '%' : null,
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                    errorText: error,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () {
+                final text = ctrl.text.trim();
+                if (text.isEmpty) {
+                  setSt(() => error = 'Required.');
+                  return;
+                }
+                if (isVat) {
+                  final pct = double.tryParse(text);
+                  if (pct == null || pct < 0 || pct > 100) {
+                    setSt(() => error = 'Enter a percent between 0 and 100.');
+                    return;
+                  }
+                  Navigator.pop(ctx, pct / 100);
+                } else if (isCurrency) {
+                  Navigator.pop(ctx, text.toUpperCase());
+                } else {
+                  Navigator.pop(ctx, text);
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    ),
+  );
 }
 
 // ── Add/Edit dialog ──────────────────────────────────────────────────────────
