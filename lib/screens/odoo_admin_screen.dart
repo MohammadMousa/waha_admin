@@ -170,6 +170,96 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
     }
   }
 
+  Future<void> _repairMappings() async {
+    final token = _token;
+    if (token == null) return;
+    setState(() { _loading = true; _error = null; _successMsg = null; });
+    try {
+      final result = await ApiClient().oodooRepairMappings(token);
+      await _loadStatus();
+      final remapped = (result['remapped'] as num?)?.toInt() ?? 0;
+      final deadDeleted = (result['deadDeleted'] as num?)?.toInt() ?? 0;
+      final orphaned = ((result['orphanedProductIds'] as List?) ?? const [])
+          .map((e) => (e as num).toInt()).toList();
+      if (orphaned.isNotEmpty && mounted) {
+        await _showOrphanedProductsDialog(remapped, deadDeleted, orphaned);
+      } else {
+        setState(() => _successMsg = '${fmtCount(remapped)} remapped, ${fmtCount(deadDeleted)} dead mappings deleted.');
+      }
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  // Repair result when orphans exist: states exactly what the backend did
+  // (remapped / dead mappings deleted / orphan count), then a real Yes/No —
+  // deleting here is a soft delete (active=false, public=false), order
+  // history preserved, per backendx's DELETE /api/products/{id} contract.
+  Future<void> _showOrphanedProductsDialog(int remapped, int deadDeleted, List<int> orphanedIds) async {
+    bool deleting = false;
+    String? resultMsg;
+    String? errorMsg;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSt) {
+          final done = resultMsg != null || errorMsg != null;
+          return AlertDialog(
+            icon: Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700, size: 32),
+            title: const Text('Repair Mappings'),
+            content: SelectableText(
+              resultMsg ??
+              errorMsg ??
+              '${fmtCount(remapped)} remapped, ${fmtCount(deadDeleted)} dead mappings deleted.\n\n'
+              '${fmtCount(orphanedIds.length)} product(s) have no Odoo link and could not be remapped. '
+              'Delete them from Waha? This deactivates them (hidden from customers) and preserves order history — it does not permanently erase them.',
+            ),
+            actions: done
+                ? [FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))]
+                : [
+                    TextButton(
+                      onPressed: deleting ? null : () => Navigator.pop(ctx),
+                      child: const Text('No'),
+                    ),
+                    FilledButton(
+                      style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
+                      onPressed: deleting ? null : () async {
+                        setSt(() => deleting = true);
+                        final token = _token;
+                        var okCount = 0;
+                        final failed = <String>[];
+                        for (final id in orphanedIds) {
+                          try {
+                            await ApiClient().deleteProduct(id, token!);
+                            okCount++;
+                          } catch (e) {
+                            failed.add('#$id: $e');
+                          }
+                        }
+                        setSt(() {
+                          deleting = false;
+                          if (failed.isEmpty) {
+                            resultMsg = '${fmtCount(okCount)} product(s) deactivated in Waha.';
+                          } else {
+                            errorMsg = '${fmtCount(okCount)} deactivated, ${fmtCount(failed.length)} failed:\n${failed.join('\n')}';
+                          }
+                        });
+                      },
+                      child: deleting
+                          ? const SizedBox(width: 18, height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Text('Yes, Delete'),
+                    ),
+                  ],
+          );
+        },
+      ),
+    );
+  }
+
   Future<void> _pushOrders() async {
     final token = _token;
     if (token == null) return;
@@ -349,6 +439,40 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
                       enabled: _configured && !_loading,
                       onPull: _pullProducts,
                       onForcePull: _forcePullProducts,
+                    ),
+                    const SizedBox(height: 10),
+                    Card(
+                      elevation: 0,
+                      color: scheme.surfaceContainerHighest,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        child: Row(
+                          children: [
+                            Icon(Icons.build_outlined, size: 22, color: scheme.primary),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Mappings', style: TextStyle(fontWeight: FontWeight.w600)),
+                                  Text(
+                                    'Fixes broken product links after switching Odoo accounts or "Record does not exist" errors.',
+                                    style: TextStyle(fontSize: 12, color: scheme.outline),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.deepOrange,
+                                side: const BorderSide(color: Colors.deepOrange),
+                              ),
+                              onPressed: (_configured && !_loading) ? _repairMappings : null,
+                              child: const Text('Repair Mappings'),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 24),
                     const Divider(),
