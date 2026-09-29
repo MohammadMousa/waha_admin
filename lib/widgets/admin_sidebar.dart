@@ -5,12 +5,39 @@ import '../state/auth_state.dart';
 import '../utils/role_labels.dart';
 import 'about_dialog.dart';
 
-class AdminSidebar extends StatelessWidget {
+// Every screen mounts its own AdminSidebar and each named route owns its own
+// PageStorageBucket (see Flutter's ModalRoute), so a PageStorageKey alone
+// can't carry the nav scroll position across screens. This static offset is
+// shared app-wide instead, read on mount and updated as the user scrolls.
+double _navScrollOffset = 0;
+
+class AdminSidebar extends StatefulWidget {
   final String currentRoute;
   const AdminSidebar({super.key, required this.currentRoute});
 
   @override
+  State<AdminSidebar> createState() => _AdminSidebarState();
+}
+
+class _AdminSidebarState extends State<AdminSidebar> {
+  late final ScrollController _navController;
+
+  @override
+  void initState() {
+    super.initState();
+    _navController = ScrollController(initialScrollOffset: _navScrollOffset);
+    _navController.addListener(() => _navScrollOffset = _navController.offset);
+  }
+
+  @override
+  void dispose() {
+    _navController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final currentRoute = widget.currentRoute;
     final scheme = Theme.of(context).colorScheme;
     final auth = context.watch<AuthState>();
     final username = auth.username ?? '';
@@ -83,6 +110,7 @@ class AdminSidebar extends StatelessWidget {
           // Nav
           Expanded(
             child: ListView(
+              controller: _navController,
               padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
                 _NavItem(

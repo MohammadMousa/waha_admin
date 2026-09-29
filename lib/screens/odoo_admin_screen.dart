@@ -25,6 +25,7 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
   final _overrideCtrl = TextEditingController();
 
   bool _loading       = false;
+  bool _repairing     = false;
   bool _configured    = false;
   bool _inherited     = false;
   int? _ownerStoreId;
@@ -37,6 +38,8 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
   List<Map<String, dynamic>> _history = [];
   String? _error;
   String? _successMsg;
+
+  String _pushTarget = 'SALES';
 
   @override
   void initState() {
@@ -74,6 +77,7 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
         _lastCatSync      = status['lastCategorySyncAt'] as String?;
         _lastProdSync     = status['lastProductSyncAt']  as String?;
         _queue            = status['queue']  as Map<String, dynamic>?;
+        _pushTarget       = status['pushTarget'] as String? ?? 'SALES';
         if (_baseUrl          != null && _baseUrl!.isNotEmpty)          _urlCtrl.text      = _baseUrl!;
         if (_username         != null && _username!.isNotEmpty)         _userCtrl.text     = _username!;
         if (_customerOverride != null && _customerOverride!.isNotEmpty) _overrideCtrl.text = _customerOverride!;
@@ -84,6 +88,27 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
         setState(() => _history =
             (logs['items'] as List? ?? []).cast<Map<String, dynamic>>().map(_toHistory).toList());
       }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _setPushTarget(String target) async {
+    if (target == _pushTarget) return;
+    final token = _token;
+    if (token == null) return;
+    final previous = _pushTarget;
+    setState(() { _pushTarget = target; _loading = true; _error = null; _successMsg = null; });
+    try {
+      await ApiClient().oodooConfigure(
+        token, _baseUrl ?? '', '', '',
+        storeId: 1, pushTarget: target,
+      );
+      setState(() => _successMsg = target == 'POS'
+          ? 'Orders will now be sent to Odoo Point of Sale.'
+          : 'Orders will now be sent to Odoo Sales.');
+    } catch (e) {
+      setState(() { _pushTarget = previous; _error = e.toString(); });
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -173,23 +198,25 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
   Future<void> _repairMappings() async {
     final token = _token;
     if (token == null) return;
-    setState(() { _loading = true; _error = null; _successMsg = null; });
+    setState(() { _loading = true; _repairing = true; _error = null; _successMsg = null; });
     try {
       final result = await ApiClient().oodooRepairMappings(token);
       await _loadStatus();
       final remapped = (result['remapped'] as num?)?.toInt() ?? 0;
       final deadDeleted = (result['deadDeleted'] as num?)?.toInt() ?? 0;
+      final conflicts = (result['conflicts'] as num?)?.toInt() ?? 0;
       final orphaned = ((result['orphanedProductIds'] as List?) ?? const [])
           .map((e) => (e as num).toInt()).toList();
       if (orphaned.isNotEmpty && mounted) {
-        await _showOrphanedProductsDialog(remapped, deadDeleted, orphaned);
+        await _showOrphanedProductsDialog(remapped, deadDeleted, conflicts, orphaned);
       } else {
-        setState(() => _successMsg = '${fmtCount(remapped)} remapped, ${fmtCount(deadDeleted)} dead mappings deleted.');
+        setState(() => _successMsg = '${fmtCount(remapped)} remapped, ${fmtCount(deadDeleted)} dead mappings deleted'
+            '${conflicts > 0 ? ', ${fmtCount(conflicts)} conflicts' : ''}.');
       }
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) setState(() { _loading = false; _repairing = false; });
     }
   }
 
@@ -197,7 +224,7 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
   // (remapped / dead mappings deleted / orphan count), then a real Yes/No —
   // deleting here is a soft delete (active=false, public=false), order
   // history preserved, per backendx's DELETE /api/products/{id} contract.
-  Future<void> _showOrphanedProductsDialog(int remapped, int deadDeleted, List<int> orphanedIds) async {
+  Future<void> _showOrphanedProductsDialog(int remapped, int deadDeleted, int conflicts, List<int> orphanedIds) async {
     bool deleting = false;
     String? resultMsg;
     String? errorMsg;
@@ -213,7 +240,8 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
             content: SelectableText(
               resultMsg ??
               errorMsg ??
-              '${fmtCount(remapped)} remapped, ${fmtCount(deadDeleted)} dead mappings deleted.\n\n'
+              '${fmtCount(remapped)} remapped, ${fmtCount(deadDeleted)} dead mappings deleted'
+              '${conflicts > 0 ? ', ${fmtCount(conflicts)} conflicts' : ''}.\n\n'
               '${fmtCount(orphanedIds.length)} product(s) have no Odoo link and could not be remapped. '
               'Delete them from Waha? This deactivates them (hidden from customers) and preserves order history — it does not permanently erase them.',
             ),
@@ -270,6 +298,60 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
       setState(() => _successMsg = count > 0
           ? 'Pushed $count order(s) to Odoo.'
           : 'No pending orders to push.');
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  static const _refusalReasons = {
+    'STILL_PENDING': 'still waiting to be processed',
+    'ORDER_SENT_TO_ODOO': 'an order already sent to Odoo — kept for reporting',
+    'NOT_FOUND': 'no longer exists',
+  };
+
+  Future<void> _deleteHistoryRows(List<int> ids) async {
+    final token = _token;
+    if (token == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete sync history'),
+        content: Text('Delete ${fmtCount(ids.length)} selected record(s)? This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() { _loading = true; _error = null; _successMsg = null; });
+    try {
+      final result = await ApiClient().deleteIntegrationLogs(token, ids);
+      await _loadStatus();
+      final deleted = (result['deleted'] as num?)?.toInt() ?? 0;
+      final refused = ((result['refused'] as List?) ?? const []).cast<Map<String, dynamic>>();
+      if (refused.isEmpty) {
+        setState(() => _successMsg = '${fmtCount(deleted)} deleted.');
+      } else if (mounted) {
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            icon: const Icon(Icons.info_outline, size: 32),
+            title: const Text('Delete sync history'),
+            content: SelectableText(
+              '${fmtCount(deleted)} deleted, ${fmtCount(refused.length)} kept:\n\n'
+              '${refused.map((r) => '#${r['id']}: ${_refusalReasons[r['reason']] ?? r['reason']}').join('\n')}',
+            ),
+            actions: [FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
+          ),
+        );
+      }
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
@@ -456,19 +538,25 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
                                 children: [
                                   const Text('Mappings', style: TextStyle(fontWeight: FontWeight.w600)),
                                   Text(
-                                    'Fixes broken product links after switching Odoo accounts or "Record does not exist" errors.',
+                                    _repairing
+                                        ? 'Repairing… this can take a few minutes on large catalogs.'
+                                        : 'Fixes broken product links after switching Odoo accounts or "Record does not exist" errors.',
                                     style: TextStyle(fontSize: 12, color: scheme.outline),
                                   ),
                                 ],
                               ),
                             ),
-                            OutlinedButton(
+                            OutlinedButton.icon(
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: Colors.deepOrange,
                                 side: const BorderSide(color: Colors.deepOrange),
                               ),
                               onPressed: (_configured && !_loading) ? _repairMappings : null,
-                              child: const Text('Repair Mappings'),
+                              icon: _repairing
+                                  ? const SizedBox(width: 14, height: 14,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.deepOrange))
+                                  : const SizedBox.shrink(),
+                              label: const Text('Repair Mappings'),
                             ),
                           ],
                         ),
@@ -477,7 +565,26 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
                     const SizedBox(height: 24),
                     const Divider(),
                     const SizedBox(height: 16),
-                    _SyncHistorySection(history: _history),
+                    Text('Order Push', style: Theme.of(context).textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 4),
+                    Text('Where orders pushed to Odoo end up.',
+                        style: TextStyle(color: scheme.outline, fontSize: 13)),
+                    const SizedBox(height: 12),
+                    SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment(value: 'SALES', label: Text('Sales'), icon: Icon(Icons.receipt_long_outlined)),
+                        ButtonSegment(value: 'POS', label: Text('Point of Sale'), icon: Icon(Icons.point_of_sale_outlined)),
+                      ],
+                      selected: {_pushTarget},
+                      onSelectionChanged: (_configured && !_loading)
+                          ? (s) => _setPushTarget(s.first)
+                          : null,
+                    ),
+                    const SizedBox(height: 24),
+                    const Divider(),
+                    const SizedBox(height: 16),
+                    _SyncHistorySection(history: _history, onDelete: _deleteHistoryRows),
                   ],
 
                   if (_queue != null) ...[
@@ -636,6 +743,7 @@ class _SyncRow extends StatelessWidget {
   String _p(int n) => n.toString().padLeft(2, '0');
 }
 
+
 class _QueueStats extends StatelessWidget {
   final Map<String, dynamic> queue;
   const _QueueStats({required this.queue});
@@ -711,18 +819,31 @@ Map<String, dynamic> _toHistory(Map<String, dynamic> r) {
     return RegExp(r'(Z|[+-]\d\d:?\d\d)$').hasMatch(t) ? t : '${t}Z';
   }
   return {
+    'id': (r['id'] as num?)?.toInt(),
     'triggeredBy': p['triggeredBy'],
     'startedAt': utc(r['created_at']),
     'categoriesPulled': p['categoriesPulled'] ?? 0,
     'productsPulled': p['productsPulled'] ?? 0,
+    // Older rows predate this field; treat missing as 0, per backend.
+    'productsSkipped': (p['productsSkipped'] as num?)?.toInt() ?? 0,
+    'skipReasons': (p['skipReasons'] is Map) ? p['skipReasons'] as Map : const {},
     'status': r['status'],
     'errorMessage': r['last_error'],
   };
 }
 
-class _SyncHistorySection extends StatelessWidget {
+class _SyncHistorySection extends StatefulWidget {
   final List<Map<String, dynamic>> history;
-  const _SyncHistorySection({required this.history});
+  final ValueChanged<List<int>> onDelete;
+  const _SyncHistorySection({required this.history, required this.onDelete});
+
+  @override
+  State<_SyncHistorySection> createState() => _SyncHistorySectionState();
+}
+
+class _SyncHistorySectionState extends State<_SyncHistorySection> {
+  bool _expanded = false;
+  final Set<int> _selected = {};
 
   Color _statusColor(String? s) => switch (s) {
         'DONE' => Colors.green.shade700,
@@ -730,10 +851,36 @@ class _SyncHistorySection extends StatelessWidget {
         _ => Colors.orange.shade700,
       };
 
+  // skipReasons: {"NullPointerException": 1018} -> one line per reason.
+  String _skipTooltip(Map<String, dynamic> r) {
+    final reasons = (r['skipReasons'] as Map?) ?? const {};
+    if (reasons.isEmpty) return '${fmtCount(r['productsSkipped'])} product(s) skipped';
+    return reasons.entries.map((e) => '${e.key}: ${fmtCount(e.value as num)}').join('\n');
+  }
+
+  Widget _pulledSummary(Map<String, dynamic> r, ColorScheme scheme) {
+    final text = Text.rich(TextSpan(
+      style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
+      children: [
+        TextSpan(text: 'Pulled: ${fmtCount(r['categoriesPulled'])} categories, '
+            '${fmtCount(r['productsPulled'])} products'),
+        if ((r['productsSkipped'] ?? 0) > 0)
+          TextSpan(
+            text: ', ${fmtCount(r['productsSkipped'])} skipped',
+            style: TextStyle(color: Colors.orange.shade800, fontWeight: FontWeight.w600),
+          ),
+      ],
+    ));
+    if ((r['productsSkipped'] ?? 0) == 0) return text;
+    return Tooltip(message: _skipTooltip(r), child: text);
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final history = widget.history;
     final last = history.isEmpty ? null : history.first;
+    final latest5 = history.take(5).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -744,90 +891,199 @@ class _SyncHistorySection extends StatelessWidget {
             'Categories and products are pulled automatically every day at 06:00 KSA.',
             style: TextStyle(color: scheme.outline, fontSize: 13)),
         const SizedBox(height: 12),
-        Card(
-          elevation: 0,
-          color: scheme.surfaceContainerHighest,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: last == null
-                ? Text('No sync requests yet.', style: TextStyle(color: scheme.outline))
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+        Container(
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: last == null
+                          ? Text('No sync requests yet.', style: TextStyle(color: scheme.outline))
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                    _expanded
+                                        ? 'Sync History (Latest ${latest5.length})'
+                                        : 'Last sync request: ${_fmtLocal(last['startedAt'])} '
+                                            '(${last['triggeredBy'] == 'SCHEDULED' ? 'scheduled' : 'manual'}, '
+                                            '${(last['status'] ?? '').toString().toLowerCase()})',
+                                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                                if (!_expanded) ...[
+                                  const SizedBox(height: 4),
+                                  _pulledSummary(last, scheme),
+                                  if ((last['errorMessage'] ?? '').toString().isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Text('${last['errorMessage']}',
+                                          style: TextStyle(
+                                              fontSize: 12,
+                                              color: last['status'] == 'FAILED'
+                                                  ? scheme.error
+                                                  : scheme.onSurfaceVariant)),
+                                    ),
+                                ],
+                              ],
+                            ),
+                    ),
+                    if (history.isNotEmpty)
+                      TextButton.icon(
+                        onPressed: () => setState(() => _expanded = !_expanded),
+                        icon: Icon(_expanded ? Icons.expand_less : Icons.expand_more, size: 18),
+                        label: Text(_expanded ? 'Hide details' : 'Show details'),
+                      ),
+                  ],
+                ),
+              ),
+              if (_expanded) ...[
+                Divider(height: 1, color: scheme.outlineVariant),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Row(
                     children: [
-                      Text('Last sync request: ${_fmtLocal(last['startedAt'])} '
-                          '(${last['triggeredBy'] == 'SCHEDULED' ? 'scheduled' : 'manual'}, '
-                          '${(last['status'] ?? '').toString().toLowerCase()})',
-                          style: const TextStyle(fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 4),
-                      Text('Pulled: ${fmtCount(last['categoriesPulled'])} categories, '
-                          '${fmtCount(last['productsPulled'])} products',
-                          style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
-                      if ((last['errorMessage'] ?? '').toString().isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text('${last['errorMessage']}',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: last['status'] == 'FAILED'
-                                      ? scheme.error
-                                      : scheme.onSurfaceVariant)),
+                      Checkbox(
+                        value: _selected.isEmpty
+                            ? false
+                            : (_selected.length == latest5.length ? true : null),
+                        tristate: true,
+                        onChanged: (v) => setState(() {
+                          if (_selected.length == latest5.length) {
+                            _selected.clear();
+                          } else {
+                            _selected
+                              ..clear()
+                              ..addAll(latest5.map((r) => r['id']).whereType<int>());
+                          }
+                        }),
+                      ),
+                      Text('${fmtCount(_selected.length)} selected', style: TextStyle(color: scheme.outline, fontSize: 13)),
+                      const Spacer(),
+                      if (_selected.isNotEmpty)
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red.shade700,
+                            side: BorderSide(color: Colors.red.shade700),
+                          ),
+                          onPressed: () {
+                            final ids = _selected.toList();
+                            setState(() => _selected.clear());
+                            widget.onDelete(ids);
+                          },
+                          icon: const Icon(Icons.delete_outline, size: 16),
+                          label: const Text('Delete'),
                         ),
                     ],
                   ),
+                ),
+                // A custom Table instead of DataTable: DataTable sizes itself to
+                // its content width and leaves the rest of the card blank when
+                // the content is narrower than the card. FlexColumnWidth on the
+                // Details column makes the table always fill the full width.
+                Table(
+                  columnWidths: const {
+                    0: IntrinsicColumnWidth(),
+                    1: IntrinsicColumnWidth(),
+                    2: IntrinsicColumnWidth(),
+                    3: IntrinsicColumnWidth(),
+                    4: IntrinsicColumnWidth(),
+                    5: IntrinsicColumnWidth(),
+                    6: FlexColumnWidth(),
+                  },
+                  border: TableBorder(
+                    horizontalInside: BorderSide(color: scheme.outlineVariant),
+                  ),
+                  children: [
+                    TableRow(
+                      decoration: BoxDecoration(color: scheme.surfaceContainerHighest),
+                      children: const [
+                        _HistoryHeaderCell(''),
+                        _HistoryHeaderCell('Started'),
+                        _HistoryHeaderCell('Trigger'),
+                        _HistoryHeaderCell('Categories', alignEnd: true),
+                        _HistoryHeaderCell('Products', alignEnd: true),
+                        _HistoryHeaderCell('Status'),
+                        _HistoryHeaderCell('Details'),
+                      ],
+                    ),
+                    ...latest5.map((r) => TableRow(children: [
+                          _HistoryCell(r['id'] == null ? const SizedBox(width: 18) : Checkbox(
+                            value: _selected.contains(r['id']),
+                            onChanged: (v) => setState(() {
+                              if (v == true) {
+                                _selected.add(r['id'] as int);
+                              } else {
+                                _selected.remove(r['id']);
+                              }
+                            }),
+                          )),
+                          _HistoryCell(Text(_fmtLocal(r['startedAt']))),
+                          _HistoryCell(Text(r['triggeredBy'] == 'SCHEDULED' ? 'Scheduled' : 'Manual')),
+                          _HistoryCell(Text(fmtCount(r['categoriesPulled'])), alignEnd: true),
+                          _HistoryCell(Text(fmtCount(r['productsPulled'])), alignEnd: true),
+                          _HistoryCell(Text('${r['status'] ?? ''}',
+                              style: TextStyle(
+                                  color: _statusColor(r['status']?.toString()),
+                                  fontWeight: FontWeight.w600))),
+                          _HistoryCell(Tooltip(
+                            message: (r['productsSkipped'] ?? 0) > 0
+                                ? _skipTooltip(r)
+                                : '${r['errorMessage'] ?? ''}',
+                            child: Text('${r['errorMessage'] ?? ''}',
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: (r['productsSkipped'] ?? 0) > 0 ? FontWeight.w600 : null,
+                                    color: r['status'] == 'FAILED'
+                                        ? scheme.error
+                                        : (r['productsSkipped'] ?? 0) > 0
+                                            ? Colors.orange.shade800
+                                            : scheme.onSurfaceVariant)),
+                          )),
+                        ])),
+                  ],
+                ),
+              ],
+            ],
           ),
         ),
-        if (history.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          Text('Sync history', style: Theme.of(context).textTheme.titleSmall
-              ?.copyWith(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          Container(
-            decoration: BoxDecoration(
-              color: scheme.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: scheme.outlineVariant),
-            ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                columnSpacing: 24,
-                headingRowColor: WidgetStatePropertyAll(scheme.surfaceContainerHighest),
-                columns: const [
-                  DataColumn(label: Text('Started', style: TextStyle(fontWeight: FontWeight.w600))),
-                  DataColumn(label: Text('Trigger', style: TextStyle(fontWeight: FontWeight.w600))),
-                  DataColumn(numeric: true, label: Text('Categories', style: TextStyle(fontWeight: FontWeight.w600))),
-                  DataColumn(numeric: true, label: Text('Products', style: TextStyle(fontWeight: FontWeight.w600))),
-                  DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.w600))),
-                  DataColumn(label: Text('Details', style: TextStyle(fontWeight: FontWeight.w600))),
-                ],
-                rows: history.map((r) => DataRow(cells: [
-                      DataCell(Text(_fmtLocal(r['startedAt']))),
-                      DataCell(Text(r['triggeredBy'] == 'SCHEDULED' ? 'Scheduled' : 'Manual')),
-                      DataCell(Text(fmtCount(r['categoriesPulled']))),
-                      DataCell(Text(fmtCount(r['productsPulled']))),
-                      DataCell(Text('${r['status'] ?? ''}',
-                          style: TextStyle(
-                              color: _statusColor(r['status']?.toString()),
-                              fontWeight: FontWeight.w600))),
-                      DataCell(SizedBox(
-                        width: 260,
-                        child: Tooltip(
-                          message: '${r['errorMessage'] ?? ''}',
-                          child: Text('${r['errorMessage'] ?? ''}',
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: r['status'] == 'FAILED'
-                                      ? scheme.error
-                                      : scheme.onSurfaceVariant)),
-                        ),
-                      )),
-                    ])).toList(),
-              ),
-            ),
-          ),
-        ],
       ],
     );
   }
+}
+
+class _HistoryHeaderCell extends StatelessWidget {
+  final String label;
+  final bool alignEnd;
+  const _HistoryHeaderCell(this.label, {this.alignEnd = false});
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Align(
+          alignment: alignEnd ? Alignment.centerRight : Alignment.centerLeft,
+          child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+        ),
+      );
+}
+
+class _HistoryCell extends StatelessWidget {
+  final Widget child;
+  final bool alignEnd;
+  const _HistoryCell(this.child, {this.alignEnd = false});
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Align(
+          alignment: alignEnd ? Alignment.centerRight : Alignment.centerLeft,
+          child: child,
+        ),
+      );
 }

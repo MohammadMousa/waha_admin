@@ -848,6 +848,14 @@ class ApiClient {
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
 
+  // {"deleted": n, "refused": [{"id":123,"reason":"STILL_PENDING|ORDER_SENT_TO_ODOO|NOT_FOUND"}]}
+  Future<Map<String, dynamic>> deleteIntegrationLogs(String token, List<int> ids) async {
+    final resp = await _http.delete(_uri('/api/admin/integrations/logs'),
+        headers: _headers(token: token), body: jsonEncode({'ids': ids}));
+    if (resp.statusCode == 200) return jsonDecode(resp.body) as Map<String, dynamic>;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
   // ── Odoo ──────────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> odooStatus(String token, {int? storeId}) async {
@@ -859,7 +867,7 @@ class ApiClient {
   }
 
   Future<void> oodooConfigure(String token, String baseUrl, String apiKey,
-      String username, {String? customerOverride, int? storeId}) async {
+      String username, {String? customerOverride, int? storeId, String? pushTarget}) async {
     final uri = _uri('/api/admin/odoo/configure')
         .replace(queryParameters: storeId != null ? {'storeId': '$storeId'} : null);
     final resp = await _http.post(uri,
@@ -870,8 +878,38 @@ class ApiClient {
           'username': username,
           if (customerOverride != null && customerOverride.isNotEmpty)
             'customerOverride': customerOverride,
+          if (pushTarget != null) 'pushTarget': pushTarget,
         }));
     if (resp.statusCode != 200) throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  // {"pointsOfSale": [{id, name}], "paymentMethods": [{id, name}]}, read live
+  // from Odoo. 404 if Odoo isn't configured, 502 on an Odoo-side error.
+  Future<Map<String, dynamic>> oodooPosOptions(String token) async {
+    final resp = await _http.get(_uri('/api/admin/odoo/pos/options'), headers: _headers(token: token));
+    if (resp.statusCode == 200) return jsonDecode(resp.body) as Map<String, dynamic>;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  // {"branches": [{storeId, posConfigId}], "paymentMethods": [{paymentMethodKey, odooPaymentMethodId}]}
+  Future<Map<String, dynamic>> oodooPosLinks(String token) async {
+    final resp = await _http.get(_uri('/api/admin/odoo/pos/links'), headers: _headers(token: token));
+    if (resp.statusCode == 200) return jsonDecode(resp.body) as Map<String, dynamic>;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<void> oodooSetBranchPosLink(String token, int storeId, int? odooId) async {
+    final resp = await _http.put(_uri('/api/admin/odoo/pos/links/branches/$storeId'),
+        headers: _headers(token: token), body: jsonEncode({'odooId': odooId}));
+    if (resp.statusCode == 200) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<void> oodooSetPaymentMethodPosLink(String token, String key, int? odooId) async {
+    final resp = await _http.put(_uri('/api/admin/odoo/pos/links/payment-methods/$key'),
+        headers: _headers(token: token), body: jsonEncode({'odooId': odooId}));
+    if (resp.statusCode == 200) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
   }
 
   Future<int> oodooPullCategories(String token, {int? storeId}) async {
@@ -911,8 +949,10 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> oodooRepairMappings(String token) async {
-    final resp = await _http.post(
-        _uri('/api/admin/odoo/mappings/repair'), headers: _headers(token: token));
+    final resp = await _http
+        .post(_uri('/api/admin/odoo/mappings/repair'), headers: _headers(token: token))
+        .timeout(const Duration(minutes: 5), onTimeout: () => throw const ApiException(
+            408, 'Repair is taking longer than expected. It may still finish on the server — check back and try again.'));
     if (resp.statusCode == 200) {
       return jsonDecode(resp.body) as Map<String, dynamic>;
     }
