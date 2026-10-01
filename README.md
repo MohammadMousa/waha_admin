@@ -17,6 +17,7 @@ Paginated order table with filters for branch, kiosk, status, payment type, sync
 
 ![Orders](docs/screenshots/orders_report1.png)
 ![Orders date picker](docs/screenshots/orders_report2.png)
+![Orders items](docs/screenshots/orders_report3.png)
 
 ### Products
 Grid view of the product catalog with category/status/store filters and full-text search. Create and edit products with bilingual names (Arabic + English), pricing, images, and category assignment.
@@ -48,7 +49,8 @@ Manage kiosk slideshow images as big square cards in a drag-to-reorder grid. Pre
 ### Odoo Integration
 Connect to an Odoo instance and pull categories and products incrementally. Push orders from the queue individually or in bulk. Connection status shown live.
 
-![Odoo](docs/screenshots/odoo.png)
+![Odoo](docs/screenshots/odoo1.png)
+![Pull History](docs/screenshots/odoo2.png)
 ![Sync logs](docs/screenshots/odoo_logs.png)
 
 ---
