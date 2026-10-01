@@ -13,8 +13,10 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
+import '../widgets/error_dialog.dart';
 import '../widgets/waha_date_picker.dart';
 import '../widgets/waha_filter_controls.dart';
+import '../utils/number_format.dart';
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
@@ -539,6 +541,8 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
     final to   = ((_page + 1) * _pageSize).clamp(0, _totalCount);
 
     final cols = ['#ID', 'Branch', 'Kiosk', 'Ref', 'Date', 'Sub-Total', 'VAT', 'Total', 'Payment Type', 'Status', 'Synced'];
+    const invoiceCol = DataColumn(label: Text('Invoice', style: TextStyle(fontWeight: FontWeight.w600)));
+    const productsCol = DataColumn(label: Text('Products', style: TextStyle(fontWeight: FontWeight.w600)));
 
     return Container(
       margin: const EdgeInsets.fromLTRB(24, 16, 24, 24),
@@ -564,13 +568,18 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
                   headingRowColor: WidgetStatePropertyAll(scheme.surfaceContainerHighest),
                   dataRowMinHeight: 40,
                   dataRowMaxHeight: 48,
-                  columns: List.generate(cols.length, (i) =>
-                    _dataColumn(scheme, cols[i], i, numeric: i >= 5 && i <= 7)),
+                  columns: [
+                    ...List.generate(cols.length, (i) =>
+                      _dataColumn(scheme, cols[i], i, numeric: i >= 5 && i <= 7)),
+                    invoiceCol,
+                    productsCol,
+                  ],
                   rows: _items.map((row) {
                     final dt = row['created_at'] != null
                         ? _dtFmt.format(DateTime.parse(row['created_at'].toString()).toLocal())
                         : '—';
                     final synced = row['synced'] == true || row['synced'] == 1;
+                    final orderId = row['id'];
                     return DataRow(cells: [
                       DataCell(Text('#${row['display_id'] ?? ''}')),
                       DataCell(SizedBox(width: 140, child: Text(_parseBranchName(row), overflow: TextOverflow.ellipsis))),
@@ -583,6 +592,12 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
                       DataCell(Text('${row['payment_type'] ?? '—'}')),
                       DataCell(_StatusChip(row['status']?.toString())),
                       DataCell(_SyncChip(synced)),
+                      DataCell(_invoiceButtons(orderId)),
+                      DataCell(IconButton(
+                        icon: const Icon(Icons.inventory_2_outlined, size: 20),
+                        tooltip: 'View products',
+                        onPressed: orderId == null ? null : () => _showProductsDialog(orderId.toString()),
+                      )),
                     ]);
                   }).toList(),
                     ),
@@ -620,6 +635,115 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
   String _fmtNum(dynamic v) {
     if (v == null) return '0.00';
     return _numFmt.format((v as num).toDouble());
+  }
+
+  Widget _invoiceButtons(dynamic orderId) {
+    Widget langBtn(String label, String? lang) {
+      final url = orderId == null
+          ? null
+          : '${AppConfig.apiBaseUrl}/api/invoices/$orderId${lang != null ? '?lang=$lang' : ''}';
+      return Tooltip(
+        message: lang == null ? 'Open invoice (English)' : 'Open invoice (Arabic)',
+        child: InkWell(
+          borderRadius: BorderRadius.circular(6),
+          onTap: url == null ? null : () => html.window.open(url, '_blank'),
+          child: Container(
+            width: 28,
+            height: 22,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              border: Border.all(color: url == null ? Colors.grey.shade300 : Colors.indigo.shade200),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(label,
+                style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: url == null ? Colors.grey.shade400 : Colors.indigo.shade700)),
+          ),
+        ),
+      );
+    }
+
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      langBtn('EN', null),
+      const SizedBox(width: 4),
+      langBtn('AR', 'ar'),
+    ]);
+  }
+
+  Future<void> _showProductsDialog(String orderId) async {
+    Map<String, dynamic>? order;
+    String? error;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSt) {
+          if (order == null && error == null) {
+            ApiClient().getOrder(orderId, token: context.read<AuthState>().token).then((o) {
+              setSt(() => order = o);
+            }).catchError((e) {
+              // Close this dialog rather than show a misleading "no products"
+              // state — the real error surfaces via the blocking dialog below.
+              error = e.toString();
+              if (ctx.mounted) Navigator.of(ctx).pop();
+            });
+          }
+          final items = (order?['items'] as List? ?? []).cast<Map<String, dynamic>>();
+          final taxRate = (order?['taxRate'] as num?)?.toDouble() ?? 0;
+          final currency = (order?['currency'] as String?)?.toUpperCase() ?? '';
+          final dialogWidth = (MediaQuery.of(context).size.width * 0.7).clamp(500.0, 900.0);
+          return AlertDialog(
+            title: Text('Order Products${order?['displayId'] != null ? ' — #${order!['displayId']}' : ''}'),
+            content: SizedBox(
+              width: dialogWidth,
+              child: order == null && error == null
+                  ? const SizedBox(height: 120, child: Center(child: CircularProgressIndicator()))
+                  : items.isEmpty
+                      ? const Padding(padding: EdgeInsets.all(16), child: Text('No products on this order.'))
+                      : SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(minWidth: dialogWidth),
+                            child: DataTable(
+                            columnSpacing: 16,
+                            columns: const [
+                              DataColumn(label: Text('Description')),
+                              DataColumn(label: Text('Barcode')),
+                              DataColumn(numeric: true, label: Text('Qty')),
+                              DataColumn(numeric: true, label: Text('Unit Price')),
+                              DataColumn(numeric: true, label: Text('Tax')),
+                              DataColumn(numeric: true, label: Text('Total')),
+                            ],
+                            rows: items.map((item) {
+                              final name = item['name'];
+                              final label = name is Map
+                                  ? ((name['en'] ?? name['ar'] ?? '') as String)
+                                  : '${name ?? ''}';
+                              final lineTotal = (item['lineTotal'] as num?)?.toDouble() ?? 0;
+                              final tax = double.parse((lineTotal * taxRate).toStringAsFixed(2));
+                              final total = lineTotal + tax;
+                              return DataRow(cells: [
+                                DataCell(SizedBox(width: 220, child: Text(label, overflow: TextOverflow.ellipsis, maxLines: 1))),
+                                DataCell(SizedBox(width: 110, child: Text('${item['barcode'] ?? ''}', overflow: TextOverflow.ellipsis, maxLines: 1))),
+                                DataCell(Text(fmtCount(item['quantity']))),
+                                DataCell(Text('${fmtMoney(item['unitPrice'])} $currency')),
+                                DataCell(Text('${fmtMoney(tax)} $currency')),
+                                DataCell(Text('${fmtMoney(total)} $currency')),
+                              ]);
+                            }).toList(),
+                            ),
+                          ),
+                        ),
+            ),
+            actions: [FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close'))],
+          );
+        },
+      ),
+    );
+    if (error != null && mounted) {
+      showErrorDialogLater(context, error!);
+    }
   }
 }
 

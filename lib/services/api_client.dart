@@ -175,6 +175,16 @@ class ApiClient {
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
 
+  // id is the order's UUID — unguessable, so (per backend) no auth is
+  // required to read it; the admin token is sent anyway since we have it.
+  Future<Map<String, dynamic>> getOrder(String orderId, {String? token}) async {
+    final resp = await _http.get(_uri('/api/orders/$orderId'), headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
   // ── Odoo order sync retry (one sync_queue row, MANAGE_STORES) ──────────────
 
   /// Resets one FAILED order sync row and immediately re-pushes it to Odoo.
