@@ -823,6 +823,25 @@ class ApiClient {
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
 
+  /// All live login sessions for one device (ref, createdAt, lastSeenAt,
+  /// appVersion, store, latest). 404 if the device isn't in the admin's org.
+  Future<List<Map<String, dynamic>>> getDeviceSessions(int id, {required String token}) async {
+    final resp = await _http.get(_uri('/api/admin/devices/$id/sessions'), headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      final body = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+      return (body['items'] as List? ?? []).cast<Map<String, dynamic>>();
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  /// Disconnects one session by its `ref` (not the token itself). 404 if not found.
+  Future<void> deleteDeviceSession(int id, String ref, {required String token}) async {
+    final resp = await _http.delete(
+        _uri('/api/admin/devices/$id/sessions/$ref'), headers: _headers(token: token));
+    if (resp.statusCode == 204) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
   /// Per-device online status for the Device Status dashboard (MANAGE_DEVICES).
   Future<Map<String, dynamic>> getDeviceStatus(String token) async {
     final resp = await _http.get(_uri('/api/admin/device-status'), headers: _headers(token: token));

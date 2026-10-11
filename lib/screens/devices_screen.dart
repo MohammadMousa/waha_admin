@@ -99,6 +99,10 @@ class _DevicesScreenState extends State<DevicesScreen> {
     }
   }
 
+  Future<void> _showSessions(Device d) async {
+    await showDialog<void>(context: context, builder: (_) => _DeviceSessionsDialog(device: d));
+  }
+
   Future<void> _delete(Device d) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -180,6 +184,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
                                           .then((_) => _load()),
                                       onToggle: () => _toggleEnabled(_devices![i]),
                                       onResetPin: () => _resetPin(_devices![i]),
+                                      onSessions: () => _showSessions(_devices![i]),
                                       onSignOut: () => _signOut(_devices![i]),
                                       onDelete: () => _delete(_devices![i]),
                                       )
@@ -200,6 +205,7 @@ class _DeviceCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onToggle;
   final VoidCallback onResetPin;
+  final VoidCallback onSessions;
   final VoidCallback onSignOut;
   final VoidCallback onDelete;
 
@@ -208,6 +214,7 @@ class _DeviceCard extends StatelessWidget {
     required this.onEdit,
     required this.onToggle,
     required this.onResetPin,
+    required this.onSessions,
     required this.onSignOut,
     required this.onDelete,
   });
@@ -261,6 +268,7 @@ class _DeviceCard extends StatelessWidget {
                 if (v == 'edit') onEdit();
                 if (v == 'toggle') onToggle();
                 if (v == 'resetPin') onResetPin();
+                if (v == 'sessions') onSessions();
                 if (v == 'signOut') onSignOut();
                 if (v == 'delete') onDelete();
               },
@@ -268,6 +276,7 @@ class _DeviceCard extends StatelessWidget {
                 const PopupMenuItem(value: 'edit', child: Text('Edit')),
                 PopupMenuItem(value: 'toggle', child: Text(d.enabled ? 'Disable' : 'Enable')),
                 const PopupMenuItem(value: 'resetPin', child: Text('Reset PIN')),
+                const PopupMenuItem(value: 'sessions', child: Text('Sessions')),
                 const PopupMenuItem(value: 'signOut', child: Text('Sign Out')),
                 const PopupMenuItem(value: 'delete',
                     child: Text('Delete', style: TextStyle(color: Colors.red))),
@@ -290,4 +299,181 @@ class _Badge extends StatelessWidget {
           color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
         child: Text(label, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600)),
       );
+}
+
+// ── Sessions popup ───────────────────────────────────────────────────────────
+
+class _DeviceSessionsDialog extends StatefulWidget {
+  final Device device;
+  const _DeviceSessionsDialog({required this.device});
+
+  @override
+  State<_DeviceSessionsDialog> createState() => _DeviceSessionsDialogState();
+}
+
+class _DeviceSessionsDialogState extends State<_DeviceSessionsDialog> {
+  List<Map<String, dynamic>>? _sessions;
+  bool _busy = false;
+
+  static final _dtFmt = DateFormat('yyyy-MM-dd HH:mm');
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final token = context.read<AuthState>().token;
+    if (token == null) return;
+    try {
+      final items = await ApiClient().getDeviceSessions(widget.device.id, token: token);
+      // Live session first, then most recently active; never-used sessions last.
+      items.sort((a, b) {
+        final aLatest = a['latest'] == true;
+        final bLatest = b['latest'] == true;
+        if (aLatest != bLatest) return aLatest ? -1 : 1;
+        final aLs = a['lastSeenAt']?.toString();
+        final bLs = b['lastSeenAt']?.toString();
+        if (aLs == null && bLs == null) return 0;
+        if (aLs == null) return 1;
+        if (bLs == null) return -1;
+        return bLs.compareTo(aLs);
+      });
+      if (mounted) setState(() => _sessions = items);
+    } on ApiException catch (e) {
+      if (mounted) { Navigator.of(context).pop(); showErrorDialogLater(context, e.message); }
+    } catch (e) {
+      if (mounted) { Navigator.of(context).pop(); showErrorDialogLater(context, e.toString()); }
+    }
+  }
+
+  Future<void> _disconnect(String ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Disconnect session?'),
+        content: const Text('That kiosk will get signed out and need to log in again on its next action.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Disconnect'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final token = context.read<AuthState>().token;
+    if (token == null) return;
+    setState(() => _busy = true);
+    try {
+      await ApiClient().deleteDeviceSession(widget.device.id, ref, token: token);
+      await _load();
+    } on ApiException catch (e) {
+      if (mounted) showErrorDialog(context, e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _signOutAll() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sign out all sessions?'),
+        content: Text('Sign out "${widget.device.displayName}" everywhere? It will need to log in again on its next action.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Sign Out All')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final token = context.read<AuthState>().token;
+    if (token == null) return;
+    setState(() => _busy = true);
+    try {
+      final n = await ApiClient().signOutDevice(widget.device.id, token: token);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(n > 0 ? 'Signed out $n session(s).' : 'No active session.')),
+        );
+      }
+      await _load();
+    } on ApiException catch (e) {
+      if (mounted) showErrorDialog(context, e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dialogWidth = (MediaQuery.of(context).size.width * 0.7).clamp(500.0, 820.0);
+    final dialogHeight = (MediaQuery.of(context).size.height * 0.6).clamp(260.0, 520.0);
+    return AlertDialog(
+      title: Text('Sessions — ${widget.device.displayName}'),
+      content: SizedBox(
+        width: dialogWidth,
+        child: _sessions == null
+            ? const SizedBox(height: 120, child: Center(child: CircularProgressIndicator()))
+            : _sessions!.isEmpty
+                ? const Padding(padding: EdgeInsets.all(16), child: Text('No active sessions.'))
+                : ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: dialogHeight),
+                    child: SingleChildScrollView(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(minWidth: dialogWidth),
+                          child: DataTable(
+                            columnSpacing: 16,
+                            columns: const [
+                              DataColumn(label: Text('')),
+                              DataColumn(label: Text('Store')),
+                              DataColumn(label: Text('App Version')),
+                              DataColumn(label: Text('Created')),
+                              DataColumn(label: Text('Last Seen')),
+                              DataColumn(label: Text('')),
+                            ],
+                            rows: _sessions!.map((s) {
+                              final isLatest = s['latest'] == true;
+                              final created = s['createdAt'] != null
+                                  ? _dtFmt.format(DateTime.parse(s['createdAt'].toString()).toLocal())
+                                  : '—';
+                              final lastSeen = s['lastSeenAt'] != null
+                                  ? _dtFmt.format(DateTime.parse(s['lastSeenAt'].toString()).toLocal())
+                                  : 'Never used';
+                              final ref = s['ref'].toString();
+                              return DataRow(cells: [
+                                DataCell(isLatest ? const _Badge('Current', Colors.green) : const SizedBox.shrink()),
+                                DataCell(Text(s['storeName']?.toString() ?? '—')),
+                                DataCell(Text(s['appVersion']?.toString() ?? '—')),
+                                DataCell(Text(created)),
+                                DataCell(Text(lastSeen)),
+                                DataCell(IconButton(
+                                  icon: const Icon(Icons.link_off, size: 18),
+                                  tooltip: 'Disconnect',
+                                  onPressed: _busy ? null : () => _disconnect(ref),
+                                )),
+                              ]);
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+      ),
+      actions: [
+        TextButton.icon(
+          onPressed: _busy || (_sessions?.isEmpty ?? true) ? null : _signOutAll,
+          icon: const Icon(Icons.logout, size: 16),
+          label: const Text('Sign Out All'),
+        ),
+        FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+      ],
+    );
+  }
 }
