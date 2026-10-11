@@ -455,11 +455,35 @@ class _PropertyEditorDialog extends StatefulWidget {
 }
 
 class _PropertyEditorDialogState extends State<_PropertyEditorDialog> {
+  // Keys with a true/false dropdown control.
+  static const _boolKeys = {
+    'auto_log_upload_enabled',
+    'enable_logging',
+    'device_auto_restart_enabled',
+  };
+  // Keys with a numeric TextField + hint (integer).
+  static const _intHints = {
+    'check_landing_page_interval_minutes': '1–1440',
+    'max_log_uploads_per_hour': 'e.g. 3',
+    'log_harvest_seconds': 'e.g. 30',
+    'heartbeat_minutes': '0–1440 (0 = device monitoring off)',
+    'late_approval_expiration_minutes': '1–60',
+    'device_auto_restart_wait_minutes': '1–60',
+    'terminal_timeout_seconds': '10–80',
+  };
+  // Keys with a numeric TextField + hint (decimal).
+  static const _decimalHints = {
+    'device_auto_restart_hours': '0.25–168',
+  };
+
   String? _selectedKnownKey; // null = "Custom key…" chosen (only when creating)
   bool _customKey = false;
   final _customKeyCtrl = TextEditingController();
   final _valueCtrl = TextEditingController();
-  String _language = 'ar';
+  final Map<String, String> _dropdownValues = {
+    'default_language': 'ar',
+    for (final k in _boolKeys) k: 'false',
+  };
   String? _error;
 
   bool get _isEditing => widget.editing != null;
@@ -481,7 +505,9 @@ class _PropertyEditorDialogState extends State<_PropertyEditorDialog> {
       _customKeyCtrl.text = key;
       _valueCtrl.text = value;
       if (key == 'default_language' && (value.toLowerCase() == 'ar' || value.toLowerCase() == 'en')) {
-        _language = value.toLowerCase();
+        _dropdownValues['default_language'] = value.toLowerCase();
+      } else if (_boolKeys.contains(key)) {
+        _dropdownValues[key] = value.toLowerCase() == 'true' ? 'true' : 'false';
       }
     } else {
       // Default to the first not-yet-set known key, if any; otherwise custom.
@@ -507,25 +533,49 @@ class _PropertyEditorDialogState extends State<_PropertyEditorDialog> {
 
   Widget _valueField() {
     final known = _known;
-    if (!_customKey && known?['key'] == 'default_language') {
+    final key = _customKey ? null : (known?['key'] as String?);
+    if (key == 'default_language') {
       return DropdownButtonFormField<String>(
-        value: _language,
+        value: _dropdownValues['default_language'],
         decoration: const InputDecoration(labelText: 'Value', border: OutlineInputBorder(), isDense: true),
         items: const [
           DropdownMenuItem(value: 'ar', child: Text('ar — Arabic')),
           DropdownMenuItem(value: 'en', child: Text('en — English')),
         ],
-        onChanged: (v) => setState(() => _language = v ?? 'ar'),
+        onChanged: (v) => setState(() => _dropdownValues['default_language'] = v ?? 'ar'),
       );
     }
-    if (!_customKey && known?['key'] == 'check_landing_page_interval_minutes') {
+    if (key != null && _boolKeys.contains(key)) {
+      return DropdownButtonFormField<String>(
+        value: _dropdownValues[key],
+        decoration: const InputDecoration(labelText: 'Value', border: OutlineInputBorder(), isDense: true),
+        items: const [
+          DropdownMenuItem(value: 'true', child: Text('true — Enabled')),
+          DropdownMenuItem(value: 'false', child: Text('false — Disabled')),
+        ],
+        onChanged: (v) => setState(() => _dropdownValues[key] = v ?? 'false'),
+      );
+    }
+    if (key != null && _intHints.containsKey(key)) {
       return TextField(
         controller: _valueCtrl,
         keyboardType: TextInputType.number,
-        decoration: const InputDecoration(
-          labelText: 'Value (minutes)',
-          hintText: '1–1440',
-          border: OutlineInputBorder(),
+        decoration: InputDecoration(
+          labelText: 'Value',
+          hintText: _intHints[key],
+          border: const OutlineInputBorder(),
+          isDense: true,
+        ),
+      );
+    }
+    if (key != null && _decimalHints.containsKey(key)) {
+      return TextField(
+        controller: _valueCtrl,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: InputDecoration(
+          labelText: 'Value',
+          hintText: _decimalHints[key],
+          border: const OutlineInputBorder(),
           isDense: true,
         ),
       );
@@ -543,9 +593,15 @@ class _PropertyEditorDialogState extends State<_PropertyEditorDialog> {
       return;
     }
     final known = _known;
-    final value = (!_customKey && known?['key'] == 'default_language')
-        ? _language
-        : _valueCtrl.text.trim();
+    final knownKey = (!_customKey) ? (known?['key'] as String?) : null;
+    final String value;
+    if (knownKey == 'default_language') {
+      value = _dropdownValues['default_language'] ?? 'ar';
+    } else if (knownKey != null && _boolKeys.contains(knownKey)) {
+      value = _dropdownValues[knownKey] ?? 'false';
+    } else {
+      value = _valueCtrl.text.trim();
+    }
     if (value.isEmpty) {
       setState(() => _error = 'Value is required.');
       return;

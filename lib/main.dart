@@ -12,6 +12,7 @@ import 'screens/accounts_screen.dart';
 import 'screens/advertisements_screen.dart';
 import 'screens/device_edit_screen.dart';
 import 'screens/device_logs_screen.dart';
+import 'screens/device_status_screen.dart';
 import 'screens/devices_screen.dart';
 import 'screens/employee_edit_screen.dart';
 import 'screens/employees_screen.dart';
@@ -83,6 +84,10 @@ class WahaAdminApp extends StatelessWidget {
           case Routes.deviceLogs:
             return MaterialPageRoute(
                 builder: (_) => const DeviceLogsScreen(), settings: settings);
+
+          case Routes.deviceStatus:
+            return MaterialPageRoute(
+                builder: (_) => const DeviceStatusScreen(), settings: settings);
 
           case Routes.profile:
             return MaterialPageRoute(

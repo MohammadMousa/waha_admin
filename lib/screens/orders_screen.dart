@@ -53,7 +53,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
   List<Map<String, dynamic>> _items = [];
   int _totalCount = 0;
   int _page       = 0;
-  static const _pageSize = 10;
+  int _pageSize   = 10;
+  static const _pageSizeOptions = [10, 25, 50, 100, 250, 500];
 
   bool _loading   = true;
   bool _exporting = false;
@@ -618,6 +619,12 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
                   style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
                 ),
                 const Spacer(),
+                _PageSizeSelector(
+                  value: _pageSize,
+                  options: _pageSizeOptions,
+                  onChanged: (v) { setState(() { _pageSize = v; _page = 0; }); _load(); },
+                ),
+                const SizedBox(width: 16),
                 _PaginationBar(
                   page: _page,
                   totalCount: _totalCount,
@@ -838,6 +845,34 @@ class _SumTile extends StatelessWidget {
 }
 
 // ── Pagination bar ────────────────────────────────────────────────────────────
+
+class _PageSizeSelector extends StatelessWidget {
+  final int value;
+  final List<int> options;
+  final ValueChanged<int> onChanged;
+
+  const _PageSizeSelector({required this.value, required this.options, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('Rows per page', style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+        const SizedBox(width: 8),
+        DropdownButton<int>(
+          value: value,
+          underline: const SizedBox.shrink(),
+          items: options
+              .map((o) => DropdownMenuItem(value: o, child: Text('$o', style: const TextStyle(fontSize: 13))))
+              .toList(),
+          onChanged: (v) { if (v != null) onChanged(v); },
+        ),
+      ],
+    );
+  }
+}
 
 class _PaginationBar extends StatelessWidget {
   final int page;

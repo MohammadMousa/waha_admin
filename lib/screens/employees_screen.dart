@@ -72,6 +72,33 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     }
   }
 
+  Future<void> _signOut(Employee e) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sign out employee?'),
+        content: Text('Sign out "${e.displayName}"? They will need to log in again on their next action.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Sign Out')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final token = context.read<AuthState>().token;
+    if (token == null) return;
+    try {
+      final n = await ApiClient().signOutEmployee(e.id, token: token);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(n > 0 ? 'Employee signed out.' : 'Employee had no active session.')),
+        );
+      }
+    } on ApiException catch (err) {
+      if (mounted) showErrorDialog(context, err.message);
+    }
+  }
+
   Future<void> _delete(Employee e) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -153,6 +180,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                                           .then((_) => _load()),
                                       onToggle: () => _toggleEnabled(_employees![i]),
                                       onResetPin: () => _resetPin(_employees![i]),
+                                      onSignOut: () => _signOut(_employees![i]),
                                       onDelete: () => _delete(_employees![i]),
                                       )
                                   ),
@@ -172,6 +200,7 @@ class _EmployeeCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onToggle;
   final VoidCallback onResetPin;
+  final VoidCallback onSignOut;
   final VoidCallback onDelete;
 
   const _EmployeeCard({
@@ -179,6 +208,7 @@ class _EmployeeCard extends StatelessWidget {
     required this.onEdit,
     required this.onToggle,
     required this.onResetPin,
+    required this.onSignOut,
     required this.onDelete,
   });
 
@@ -234,12 +264,14 @@ class _EmployeeCard extends StatelessWidget {
                 if (v == 'edit') onEdit();
                 if (v == 'toggle') onToggle();
                 if (v == 'resetPin') onResetPin();
+                if (v == 'signOut') onSignOut();
                 if (v == 'delete') onDelete();
               },
               itemBuilder: (_) => [
                 const PopupMenuItem(value: 'edit', child: Text('Edit')),
                 PopupMenuItem(value: 'toggle', child: Text(e.enabled ? 'Disable' : 'Enable')),
                 const PopupMenuItem(value: 'resetPin', child: Text('Reset PIN')),
+                const PopupMenuItem(value: 'signOut', child: Text('Sign Out')),
                 const PopupMenuItem(value: 'delete',
                     child: Text('Delete', style: TextStyle(color: Colors.red))),
               ],

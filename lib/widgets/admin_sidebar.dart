@@ -232,22 +232,6 @@ class _AdminSidebarState extends State<AdminSidebar> {
                     current: currentRoute,
                     indent: true,
                   ),
-                if (canManageDevices)
-                  _NavItem(
-                    icon: Icons.devices_outlined,
-                    label: 'Devices',
-                    route: Routes.devices,
-                    current: currentRoute,
-                    indent: true,
-                  ),
-                if (canManageDevices)
-                  _NavItem(
-                    icon: Icons.receipt_long_outlined,
-                    label: 'Device Logs',
-                    route: Routes.deviceLogs,
-                    current: currentRoute,
-                    indent: true,
-                  ),
                 _NavItem(
                   icon: Icons.payment_outlined,
                   label: 'Payment Methods',
@@ -269,6 +253,30 @@ class _AdminSidebarState extends State<AdminSidebar> {
                   current: currentRoute,
                   indent: true,
                 ),
+                if (canManageDevices) ...[
+                  _SectionLabel('Devices Management'),
+                  _NavItem(
+                    icon: Icons.devices_outlined,
+                    label: 'Devices',
+                    route: Routes.devices,
+                    current: currentRoute,
+                    indent: true,
+                  ),
+                  _NavItem(
+                    icon: Icons.receipt_long_outlined,
+                    label: 'Device Logs',
+                    route: Routes.deviceLogs,
+                    current: currentRoute,
+                    indent: true,
+                  ),
+                  _NavItem(
+                    icon: Icons.wifi_tethering_outlined,
+                    label: 'Device Status',
+                    route: Routes.deviceStatus,
+                    current: currentRoute,
+                    indent: true,
+                  ),
+                ],
                 _SectionLabel('Integrations'),
                 _NavItem(
                   icon: Icons.hub_outlined,

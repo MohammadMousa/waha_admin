@@ -72,6 +72,33 @@ class _DevicesScreenState extends State<DevicesScreen> {
     }
   }
 
+  Future<void> _signOut(Device d) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sign out device?'),
+        content: Text('Sign out "${d.displayName}"? It will need to log in again on its next action.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Sign Out')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final token = context.read<AuthState>().token;
+    if (token == null) return;
+    try {
+      final n = await ApiClient().signOutDevice(d.id, token: token);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(n > 0 ? 'Device signed out.' : 'Device had no active session.')),
+        );
+      }
+    } on ApiException catch (err) {
+      if (mounted) showErrorDialog(context, err.message);
+    }
+  }
+
   Future<void> _delete(Device d) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -153,6 +180,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
                                           .then((_) => _load()),
                                       onToggle: () => _toggleEnabled(_devices![i]),
                                       onResetPin: () => _resetPin(_devices![i]),
+                                      onSignOut: () => _signOut(_devices![i]),
                                       onDelete: () => _delete(_devices![i]),
                                       )
                                   ),
@@ -172,6 +200,7 @@ class _DeviceCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onToggle;
   final VoidCallback onResetPin;
+  final VoidCallback onSignOut;
   final VoidCallback onDelete;
 
   const _DeviceCard({
@@ -179,6 +208,7 @@ class _DeviceCard extends StatelessWidget {
     required this.onEdit,
     required this.onToggle,
     required this.onResetPin,
+    required this.onSignOut,
     required this.onDelete,
   });
 
@@ -231,12 +261,14 @@ class _DeviceCard extends StatelessWidget {
                 if (v == 'edit') onEdit();
                 if (v == 'toggle') onToggle();
                 if (v == 'resetPin') onResetPin();
+                if (v == 'signOut') onSignOut();
                 if (v == 'delete') onDelete();
               },
               itemBuilder: (_) => [
                 const PopupMenuItem(value: 'edit', child: Text('Edit')),
                 PopupMenuItem(value: 'toggle', child: Text(d.enabled ? 'Disable' : 'Enable')),
                 const PopupMenuItem(value: 'resetPin', child: Text('Reset PIN')),
+                const PopupMenuItem(value: 'signOut', child: Text('Sign Out')),
                 const PopupMenuItem(value: 'delete',
                     child: Text('Delete', style: TextStyle(color: Colors.red))),
               ],

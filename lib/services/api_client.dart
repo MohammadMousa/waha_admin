@@ -747,6 +747,16 @@ class ApiClient {
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
 
+  /// Returns how many active sessions were signed out (0 or 1).
+  Future<int> signOutEmployee(int id, {required String token}) async {
+    final resp = await _http.post(_uri('/api/admin/employees/$id/sign-out'), headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      final body = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+      return (body['signedOut'] as num?)?.toInt() ?? 0;
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
   Future<void> addEmployeeStore(int id, int storeId, {required String token}) async {
     final resp = await _http.post(_uri('/api/admin/employees/$id/stores'),
         headers: _headers(token: token), body: jsonEncode({'storeId': storeId}));
@@ -800,6 +810,25 @@ class ApiClient {
   Future<void> deleteDevice(int id, {required String token}) async {
     final resp = await _http.delete(_uri('/api/admin/devices/$id'), headers: _headers(token: token));
     if (resp.statusCode == 200) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  /// Returns how many active sessions were signed out (0 or 1).
+  Future<int> signOutDevice(int id, {required String token}) async {
+    final resp = await _http.post(_uri('/api/admin/devices/$id/sign-out'), headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      final body = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+      return (body['signedOut'] as num?)?.toInt() ?? 0;
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  /// Per-device online status for the Device Status dashboard (MANAGE_DEVICES).
+  Future<Map<String, dynamic>> getDeviceStatus(String token) async {
+    final resp = await _http.get(_uri('/api/admin/device-status'), headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    }
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
 
