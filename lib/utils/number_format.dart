@@ -25,3 +25,18 @@ String fmtAvg(dynamic v) {
   final d = ((v as num?) ?? 0).toDouble();
   return d == d.roundToDouble() ? fmtCount(d) : fmtMoney(d);
 }
+
+/// 45 -> "45m", 207 -> "3h 27m", 1984 -> "1d 9h 4m" (durations given in
+/// minutes). Always includes every non-zero unit down to minutes.
+String fmtDuration(dynamic v) {
+  final totalMinutes = ((v as num?) ?? 0).round();
+  final days = totalMinutes ~/ 1440;
+  final hours = (totalMinutes % 1440) ~/ 60;
+  final minutes = totalMinutes % 60;
+  final parts = [
+    if (days > 0) '${days}d',
+    if (hours > 0) '${hours}h',
+    if (minutes > 0 || (days == 0 && hours == 0)) '${minutes}m',
+  ];
+  return parts.join(' ');
+}

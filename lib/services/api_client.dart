@@ -50,6 +50,14 @@ class ApiClient {
     }
   }
 
+  /// Public backend config, incl. `apiLevel` (string digits; absent on
+  /// backends from before this scheme — callers should treat that as "0").
+  Future<Map<String, dynamic>> getConfig() async {
+    final resp = await _http.get(_uri('/api/config'), headers: _headers());
+    if (resp.statusCode == 200) return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
   // ── Auth ──────────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> login(String username, String password) async {
@@ -839,6 +847,22 @@ class ApiClient {
     final resp = await _http.delete(
         _uri('/api/admin/devices/$id/sessions/$ref'), headers: _headers(token: token));
     if (resp.statusCode == 204) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  /// Disconnects up to 200 sessions by `ref` in one call. Unknown refs, or
+  /// refs belonging to another device, are skipped (not an error), so the
+  /// returned count may be lower than `refs.length`.
+  Future<int> deleteDeviceSessions(int id, List<String> refs, {required String token}) async {
+    final resp = await _http.post(
+      _uri('/api/admin/devices/$id/sessions/delete'),
+      headers: _headers(token: token),
+      body: jsonEncode({'refs': refs}),
+    );
+    if (resp.statusCode == 200) {
+      final body = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+      return (body['disconnected'] as num?)?.toInt() ?? 0;
+    }
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
 

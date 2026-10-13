@@ -283,7 +283,7 @@ class _OnlineBadge extends StatelessWidget {
       label = 'Online';
     } else if (online == false) {
       color = const Color(0xFFC62828);
-      label = offlineMinutes != null ? 'Offline ${fmtCount(offlineMinutes)}m' : 'Offline';
+      label = offlineMinutes != null ? 'Offline ${fmtDuration(offlineMinutes)}' : 'Offline';
     } else {
       color = Colors.grey;
       label = 'Unknown';

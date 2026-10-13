@@ -314,6 +314,7 @@ class _DeviceSessionsDialog extends StatefulWidget {
 class _DeviceSessionsDialogState extends State<_DeviceSessionsDialog> {
   List<Map<String, dynamic>>? _sessions;
   bool _busy = false;
+  final Set<String> _selected = {};
 
   static final _dtFmt = DateFormat('yyyy-MM-dd HH:mm');
 
@@ -340,7 +341,12 @@ class _DeviceSessionsDialogState extends State<_DeviceSessionsDialog> {
         if (bLs == null) return -1;
         return bLs.compareTo(aLs);
       });
-      if (mounted) setState(() => _sessions = items);
+      if (mounted) {
+        setState(() {
+          _sessions = items;
+          _selected.retainWhere((ref) => items.any((s) => s['ref'].toString() == ref));
+        });
+      }
     } on ApiException catch (e) {
       if (mounted) { Navigator.of(context).pop(); showErrorDialogLater(context, e.message); }
     } catch (e) {
@@ -370,6 +376,43 @@ class _DeviceSessionsDialogState extends State<_DeviceSessionsDialog> {
     setState(() => _busy = true);
     try {
       await ApiClient().deleteDeviceSession(widget.device.id, ref, token: token);
+      await _load();
+    } on ApiException catch (e) {
+      if (mounted) showErrorDialog(context, e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _disconnectSelected() async {
+    final refs = _selected.toList();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Disconnect selected sessions?'),
+        content: Text('Disconnect ${refs.length} session(s)? Those kiosks will get signed out and need to log in again on their next action.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Disconnect'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final token = context.read<AuthState>().token;
+    if (token == null) return;
+    setState(() => _busy = true);
+    try {
+      final n = await ApiClient().deleteDeviceSessions(widget.device.id, refs, token: token);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Disconnected $n session(s).')),
+        );
+      }
+      _selected.clear();
       await _load();
     } on ApiException catch (e) {
       if (mounted) showErrorDialog(context, e.message);
@@ -430,13 +473,30 @@ class _DeviceSessionsDialogState extends State<_DeviceSessionsDialog> {
                           constraints: BoxConstraints(minWidth: dialogWidth),
                           child: DataTable(
                             columnSpacing: 16,
-                            columns: const [
-                              DataColumn(label: Text('')),
-                              DataColumn(label: Text('Store')),
-                              DataColumn(label: Text('App Version')),
-                              DataColumn(label: Text('Created')),
-                              DataColumn(label: Text('Last Seen')),
-                              DataColumn(label: Text('')),
+                            columns: [
+                              DataColumn(
+                                label: Checkbox(
+                                  value: _selected.isNotEmpty && _selected.length == _sessions!.length,
+                                  tristate: true,
+                                  onChanged: _busy
+                                      ? null
+                                      : (_) => setState(() {
+                                            if (_selected.length == _sessions!.length) {
+                                              _selected.clear();
+                                            } else {
+                                              _selected
+                                                ..clear()
+                                                ..addAll(_sessions!.map((s) => s['ref'].toString()));
+                                            }
+                                          }),
+                                ),
+                              ),
+                              const DataColumn(label: Text('')),
+                              const DataColumn(label: Text('Store')),
+                              const DataColumn(label: Text('App Version')),
+                              const DataColumn(label: Text('Created')),
+                              const DataColumn(label: Text('Last Seen')),
+                              const DataColumn(label: Text('')),
                             ],
                             rows: _sessions!.map((s) {
                               final isLatest = s['latest'] == true;
@@ -448,6 +508,18 @@ class _DeviceSessionsDialogState extends State<_DeviceSessionsDialog> {
                                   : 'Never used';
                               final ref = s['ref'].toString();
                               return DataRow(cells: [
+                                DataCell(Checkbox(
+                                  value: _selected.contains(ref),
+                                  onChanged: _busy
+                                      ? null
+                                      : (v) => setState(() {
+                                            if (v == true) {
+                                              _selected.add(ref);
+                                            } else {
+                                              _selected.remove(ref);
+                                            }
+                                          }),
+                                )),
                                 DataCell(isLatest ? const _Badge('Current', Colors.green) : const SizedBox.shrink()),
                                 DataCell(Text(s['storeName']?.toString() ?? '—')),
                                 DataCell(Text(s['appVersion']?.toString() ?? '—')),
@@ -467,6 +539,11 @@ class _DeviceSessionsDialogState extends State<_DeviceSessionsDialog> {
                   ),
       ),
       actions: [
+        TextButton.icon(
+          onPressed: _busy || _selected.isEmpty ? null : _disconnectSelected,
+          icon: const Icon(Icons.link_off, size: 16),
+          label: Text('Disconnect Selected${_selected.isEmpty ? '' : ' (${_selected.length})'}'),
+        ),
         TextButton.icon(
           onPressed: _busy || (_sessions?.isEmpty ?? true) ? null : _signOutAll,
           icon: const Icon(Icons.logout, size: 16),

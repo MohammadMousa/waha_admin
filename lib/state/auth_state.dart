@@ -1,17 +1,24 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/api_client.dart';
 
 class AuthState extends ChangeNotifier {
   String? _token;
   String? _username;
   String? _roleName;
   Set<String> _permissions = {};
+  int _apiLevel = 0;
 
   String? get token => _token;
   String? get username => _username;
   String? get roleName => _roleName;
   Set<String> get permissions => _permissions;
   bool get isLoggedIn => _token != null;
+
+  /// Backend feature level from GET /api/config (0 if the backend predates
+  /// this scheme, or the call failed). Lets a feature gate on the exact
+  /// level it needs instead of guessing from permissions.
+  int get apiLevel => _apiLevel;
 
   bool hasPermission(String permission) => _permissions.contains(permission);
 
@@ -21,7 +28,17 @@ class AuthState extends ChangeNotifier {
     _username = prefs.getString('admin_username');
     _roleName = prefs.getString('admin_role');
     _permissions = (prefs.getStringList('admin_permissions') ?? const []).toSet();
+    await _loadApiLevel();
     notifyListeners();
+  }
+
+  Future<void> _loadApiLevel() async {
+    try {
+      final config = await ApiClient().getConfig();
+      _apiLevel = int.tryParse(config['apiLevel']?.toString() ?? '') ?? 0;
+    } catch (_) {
+      // Keep the previous level — never enable new features on a failed check.
+    }
   }
 
   Future<void> setSession(
@@ -43,6 +60,7 @@ class AuthState extends ChangeNotifier {
       await prefs.remove('admin_role');
     }
     await prefs.setStringList('admin_permissions', permissions.toList());
+    await _loadApiLevel();
     notifyListeners();
   }
 
