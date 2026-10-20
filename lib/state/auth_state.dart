@@ -35,7 +35,7 @@ class AuthState extends ChangeNotifier {
   Future<void> _loadApiLevel() async {
     try {
       final config = await ApiClient().getConfig();
-      _apiLevel = int.tryParse(config['apiLevel']?.toString() ?? '') ?? 0;
+      _apiLevel = int.tryParse(config['api_level']?.toString() ?? '') ?? 0;
     } catch (_) {
       // Keep the previous level — never enable new features on a failed check.
     }

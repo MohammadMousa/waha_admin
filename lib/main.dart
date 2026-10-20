@@ -41,6 +41,7 @@ import 'screens/register_screen.dart';
 import 'screens/resource_explorer_screen.dart';
 import 'screens/charts_screen.dart';
 import 'screens/store_edit_screen.dart';
+import 'screens/offers_screen.dart';
 import 'screens/stores_screen.dart';
 import 'state/auth_state.dart';
 import 'services/app_info.dart';
@@ -172,6 +173,10 @@ class WahaAdminApp extends StatelessWidget {
           case Routes.advertisements:
             return MaterialPageRoute(
                 builder: (_) => const AdvertisementsScreen(), settings: settings);
+
+          case Routes.offers:
+            return MaterialPageRoute(
+                builder: (_) => const OffersScreen(), settings: settings);
 
           case Routes.landingPages:
             return MaterialPageRoute(

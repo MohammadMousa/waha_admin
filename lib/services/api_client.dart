@@ -44,13 +44,19 @@ class ApiClient {
   String _extractMessage(http.Response resp) {
     try {
       final body = jsonDecode(resp.body) as Map<String, dynamic>;
-      return body['message'] as String? ?? 'Request failed (${resp.statusCode})';
+      final msg = body['message'] as String? ?? 'Request failed (${resp.statusCode})';
+      // Validation replies carry per-field texts; list them all in the one message.
+      final errors = body['errors'];
+      if (errors is Map && errors.isNotEmpty) {
+        return '$msg\n${errors.entries.map((e) => '• ${e.key}: ${e.value}').join('\n')}';
+      }
+      return msg;
     } catch (_) {
       return 'Request failed (${resp.statusCode})';
     }
   }
 
-  /// Public backend config, incl. `apiLevel` (string digits; absent on
+  /// Public backend config, incl. `api_level` (string digits; absent on
   /// backends from before this scheme — callers should treat that as "0").
   Future<Map<String, dynamic>> getConfig() async {
     final resp = await _http.get(_uri('/api/config'), headers: _headers());
@@ -872,6 +878,55 @@ class ApiClient {
     if (resp.statusCode == 200) {
       return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
     }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  // ── Offers (api level 2) ─────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> getOffers(String token,
+      {String? status, String? search, int page = 0, int size = 20}) async {
+    final uri = _uri('/api/admin/offers').replace(queryParameters: {
+      if (status != null) 'status': status,
+      if (search != null && search.isNotEmpty) 'q': search,
+      'page': '$page',
+      'size': '$size',
+    });
+    final resp = await _http.get(uri, headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<Map<String, dynamic>> getOffer(int id, String token) async {
+    final resp = await _http.get(_uri('/api/admin/offers/$id'), headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  /// Creates (id == null) or edits an offer. `type` is only accepted on create.
+  Future<void> saveOffer(Map<String, dynamic> body, {int? id, required String token}) async {
+    final resp = id == null
+        ? await _http.post(_uri('/api/admin/offers'),
+            headers: _headers(token: token), body: jsonEncode(body))
+        : await _http.put(_uri('/api/admin/offers/$id'),
+            headers: _headers(token: token), body: jsonEncode(body));
+    if (resp.statusCode == 200 || resp.statusCode == 201) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<void> setOfferEnabled(int id, bool enabled, {required String token}) async {
+    final resp = await _http.patch(_uri('/api/admin/offers/$id/enabled'),
+        headers: _headers(token: token), body: jsonEncode({'enabled': enabled}));
+    if (resp.statusCode == 200 || resp.statusCode == 204) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<void> deleteOffer(int id, {required String token}) async {
+    final resp = await _http.delete(_uri('/api/admin/offers/$id'), headers: _headers(token: token));
+    if (resp.statusCode == 204 || resp.statusCode == 200) return;
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
 

@@ -200,6 +200,15 @@ class _AdminSidebarState extends State<AdminSidebar> {
                   current: currentRoute,
                   indent: true,
                 ),
+                // Offers exist from backend api level 2; older backends have no endpoint.
+                if (auth.apiLevel >= 2 && auth.hasPermission('VIEW_OFFERS'))
+                  _NavItem(
+                    icon: Icons.local_offer_outlined,
+                    label: 'Offers',
+                    route: Routes.offers,
+                    current: currentRoute,
+                    indent: true,
+                  ),
                 _SectionLabel('Administration'),
                 if (canManageStores)
                   _NavItem(

@@ -25,6 +25,7 @@ class Routes {
   // Marketing
   static const advertisements  = '/advertisements';
   static const landingPages    = '/landing-pages';
+  static const offers          = '/offers';
 
   // Reporting
   static const charts          = '/reports/charts';

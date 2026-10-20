@@ -8,10 +8,11 @@ import 'package:intl/intl.dart';
 Future<DateTime?> showWahaDatePicker(
   BuildContext context, {
   DateTime? initial,
+  bool allowFuture = false,
 }) {
   return showDialog<DateTime>(
     context: context,
-    builder: (_) => _SingleDatePickerDialog(initial: initial),
+    builder: (_) => _SingleDatePickerDialog(initial: initial, allowFuture: allowFuture),
   );
 }
 
@@ -31,7 +32,8 @@ Future<DateTimeRange?> showWahaDateRangePicker(
 
 class _SingleDatePickerDialog extends StatefulWidget {
   final DateTime? initial;
-  const _SingleDatePickerDialog({this.initial});
+  final bool allowFuture;
+  const _SingleDatePickerDialog({this.initial, this.allowFuture = false});
 
   @override
   State<_SingleDatePickerDialog> createState() =>
@@ -82,6 +84,7 @@ class _SingleDatePickerDialogState extends State<_SingleDatePickerDialog> {
               child: WahaCalendarGrid(
                 month: _viewMonth,
                 selected: _selected,
+                allowFuture: widget.allowFuture,
                 onSelect: (d) => setState(() => _selected = d),
               ),
             ),
@@ -288,12 +291,15 @@ class WahaCalendarGrid extends StatelessWidget {
   final DateTime month;
   final DateTime? selected;
   final ValueChanged<DateTime> onSelect;
+  /// Report pickers grey out days after today; offers need future dates.
+  final bool allowFuture;
 
   const WahaCalendarGrid({
     super.key,
     required this.month,
     required this.selected,
     required this.onSelect,
+    this.allowFuture = false,
   });
 
   @override
@@ -314,7 +320,7 @@ class WahaCalendarGrid extends StatelessWidget {
       ...List.generate(daysInMonth, (i) {
         final d        = DateTime(month.year, month.month, i + 1);
         final isSelected = selected != null && _same(d, selected!);
-        final future   = d.isAfter(DateTime.now());
+        final future   = !allowFuture && d.isAfter(DateTime.now());
 
         return GestureDetector(
           onTap: future ? null : () => onSelect(d),
