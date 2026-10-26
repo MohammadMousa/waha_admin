@@ -45,9 +45,11 @@ import 'screens/offers_screen.dart';
 import 'screens/stores_screen.dart';
 import 'state/auth_state.dart';
 import 'services/app_info.dart';
+import 'config/app_config.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppConfig.init();
   await AppInfo.init();
   runApp(
     ChangeNotifierProvider(

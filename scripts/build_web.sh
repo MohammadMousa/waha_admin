@@ -5,18 +5,22 @@
 # writes the bumped version into build/web/version.json.
 #
 # Usage: scripts/build_web.sh <API_BASE_URL> [extra flutter build web flags]
-# Example: scripts/build_web.sh http://18.211.74.179
+# Example1: scripts/build_web.sh http://17.201.74.159
+# Example2: scripts/build_web.sh https://waha1.duckdns.org
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-if [ $# -lt 1 ] || [[ "$1" == -* ]]; then
-  echo "Usage: $0 <API_BASE_URL> [extra flutter build web flags]" >&2
-  exit 1
+api="${1:-}"
+if [ $# -ge 1 ]; then
+  shift
 fi
-api="$1"
-shift
 
 python3 tool/bump_version.py
+
 flutter build web --release --no-wasm-dry-run \
-  --dart-define=API_BASE_URL="$api" \
   --dart-define=BUILD_TIME="$(date '+%Y-%m-%d %H:%M %Z')" "$@"
+
+# Automatically write config.json to the production build output
+echo "{\"apiBaseUrl\": \"$api\"}" > build/web/config.json
+
+echo "Build complete! API base URL set to: ${api:-'(relative path /api)'}"
