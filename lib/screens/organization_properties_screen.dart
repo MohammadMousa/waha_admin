@@ -53,7 +53,7 @@ class _OrganizationPropertiesScreenState extends State<OrganizationPropertiesScr
       if (!mounted) return;
       setState(() {
         _items = results[0] as List<Map<String, dynamic>>;
-        _knownKeys = results[1] as List<Map<String, dynamic>>;
+        _knownKeys = _withLocalKeys(results[1] as List<Map<String, dynamic>>);
         _orgInfo = results[2] as Map<String, dynamic>;
         _loading = false;
       });
@@ -64,6 +64,19 @@ class _OrganizationPropertiesScreenState extends State<OrganizationPropertiesScr
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
     }
   }
+
+  /// Keys the kiosk reads but the backend does not list yet, so the editor still
+  /// offers them as proper controls instead of free text.
+  static List<Map<String, dynamic>> _withLocalKeys(List<Map<String, dynamic>> keys) => [
+        ...keys,
+        if (keys.every((k) => k['key'] != 'Log_Level'))
+          {
+            'key': 'Log_Level',
+            'type': 'string',
+            'description': 'How much the kiosk app logs.',
+            'constraints': 'Info, Warn or Error. Default: Warn.',
+          },
+      ];
 
   Map<String, dynamic>? _knownFor(String key) =>
       _knownKeys.where((k) => k['key'] == key).firstOrNull;
@@ -482,6 +495,7 @@ class _PropertyEditorDialogState extends State<_PropertyEditorDialog> {
   final _valueCtrl = TextEditingController();
   final Map<String, String> _dropdownValues = {
     'default_language': 'ar',
+    'Log_Level': 'Warn',
     for (final k in _boolKeys) k: 'false',
   };
   String? _error;
@@ -506,6 +520,12 @@ class _PropertyEditorDialogState extends State<_PropertyEditorDialog> {
       _valueCtrl.text = value;
       if (key == 'default_language' && (value.toLowerCase() == 'ar' || value.toLowerCase() == 'en')) {
         _dropdownValues['default_language'] = value.toLowerCase();
+      } else if (key == 'Log_Level') {
+        // The kiosk accepts any case; show the stored value as one of the three.
+        _dropdownValues[key] = const ['Info', 'Warn', 'Error']
+                .where((l) => l.toLowerCase() == value.toLowerCase())
+                .firstOrNull ??
+            'Warn';
       } else if (_boolKeys.contains(key)) {
         _dropdownValues[key] = value.toLowerCase() == 'true' ? 'true' : 'false';
       }
@@ -543,6 +563,18 @@ class _PropertyEditorDialogState extends State<_PropertyEditorDialog> {
           DropdownMenuItem(value: 'en', child: Text('en — English')),
         ],
         onChanged: (v) => setState(() => _dropdownValues['default_language'] = v ?? 'ar'),
+      );
+    }
+    if (key == 'Log_Level') {
+      return DropdownButtonFormField<String>(
+        value: _dropdownValues['Log_Level'],
+        decoration: const InputDecoration(labelText: 'Value', border: OutlineInputBorder(), isDense: true),
+        items: const [
+          DropdownMenuItem(value: 'Info', child: Text('Info — everything')),
+          DropdownMenuItem(value: 'Warn', child: Text('Warn — warnings and errors (default)')),
+          DropdownMenuItem(value: 'Error', child: Text('Error — errors only')),
+        ],
+        onChanged: (v) => setState(() => _dropdownValues['Log_Level'] = v ?? 'Warn'),
       );
     }
     if (key != null && _boolKeys.contains(key)) {
@@ -597,6 +629,8 @@ class _PropertyEditorDialogState extends State<_PropertyEditorDialog> {
     final String value;
     if (knownKey == 'default_language') {
       value = _dropdownValues['default_language'] ?? 'ar';
+    } else if (knownKey == 'Log_Level') {
+      value = _dropdownValues['Log_Level'] ?? 'Warn';
     } else if (knownKey != null && _boolKeys.contains(knownKey)) {
       value = _dropdownValues[knownKey] ?? 'false';
     } else {

@@ -66,6 +66,16 @@ class ApiClient {
 
   // ── Auth ──────────────────────────────────────────────────────────────────
 
+  /// Ends this token's session on the server. Best effort: a failure (offline,
+  /// token already invalid) never blocks signing out locally.
+  Future<void> logout(String token) async {
+    try {
+      await _http
+          .post(_uri('/api/auth/logout'), headers: _headers(token: token))
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {}
+  }
+
   Future<Map<String, dynamic>> login(String username, String password) async {
     final resp = await _http.post(
       _uri('/api/auth/login'),
@@ -929,6 +939,53 @@ class ApiClient {
     if (resp.statusCode == 204 || resp.statusCode == 200) return;
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
+
+  // ── Account sessions (api level 3) ───────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> _getSessionList(String path, String token) async {
+    final resp = await _http.get(_uri(path), headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      final body = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+      return (body['items'] as List? ?? []).cast<Map<String, dynamic>>();
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<void> _deleteSession(String path, String token) async {
+    final resp = await _http.delete(_uri(path), headers: _headers(token: token));
+    if (resp.statusCode == 200 || resp.statusCode == 204) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<int> _postSessionCount(String path, String token, String field, [Object? body]) async {
+    final resp = await _http.post(_uri(path),
+        headers: _headers(token: token), body: body == null ? null : jsonEncode(body));
+    if (resp.statusCode == 200) {
+      final json = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+      return (json[field] as num?)?.toInt() ?? 0;
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<List<Map<String, dynamic>>> getEmployeeSessions(int id, String token) =>
+      _getSessionList('/api/admin/employees/$id/sessions', token);
+
+  Future<void> deleteEmployeeSession(int id, String ref, String token) =>
+      _deleteSession('/api/admin/employees/$id/sessions/$ref', token);
+
+  Future<int> deleteEmployeeSessions(int id, List<String> refs, String token) =>
+      _postSessionCount('/api/admin/employees/$id/sessions/delete', token, 'disconnected', {'refs': refs});
+
+  /// The signed-in account's own sessions; the row of this browser has `current: true`.
+  Future<List<Map<String, dynamic>>> getMySessions(String token) =>
+      _getSessionList('/api/auth/me/sessions', token);
+
+  Future<void> deleteMySession(String ref, String token) =>
+      _deleteSession('/api/auth/me/sessions/$ref', token);
+
+  /// Ends every session of this account except the one making the call.
+  Future<int> signOutMyOtherSessions(String token) =>
+      _postSessionCount('/api/auth/me/sessions/sign-out-others', token, 'signedOut');
 
   // ── Payment methods ───────────────────────────────────────────────────────
 

@@ -5,6 +5,7 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../utils/role_labels.dart';
+import '../widgets/account_sessions_dialog.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/error_dialog.dart';
 
@@ -259,6 +260,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                             ),
                           ),
+                          // Own sessions exist from backend api level 3.
+                          if (auth.apiLevel >= 3) ...[
+                            const SizedBox(height: 16),
+                            Card(
+                              child: Padding(
+                                padding: const EdgeInsets.all(20),
+                                child: Row(
+                                  children: [
+                                    Text('Active sessions',
+                                        style: Theme.of(context).textTheme.titleSmall),
+                                    const Spacer(),
+                                    TextButton(
+                                      onPressed: _showSessions,
+                                      child: const Text('View sessions'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -268,6 +289,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showSessions() {
+    showDialog<void>(
+      context: context,
+      builder: (_) => AccountSessionsDialog(
+        title: 'My sessions',
+        load: (t) => ApiClient().getMySessions(t),
+        deleteOne: (ref, t) => ApiClient().deleteMySession(ref, t),
+        signOutAll: (t) => ApiClient().signOutMyOtherSessions(t),
+        signOutLabel: 'Sign out other devices',
+        signOutQuestion: 'Sign out every other device? This one stays signed in.',
       ),
     );
   }

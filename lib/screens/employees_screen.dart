@@ -6,6 +6,7 @@ import '../models/employee.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
+import '../widgets/account_sessions_dialog.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/reset_pin_dialog.dart';
 import '../widgets/error_dialog.dart';
@@ -70,6 +71,21 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     } on ApiException catch (err) {
       if (mounted) showErrorDialog(context, err.message);
     }
+  }
+
+  void _showSessions(Employee e) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => AccountSessionsDialog(
+        title: 'Sessions — ${e.displayName}',
+        load: (t) => ApiClient().getEmployeeSessions(e.id, t),
+        deleteOne: (ref, t) => ApiClient().deleteEmployeeSession(e.id, ref, t),
+        deleteMany: (refs, t) => ApiClient().deleteEmployeeSessions(e.id, refs, t),
+        signOutAll: (t) => ApiClient().signOutEmployee(e.id, token: t),
+        signOutQuestion: 'Sign out "${e.displayName}" everywhere? They will need to enter their PIN again.',
+        disconnectNote: 'That session will be signed out and need the PIN again on its next action.',
+      ),
+    );
   }
 
   Future<void> _signOut(Employee e) async {
@@ -181,6 +197,9 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                                       onToggle: () => _toggleEnabled(_employees![i]),
                                       onResetPin: () => _resetPin(_employees![i]),
                                       onSignOut: () => _signOut(_employees![i]),
+                                      onSessions: context.watch<AuthState>().apiLevel >= 3
+                                          ? () => _showSessions(_employees![i])
+                                          : null,
                                       onDelete: () => _delete(_employees![i]),
                                       )
                                   ),
@@ -201,6 +220,8 @@ class _EmployeeCard extends StatelessWidget {
   final VoidCallback onToggle;
   final VoidCallback onResetPin;
   final VoidCallback onSignOut;
+  /// Null when the backend is below api level 3 (no sessions API).
+  final VoidCallback? onSessions;
   final VoidCallback onDelete;
 
   const _EmployeeCard({
@@ -209,6 +230,7 @@ class _EmployeeCard extends StatelessWidget {
     required this.onToggle,
     required this.onResetPin,
     required this.onSignOut,
+    this.onSessions,
     required this.onDelete,
   });
 
@@ -265,12 +287,15 @@ class _EmployeeCard extends StatelessWidget {
                 if (v == 'toggle') onToggle();
                 if (v == 'resetPin') onResetPin();
                 if (v == 'signOut') onSignOut();
+                if (v == 'sessions') onSessions?.call();
                 if (v == 'delete') onDelete();
               },
               itemBuilder: (_) => [
                 const PopupMenuItem(value: 'edit', child: Text('Edit')),
                 PopupMenuItem(value: 'toggle', child: Text(e.enabled ? 'Disable' : 'Enable')),
                 const PopupMenuItem(value: 'resetPin', child: Text('Reset PIN')),
+                if (onSessions != null)
+                  const PopupMenuItem(value: 'sessions', child: Text('Sessions')),
                 const PopupMenuItem(value: 'signOut', child: Text('Sign Out')),
                 const PopupMenuItem(value: 'delete',
                     child: Text('Delete', style: TextStyle(color: Colors.red))),

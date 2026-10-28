@@ -78,6 +78,7 @@ class AuthState extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    final oldToken = _token;
     _token = null;
     _username = null;
     _roleName = null;
@@ -88,5 +89,7 @@ class AuthState extends ChangeNotifier {
     await prefs.remove('admin_role');
     await prefs.remove('admin_permissions');
     notifyListeners();
+    // Delete the session row on the server too (tokens never expire).
+    if (oldToken != null) await ApiClient().logout(oldToken);
   }
 }
