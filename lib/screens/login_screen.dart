@@ -72,7 +72,8 @@ class _LoginScreenState extends State<LoginScreen> {
           roleName: data['roleName'] as String?,
           permissions: (data['permissions'] as List?)?.cast<String>().toSet() ?? const {},
         );
-        nav.pushReplacementNamed(Routes.dashboard);
+        nav.pushReplacementNamed(
+            auth.needsOrganizationPick ? Routes.organizations : Routes.dashboard);
       }
     } on ApiException catch (e) {
       if (!mounted) return;

@@ -128,7 +128,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       final uri = Uri.parse('${AppConfig.apiBaseUrl}/api/admin/reports/orders')
           .replace(queryParameters: params);
       final resp = await http.get(uri,
-          headers: {'Authorization': 'Bearer $token'});
+          headers: ApiClient.authHeaders(token));
       if (!mounted) return;
       if (resp.statusCode == 200) {
         final data = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
@@ -201,7 +201,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       };
       final uri = Uri.parse('${AppConfig.apiBaseUrl}/api/admin/reports/orders')
           .replace(queryParameters: params);
-      final resp = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+      final resp = await http.get(uri, headers: ApiClient.authHeaders(token));
       if (resp.statusCode == 200 && mounted) {
         final data  = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
         final rows  = (data['items'] as List? ?? []).cast<Map<String, dynamic>>();
@@ -256,7 +256,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       };
       final uri = Uri.parse('${AppConfig.apiBaseUrl}/api/admin/reports/orders')
           .replace(queryParameters: params);
-      final resp = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+      final resp = await http.get(uri, headers: ApiClient.authHeaders(token));
       if (resp.statusCode != 200 || !mounted) return;
       final data = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
       final rows = (data['items'] as List? ?? []).cast<Map<String, dynamic>>();

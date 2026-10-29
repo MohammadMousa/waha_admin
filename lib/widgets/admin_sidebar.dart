@@ -19,6 +19,14 @@ class AdminSidebar extends StatefulWidget {
   State<AdminSidebar> createState() => _AdminSidebarState();
 }
 
+/// Screens that make sense without a picked organization.
+const _orgFreeRoutes = {
+  Routes.organizations,
+  Routes.systemConfig,
+  Routes.systemAudit,
+  Routes.profile,
+};
+
 class _AdminSidebarState extends State<AdminSidebar> {
   late final ScrollController _navController;
 
@@ -40,6 +48,15 @@ class _AdminSidebarState extends State<AdminSidebar> {
     final currentRoute = widget.currentRoute;
     final scheme = Theme.of(context).colorScheme;
     final auth = context.watch<AuthState>();
+    // A super-admin with several organizations and none picked would only see
+    // empty data on org-scoped screens: send them to pick one first.
+    if (auth.needsOrganizationPick && !_orgFreeRoutes.contains(currentRoute)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && context.read<AuthState>().needsOrganizationPick) {
+          Navigator.of(context).pushReplacementNamed(Routes.organizations);
+        }
+      });
+    }
     final username = auth.username ?? '';
     final roleName = auth.roleName;
     // Accounts (users table) is SUPER_ADMIN-only. Employees/Devices are
@@ -106,6 +123,35 @@ class _AdminSidebarState extends State<AdminSidebar> {
             ),
             ),
           ),
+
+          // Super-admin: pick the organization the whole session acts as.
+          if (auth.isSuperAdmin && auth.organizations.isNotEmpty)
+            Container(
+              width: double.infinity,
+              color: scheme.primaryContainer,
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: DropdownButtonFormField<int>(
+                // Several organizations: starts on the hint; one: preselected.
+                initialValue: auth.actingOrganization?.id,
+                isExpanded: true,
+                hint: const Text('Pick organization'),
+                decoration: const InputDecoration(
+                    isDense: true, border: OutlineInputBorder(), filled: true),
+                items: [
+                  for (final o in auth.organizations)
+                    DropdownMenuItem(value: o.id, child: Text(o.name, overflow: TextOverflow.ellipsis)),
+                ],
+                onChanged: (id) {
+                  if (id == null || id == auth.actingOrganization?.id) return;
+                  context.read<AuthState>().selectOrganization(
+                      auth.organizations.firstWhere((o) => o.id == id));
+                  // Reload the current screen for the new organization; from the
+                  // Organizations screen go on to the dashboard.
+                  Navigator.of(context).pushReplacementNamed(
+                      currentRoute == Routes.organizations ? Routes.dashboard : currentRoute);
+                },
+              ),
+            ),
 
           // Nav
           Expanded(
@@ -301,6 +347,33 @@ class _AdminSidebarState extends State<AdminSidebar> {
                   current: currentRoute,
                   indent: true,
                 ),
+                // System settings and audit exist from backend api level 3, super-admin only.
+                if (auth.apiLevel >= 3 && auth.hasPermission('MANAGE_SYSTEM')) ...[
+                  _SectionLabel('System'),
+                  // Only worth a screen when there is a choice to make.
+                  if (auth.organizations.length > 1)
+                    _NavItem(
+                      icon: Icons.apartment_outlined,
+                      label: 'Organizations',
+                      route: Routes.organizations,
+                      current: currentRoute,
+                      indent: true,
+                    ),
+                  _NavItem(
+                    icon: Icons.settings_applications_outlined,
+                    label: 'System Configuration',
+                    route: Routes.systemConfig,
+                    current: currentRoute,
+                    indent: true,
+                  ),
+                  _NavItem(
+                    icon: Icons.history_outlined,
+                    label: 'System Audit',
+                    route: Routes.systemAudit,
+                    current: currentRoute,
+                    indent: true,
+                  ),
+                ],
               ],
             ),
           ),

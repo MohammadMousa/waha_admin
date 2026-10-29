@@ -23,6 +23,8 @@ class AccountSessionsDialog extends StatefulWidget {
   final String signOutLabel;
   final String signOutQuestion;
   final String disconnectNote;
+  /// Shown in the Store column when a session has none (employees never do).
+  final String noStoreText;
 
   const AccountSessionsDialog({
     super.key,
@@ -34,6 +36,7 @@ class AccountSessionsDialog extends StatefulWidget {
     this.signOutLabel = 'Sign Out All',
     required this.signOutQuestion,
     this.disconnectNote = 'That session will be signed out and need to log in again.',
+    this.noStoreText = '—',
   });
 
   @override
@@ -152,15 +155,6 @@ class _AccountSessionsDialogState extends State<AccountSessionsDialog> {
     });
   }
 
-  /// "Windows 11 · Chrome", "Pixel 7 · Android 14"; null info shows a dash.
-  static String _infoText(dynamic info) {
-    if (info is! Map) return '—';
-    String f(String k) => (info[k] ?? '').toString().trim();
-    final os = [f('os'), f('osVersion')].where((p) => p.isNotEmpty).join(' ');
-    final parts = [f('model'), os, f('browser')].where((p) => p.isNotEmpty).toList();
-    return parts.isEmpty ? '—' : parts.join(' · ');
-  }
-
   @override
   Widget build(BuildContext context) {
     final dialogWidth = (MediaQuery.of(context).size.width * 0.7).clamp(500.0, 900.0);
@@ -240,8 +234,8 @@ class _AccountSessionsDialogState extends State<AccountSessionsDialog> {
                                     : s['latest'] == true
                                         ? const _Badge('Latest', Colors.blue)
                                         : const SizedBox.shrink()),
-                                DataCell(Text(_infoText(s['info']))),
-                                DataCell(Text(s['storeName']?.toString() ?? '—')),
+                                DataCell(Text(sessionInfoText(s['info']))),
+                                DataCell(Text(s['storeName']?.toString() ?? widget.noStoreText)),
                                 DataCell(Text(s['appVersion']?.toString() ?? '—')),
                                 DataCell(Text(created)),
                                 DataCell(Text(lastSeen)),
@@ -277,6 +271,15 @@ class _AccountSessionsDialogState extends State<AccountSessionsDialog> {
       ],
     );
   }
+}
+
+/// "Windows 11 · Chrome", "Pixel 7 · Android 14"; null info shows a dash.
+String sessionInfoText(dynamic info) {
+  if (info is! Map) return '—';
+  String f(String k) => (info[k] ?? '').toString().trim();
+  final os = [f('os'), f('osVersion')].where((p) => p.isNotEmpty).join(' ');
+  final parts = [f('model'), os, f('browser')].where((p) => p.isNotEmpty).toList();
+  return parts.isEmpty ? '—' : parts.join(' · ');
 }
 
 class _Badge extends StatelessWidget {

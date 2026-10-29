@@ -10,6 +10,7 @@ import '../models/payment_method.dart';
 import '../models/receipt_info.dart';
 import '../models/resource.dart';
 import '../models/branch_group.dart';
+import 'app_info.dart';
 import '../models/organization.dart';
 import '../models/store.dart';
 
@@ -36,9 +37,20 @@ class ApiClient {
 
   Uri _uri(String path) => Uri.parse('${AppConfig.apiBaseUrl}$path');
 
+  /// Organization a super-admin is acting as (null = none picked). Kept in memory
+  /// only, so every browser tab has its own; set by AuthState, sent on every call.
+  static int? actingOrganizationId;
+
+  /// Authorization plus, for a super-admin acting as an organization, the
+  /// organization header. Use this for any request built outside `_headers`.
+  static Map<String, String> authHeaders(String token) => {
+        'Authorization': 'Bearer $token',
+        if (actingOrganizationId != null) 'X-Organization-Id': '$actingOrganizationId',
+      };
+
   Map<String, String> _headers({String? token}) => {
         'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
+        if (token != null) ...authHeaders(token),
       };
 
   String _extractMessage(http.Response resp) {
@@ -80,7 +92,9 @@ class ApiClient {
     final resp = await _http.post(
       _uri('/api/auth/login'),
       headers: _headers(),
-      body: jsonEncode({'username': username, 'password': password}),
+      // appVersion goes in the body, as the kiosk does; a custom header would be
+      // blocked by the browser's CORS check on this backend.
+      body: jsonEncode({'username': username, 'password': password, 'appVersion': AppInfo.version}),
     );
     if (resp.statusCode == 200) return jsonDecode(resp.body) as Map<String, dynamic>;
     throw _loginError(resp);
@@ -987,6 +1001,71 @@ class ApiClient {
   Future<int> signOutMyOtherSessions(String token) =>
       _postSessionCount('/api/auth/me/sessions/sign-out-others', token, 'signedOut');
 
+  // ── System configuration, caches, lockouts, audit (api level 3, MANAGE_SYSTEM) ──
+
+  Future<Map<String, dynamic>> _systemRequest(String method, String path, String token,
+      {Object? body}) async {
+    final uri = _uri(path);
+    final headers = _headers(token: token);
+    final encoded = body == null ? null : jsonEncode(body);
+    final resp = switch (method) {
+      'GET' => await _http.get(uri, headers: headers),
+      'PUT' => await _http.put(uri, headers: headers, body: encoded),
+      'DELETE' => await _http.delete(uri, headers: headers),
+      _ => await _http.post(uri, headers: headers, body: encoded),
+    };
+    if (resp.statusCode == 200 || resp.statusCode == 201) {
+      return resp.bodyBytes.isEmpty
+          ? <String, dynamic>{}
+          : jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<Map<String, dynamic>> getSystemProperties(String token) =>
+      _systemRequest('GET', '/api/admin/system/properties', token);
+
+  /// Saves the given global settings; returns the refreshed list.
+  Future<Map<String, dynamic>> putSystemProperties(String token, Map<String, String> values) =>
+      _systemRequest('PUT', '/api/admin/system/properties', token, body: values);
+
+  Future<Map<String, dynamic>> getSystemCaches(String token) =>
+      _systemRequest('GET', '/api/admin/system/caches', token);
+
+  /// action: clear | save for one cache, or clear-all | save-all for every cache.
+  Future<Map<String, dynamic>> systemCacheAction(String token, String action, {String? name}) =>
+      _systemRequest('POST',
+          name != null ? '/api/admin/system/caches/$name/$action' : '/api/admin/system/caches/$action',
+          token);
+
+  Future<int> clearLockouts(String token) async {
+    final r = await _systemRequest('POST', '/api/admin/system/lockouts/clear', token);
+    return (r['cleared'] as num?)?.toInt() ?? 0;
+  }
+
+  Future<Map<String, dynamic>> getSystemAudit(String token,
+      {int page = 0, int size = 50, String? action, String? actor, String? from, String? to}) {
+    final q = {
+      'page': '$page',
+      'size': '$size',
+      if (action != null && action.isNotEmpty) 'action': action,
+      if (actor != null && actor.isNotEmpty) 'actor': actor,
+      if (from != null) 'from': from,
+      if (to != null) 'to': to,
+    };
+    return _systemRequest('GET', '/api/admin/system/audit?${Uri(queryParameters: q).query}', token);
+  }
+
+  Future<void> deleteSystemAuditRow(String token, int id) =>
+      _systemRequest('DELETE', '/api/admin/system/audit/$id', token);
+
+  /// Clears the audit (all rows, or only those before [before], yyyy-MM-dd).
+  Future<int> clearSystemAudit(String token, {String? before}) async {
+    final r = await _systemRequest('POST', '/api/admin/system/audit/clear', token,
+        body: before == null ? null : {'before': before});
+    return (r['deleted'] as num?)?.toInt() ?? 0;
+  }
+
   // ── Payment methods ───────────────────────────────────────────────────────
 
   Future<List<AdminPaymentMethodView>> getAdminPaymentMethods({int? storeId, String? token}) async {
@@ -1205,7 +1284,7 @@ class ApiClient {
       {String? nameOverride}) async {
     final uri = _uri('/api/resources/$store/directories/$dir');
     final request = http.MultipartRequest('POST', uri)
-      ..headers['Authorization'] = 'Bearer $token'
+      ..headers.addAll(authHeaders(token))
       ..files.add(http.MultipartFile.fromBytes('file', bytes,
           filename: filename,
           contentType: http.MediaType.parse(mimeType.isNotEmpty ? mimeType : 'application/octet-stream')));

@@ -42,7 +42,10 @@ import 'screens/resource_explorer_screen.dart';
 import 'screens/charts_screen.dart';
 import 'screens/store_edit_screen.dart';
 import 'screens/offers_screen.dart';
+import 'screens/organizations_screen.dart';
 import 'screens/stores_screen.dart';
+import 'screens/system_audit_screen.dart';
+import 'screens/system_config_screen.dart';
 import 'state/auth_state.dart';
 import 'services/app_info.dart';
 import 'config/app_config.dart';
@@ -87,6 +90,18 @@ class WahaAdminApp extends StatelessWidget {
           case Routes.deviceLogs:
             return MaterialPageRoute(
                 builder: (_) => const DeviceLogsScreen(), settings: settings);
+
+          case Routes.organizations:
+            return MaterialPageRoute(
+                builder: (_) => const OrganizationsScreen(), settings: settings);
+
+          case Routes.systemConfig:
+            return MaterialPageRoute(
+                builder: (_) => const SystemConfigScreen(), settings: settings);
+
+          case Routes.systemAudit:
+            return MaterialPageRoute(
+                builder: (_) => const SystemAuditScreen(), settings: settings);
 
           case Routes.deviceStatus:
             return MaterialPageRoute(
@@ -333,7 +348,8 @@ class _InitializerState extends State<_Initializer> {
     if (!mounted) return;
     setState(() => _ready = true);
     if (auth.isLoggedIn) {
-      Navigator.of(context).pushReplacementNamed(Routes.dashboard);
+      Navigator.of(context).pushReplacementNamed(
+          auth.needsOrganizationPick ? Routes.organizations : Routes.dashboard);
     } else {
       Navigator.of(context).pushReplacementNamed(Routes.login);
     }

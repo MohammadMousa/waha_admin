@@ -82,6 +82,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
         deleteOne: (ref, t) => ApiClient().deleteEmployeeSession(e.id, ref, t),
         deleteMany: (refs, t) => ApiClient().deleteEmployeeSessions(e.id, refs, t),
         signOutAll: (t) => ApiClient().signOutEmployee(e.id, token: t),
+        noStoreText: 'No store',
         signOutQuestion: 'Sign out "${e.displayName}" everywhere? They will need to enter their PIN again.',
         disconnectNote: 'That session will be signed out and need the PIN again on its next action.',
       ),

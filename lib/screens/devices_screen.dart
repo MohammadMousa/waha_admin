@@ -6,6 +6,7 @@ import '../models/device.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
+import '../widgets/account_sessions_dialog.dart' show sessionInfoText;
 import '../widgets/admin_sidebar.dart';
 import '../widgets/reset_pin_dialog.dart';
 import '../widgets/error_dialog.dart';
@@ -492,6 +493,7 @@ class _DeviceSessionsDialogState extends State<_DeviceSessionsDialog> {
                                 ),
                               ),
                               const DataColumn(label: Text('')),
+                              const DataColumn(label: Text('Device')),
                               const DataColumn(label: Text('Store')),
                               const DataColumn(label: Text('App Version')),
                               const DataColumn(label: Text('Created')),
@@ -521,6 +523,7 @@ class _DeviceSessionsDialogState extends State<_DeviceSessionsDialog> {
                                           }),
                                 )),
                                 DataCell(isLatest ? const _Badge('Current', Colors.green) : const SizedBox.shrink()),
+                                DataCell(Text(sessionInfoText(s['info']))),
                                 DataCell(Text(s['storeName']?.toString() ?? '—')),
                                 DataCell(Text(s['appVersion']?.toString() ?? '—')),
                                 DataCell(Text(created)),

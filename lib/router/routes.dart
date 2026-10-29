@@ -19,6 +19,11 @@ class Routes {
   static const deviceStatus    = '/devices/status';
   static const register        = '/register';
 
+  // System (super-admin)
+  static const systemConfig    = '/system/config';
+  static const systemAudit     = '/system/audit';
+  static const organizations   = '/organizations';
+
   // Catalog
   static const products        = '/products';
 

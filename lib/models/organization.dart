@@ -1,11 +1,13 @@
 class Organization {
   final int id;
   final String name;
+  final String? slug;
 
-  const Organization({required this.id, required this.name});
+  const Organization({required this.id, required this.name, this.slug});
 
   factory Organization.fromJson(Map<String, dynamic> j) => Organization(
         id: (j['id'] as num).toInt(),
         name: j['name'] as String,
+        slug: j['slug'] as String?,
       );
 }
