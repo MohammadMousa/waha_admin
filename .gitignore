@@ -57,3 +57,6 @@ CLAUDE.md
 
 # Test runner scripts and output
 tools/report_tests/
+
+# Per-machine runtime config
+web/config.json

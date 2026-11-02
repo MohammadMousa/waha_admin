@@ -35,89 +35,92 @@ class KpiCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Label + icon/sparkline
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: scheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // Sparkline or icon
-                if (sparkline != null && sparkline!.length > 1)
-                  ClipRect(
-                    child: SizedBox(
-                      width: 72,
-                      height: 40,
-                      child: _Sparkline(
-                        data: sparkline!,
-                        color: isNeg ? const Color(0xFFE53935) : scheme.primary,
+            // Label, with the % change badge at the right
+            SizedBox(
+              height: 22,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: scheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
                       ),
                     ),
-                  )
-                else
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: scheme.primaryContainer.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(icon, color: scheme.primary, size: 20),
                   ),
-              ],
-            ),
-
-            const SizedBox(height: 10),
-
-            // Value
-            Text(
-              value,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-            ),
-
-            // % change badge
-            if (pctChange != null) ...[
-              const SizedBox(height: 6),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: pctColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isNeg ? Icons.arrow_downward : Icons.arrow_upward,
-                          size: 11,
-                          color: pctColor,
-                        ),
-                        const SizedBox(width: 2),
-                        Text(
-                          '${pctChange!.abs().toStringAsFixed(1)}%',
-                          style: TextStyle(
-                            fontSize: 11,
+                  if (pctChange != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: pctColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isNeg ? Icons.arrow_downward : Icons.arrow_upward,
+                            size: 11,
                             color: pctColor,
-                            fontWeight: FontWeight.w700,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 2),
+                          Text(
+                            '${pctChange!.abs().toStringAsFixed(1)}%',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: pctColor,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
                 ],
               ),
-            ],
+            ),
+
+            const SizedBox(height: 6),
+
+            // Value, with the sparkline or icon at the right
+            SizedBox(
+              height: 40,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (sparkline != null && sparkline!.length > 1)
+                    ClipRect(
+                      child: SizedBox(
+                        width: 72,
+                        height: 40,
+                        child: _Sparkline(
+                          data: sparkline!,
+                          color: isNeg ? const Color(0xFFE53935) : scheme.primary,
+                        ),
+                      ),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: scheme.primaryContainer.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(icon, color: scheme.primary, size: 20),
+                    ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

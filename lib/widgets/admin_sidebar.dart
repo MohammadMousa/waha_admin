@@ -165,7 +165,7 @@ class _AdminSidebarState extends State<AdminSidebar> {
                   route: Routes.dashboard,
                   current: currentRoute,
                 ),
-                _SectionLabel('Reporting'),
+                _NavGroup('Reporting', current: currentRoute, children: [
                 _NavItem(
                   icon: Icons.receipt_long_outlined,
                   label: 'Orders',
@@ -187,7 +187,8 @@ class _AdminSidebarState extends State<AdminSidebar> {
                   current: currentRoute,
                   indent: true,
                 ),
-                _SectionLabel('Inventory'),
+                ]),
+                _NavGroup('Inventory', current: currentRoute, children: [
                 _NavItem(
                   icon: Icons.inventory_2_outlined,
                   label: 'Stock',
@@ -216,7 +217,8 @@ class _AdminSidebarState extends State<AdminSidebar> {
                   current: currentRoute,
                   indent: true,
                 ),
-                _SectionLabel('Catalog'),
+                ]),
+                _NavGroup('Catalog', current: currentRoute, children: [
                 _NavItem(
                   icon: Icons.grid_view_outlined,
                   label: 'Products',
@@ -231,7 +233,8 @@ class _AdminSidebarState extends State<AdminSidebar> {
                   current: currentRoute,
                   indent: true,
                 ),
-                _SectionLabel('Marketing'),
+                ]),
+                _NavGroup('Marketing', current: currentRoute, children: [
                 _NavItem(
                   icon: Icons.burst_mode_outlined,
                   label: 'Advertisements',
@@ -255,7 +258,8 @@ class _AdminSidebarState extends State<AdminSidebar> {
                     current: currentRoute,
                     indent: true,
                   ),
-                _SectionLabel('Administration'),
+                ]),
+                _NavGroup('Administration', current: currentRoute, children: [
                 if (canManageStores)
                   _NavItem(
                     icon: Icons.tune,
@@ -308,8 +312,8 @@ class _AdminSidebarState extends State<AdminSidebar> {
                   current: currentRoute,
                   indent: true,
                 ),
-                if (canManageDevices) ...[
-                  _SectionLabel('Devices Management'),
+                ]),
+                if (canManageDevices) _NavGroup('Devices Management', current: currentRoute, children: [
                   _NavItem(
                     icon: Icons.devices_outlined,
                     label: 'Devices',
@@ -331,8 +335,8 @@ class _AdminSidebarState extends State<AdminSidebar> {
                     current: currentRoute,
                     indent: true,
                   ),
-                ],
-                _SectionLabel('Integrations'),
+                ]),
+                _NavGroup('Integrations', current: currentRoute, children: [
                 _NavItem(
                   icon: Icons.hub_outlined,
                   label: 'Odoo',
@@ -348,8 +352,8 @@ class _AdminSidebarState extends State<AdminSidebar> {
                   indent: true,
                 ),
                 // System settings and audit exist from backend api level 3, super-admin only.
-                if (auth.apiLevel >= 3 && auth.hasPermission('MANAGE_SYSTEM')) ...[
-                  _SectionLabel('System'),
+                ]),
+                if (auth.apiLevel >= 3 && auth.hasPermission('MANAGE_SYSTEM')) _NavGroup('System', current: currentRoute, children: [
                   // Only worth a screen when there is a choice to make.
                   if (auth.organizations.length > 1)
                     _NavItem(
@@ -373,7 +377,7 @@ class _AdminSidebarState extends State<AdminSidebar> {
                     current: currentRoute,
                     indent: true,
                   ),
-                ],
+                ]),
               ],
             ),
           ),
@@ -400,20 +404,73 @@ class _AdminSidebarState extends State<AdminSidebar> {
   }
 }
 
-class _SectionLabel extends StatelessWidget {
-  final String label;
-  const _SectionLabel(this.label);
+/// Groups the user has opened, kept app-wide for the same reason as the nav
+/// scroll offset: every screen mounts its own sidebar.
+final Set<String> _openGroups = {};
+
+/// Collapsible sidebar section. The one holding the current page opens itself
+/// when the sidebar mounts; after that only the user opens or closes it.
+class _NavGroup extends StatefulWidget {
+  final String title;
+  final String current;
+  final List<Widget> children;
+  const _NavGroup(this.title, {required this.current, required this.children});
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-        child: Text(label.toUpperCase(),
-            style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.8,
-                color: Theme.of(context).colorScheme.outline)),
-      );
+  State<_NavGroup> createState() => _NavGroupState();
+}
+
+class _NavGroupState extends State<_NavGroup> {
+  bool get _holdsCurrent =>
+      widget.children.any((c) => c is _NavItem && c.route == widget.current);
+
+  @override
+  void initState() {
+    super.initState();
+    if (_holdsCurrent) _openGroups.add(widget.title);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final open = _openGroups.contains(widget.title);
+    final active = _holdsCurrent;
+    final color = active ? scheme.primary : scheme.onSurface;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Material(
+          color: active && !open ? scheme.primaryContainer : Colors.transparent,
+          child: InkWell(
+            onTap: () => setState(() {
+              if (open) {
+                _openGroups.remove(widget.title);
+              } else {
+                _openGroups.add(widget.title);
+              }
+            }),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 11, 16, 11),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(widget.title,
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                            color: color)),
+                  ),
+                  Icon(open ? Icons.expand_more : Icons.chevron_right,
+                      size: 18, color: active ? scheme.primary : scheme.outline),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (open) ...widget.children,
+      ],
+    );
+  }
 }
 
 class _NavItem extends StatelessWidget {
