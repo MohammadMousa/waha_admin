@@ -473,6 +473,7 @@ class _PropertyEditorDialogState extends State<_PropertyEditorDialog> {
     'auto_log_upload_enabled',
     'enable_logging',
     'device_auto_restart_enabled',
+    'prices_exclude_vat',
   };
   // Keys with a numeric TextField + hint (integer).
   static const _intHints = {

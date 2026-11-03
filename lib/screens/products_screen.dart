@@ -1,4 +1,8 @@
 import 'dart:async';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
+
+import 'package:file_picker/file_picker.dart';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -27,6 +31,118 @@ class ProductsScreen extends StatefulWidget {
 
 class _ProductsScreenState extends State<ProductsScreen> {
   ProductViewSettings _view = const ProductViewSettings();
+
+  bool _transferring = false;
+
+  Future<void> _export(String format) async {
+    final token = context.read<AuthState>().token;
+    if (token == null) return;
+    setState(() => _transferring = true);
+    try {
+      final bytes = await ApiClient().exportProducts(token, format);
+      final mime = format == 'xlsx'
+          ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          : 'text/csv;charset=utf-8';
+      final url = html.Url.createObjectUrlFromBlob(html.Blob([bytes], mime));
+      html.AnchorElement(href: url)
+        ..setAttribute('download', 'products.$format')
+        ..click();
+      html.Url.revokeObjectUrl(url);
+    } on ApiException catch (e) {
+      if (mounted) showErrorDialog(context, e.message);
+    } catch (e) {
+      if (mounted) showErrorDialog(context, e.toString());
+    } finally {
+      if (mounted) setState(() => _transferring = false);
+    }
+  }
+
+  /// Pick a file, have the server check it, show what would change, then apply on confirm.
+  Future<void> _import() async {
+    final token = context.read<AuthState>().token;
+    if (token == null) return;
+    final picked = await FilePicker.platform
+        .pickFiles(type: FileType.custom, allowedExtensions: ['csv', 'xlsx'], withData: true);
+    final file = picked?.files.firstOrNull;
+    final bytes = file?.bytes;
+    if (file == null || bytes == null || !mounted) return;
+    setState(() => _transferring = true);
+    try {
+      final api = ApiClient();
+      final check = await api.importProducts(token, bytes, file.name, 'validate');
+      if (!mounted) return;
+      final errors = (check['errors'] as List? ?? []).cast<Map<String, dynamic>>();
+      final confirmed = await _showImportPreview(file.name, check, errors);
+      if (confirmed != true || !mounted) return;
+      final done = await api.importProducts(token, bytes, file.name, 'apply');
+      if (!mounted) return;
+      final left = (done['errors'] as List? ?? []).cast<Map<String, dynamic>>();
+      if (left.isNotEmpty) {
+        await _showImportPreview(file.name, done, left);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Import done: ${fmtCount(done['created'])} created, '
+                '${fmtCount(done['updated'])} updated.')));
+      }
+      await _loadPage(0);
+    } on ApiException catch (e) {
+      if (mounted) showErrorDialog(context, e.message);
+    } catch (e) {
+      if (mounted) showErrorDialog(context, e.toString());
+    } finally {
+      if (mounted) setState(() => _transferring = false);
+    }
+  }
+
+  /// Summary of a validate (or failed apply) result; true when the user chooses Import.
+  Future<bool?> _showImportPreview(
+      String name, Map<String, dynamic> r, List<Map<String, dynamic>> errors) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(errors.isEmpty ? 'Import $name' : 'Import has errors'),
+        content: SizedBox(
+          width: 520,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${fmtCount(r['created'])} to create, ${fmtCount(r['updated'])} to update, '
+                  '${fmtCount(r['unchanged'])} unchanged.'),
+              if (errors.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text('${errors.length} error(s). Nothing was imported.',
+                    style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
+                const SizedBox(height: 8),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 280),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (final e in errors)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Text('Row ${e['row']}${e['field'] != null ? ' · ${e['field']}' : ''}: ${e['message']}'),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(errors.isEmpty ? 'Cancel' : 'Close')),
+          if (errors.isEmpty)
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Import')),
+        ],
+      ),
+    );
+  }
 
   Future<void> _openViewSettings() async {
     final r = await showProductViewSettingsDialog(context, _view);
@@ -239,6 +355,29 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 onPressed: _openViewSettings,
               ),
               const SizedBox(width: 4),
+              PopupMenuButton<String>(
+                tooltip: 'Export products',
+                enabled: !_transferring,
+                onSelected: _export,
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: 'csv', child: Text('Export as CSV')),
+                  PopupMenuItem(value: 'xlsx', child: Text('Export as Excel (XLSX)')),
+                ],
+                child: IgnorePointer(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.file_download_outlined, size: 18),
+                    label: const Text('Export'),
+                    onPressed: _transferring ? null : () {},
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.file_upload_outlined, size: 18),
+                label: const Text('Import'),
+                onPressed: _transferring ? null : _import,
+              ),
+              const SizedBox(width: 8),
               FilledButton.icon(
                 icon: const Icon(Icons.add, size: 18),
                 label: const Text('New Product'),
@@ -444,11 +583,36 @@ class _ProductCard extends StatelessWidget {
                   ],
                 ),
                 if (price != null)
-                  Text('SAR ${fmtMoney(price)}',
-                      style: TextStyle(
-                          fontSize: view.priceSize,
-                          color: scheme.primary,
-                          fontWeight: FontWeight.w600)),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text('SAR ${fmtMoney(price)}',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontSize: view.priceSize,
+                                color: scheme.primary,
+                                fontWeight: FontWeight.w600)),
+                      ),
+                      // The list shows the price with VAT unless the organization
+                      // turned that off, in which case it differs from priceWithVat.
+                      if (product['priceWithVat'] != null) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: scheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            (price as num) == (product['priceWithVat'] as num)
+                                ? 'incl. VAT'
+                                : 'excl. VAT',
+                            style: TextStyle(fontSize: 10, color: scheme.onSurfaceVariant),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 if (categoryName != null && categoryName!.isNotEmpty)
                   Text(categoryName!,
                       maxLines: 1,

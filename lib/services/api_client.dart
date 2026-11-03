@@ -652,6 +652,30 @@ class ApiClient {
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
 
+  /// Whole product catalog as a file (stored prices, without VAT). [format] is csv or xlsx.
+  Future<Uint8List> exportProducts(String token, String format) async {
+    final uri = _uri('/api/admin/products/export').replace(queryParameters: {'format': format});
+    final resp = await _http.get(uri, headers: authHeaders(token));
+    if (resp.statusCode == 200) return resp.bodyBytes;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  /// Uploads a csv/xlsx product file. [mode] validate only checks it; apply writes it.
+  /// Returns {created, updated, unchanged, errors:[{row, field, message}]}.
+  Future<Map<String, dynamic>> importProducts(
+      String token, Uint8List bytes, String filename, String mode) async {
+    final uri = _uri('/api/admin/products/import').replace(queryParameters: {'mode': mode});
+    final request = http.MultipartRequest('POST', uri)
+      ..headers.addAll(authHeaders(token))
+      ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+    final streamed = await _http.send(request);
+    final resp = await http.Response.fromStream(streamed);
+    if (resp.statusCode == 200) {
+      return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
   Future<void> addProductGalleryImage(int productId, int resourceId, {required String token}) async {
     final resp = await _http.post(_uri('/api/products/$productId/images'),
         headers: _headers(token: token), body: jsonEncode({'resourceId': resourceId}));

@@ -698,6 +698,15 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
           }
           final items = (order?['items'] as List? ?? []).cast<Map<String, dynamic>>();
           final taxRate = (order?['taxRate'] as num?)?.toDouble() ?? 0;
+          // Shown prices carry VAT unless the organization turned that off: then
+          // lineTotal - discountAmount no longer equals netAmount + taxAmount.
+          final withVat = items.every((i) {
+            final net = i['netAmount'], tax = i['taxAmount'];
+            if (net == null || tax == null) return false;
+            final shown = ((i['lineTotal'] as num?) ?? 0) - ((i['discountAmount'] as num?) ?? 0);
+            return (shown - ((net as num) + (tax as num))).abs() < 0.01;
+          });
+          final vatNote = withVat ? 'incl. VAT' : 'excl. VAT';
           final currency = (order?['currency'] as String?)?.toUpperCase() ?? '';
           final dialogWidth = (MediaQuery.of(context).size.width * 0.7).clamp(500.0, 900.0);
           return AlertDialog(
@@ -714,22 +723,29 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
                             constraints: BoxConstraints(minWidth: dialogWidth),
                             child: DataTable(
                             columnSpacing: 16,
-                            columns: const [
+                            columns: [
                               DataColumn(label: Text('Description')),
                               DataColumn(label: Text('Barcode')),
                               DataColumn(numeric: true, label: Text('Qty')),
-                              DataColumn(numeric: true, label: Text('Unit Price')),
+                              DataColumn(numeric: true, label: Text('Unit Price ($vatNote)')),
                               DataColumn(numeric: true, label: Text('Tax')),
-                              DataColumn(numeric: true, label: Text('Total')),
+                              DataColumn(numeric: true, label: Text('Total (incl. VAT)')),
                             ],
                             rows: items.map((item) {
                               final name = item['name'];
                               final label = name is Map
                                   ? ((name['en'] ?? name['ar'] ?? '') as String)
                                   : '${name ?? ''}';
+                              // Tax and the final amount come from the server's per-line
+                              // net and tax; only a backend without them is worked out here.
+                              final net = (item['netAmount'] as num?)?.toDouble();
+                              final serverTax = (item['taxAmount'] as num?)?.toDouble();
                               final lineTotal = (item['lineTotal'] as num?)?.toDouble() ?? 0;
-                              final tax = double.parse((lineTotal * taxRate).toStringAsFixed(2));
-                              final total = lineTotal + tax;
+                              final tax = serverTax ??
+                                  double.parse((lineTotal * taxRate).toStringAsFixed(2));
+                              final total = net != null && serverTax != null
+                                  ? net + serverTax
+                                  : lineTotal + tax;
                               return DataRow(cells: [
                                 DataCell(SizedBox(width: 220, child: Text(label, overflow: TextOverflow.ellipsis, maxLines: 1))),
                                 DataCell(SizedBox(width: 110, child: Text('${item['barcode'] ?? ''}', overflow: TextOverflow.ellipsis, maxLines: 1))),
