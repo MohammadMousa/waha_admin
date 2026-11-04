@@ -4,6 +4,7 @@ class Routes {
   static const profile         = '/profile';
   static const productsSales   = '/reports/products-sales';
   static const orders          = '/reports/orders';
+  static const couponReport    = '/reports/coupons';
 
   // Administration
   static const stores          = '/stores';
@@ -26,11 +27,14 @@ class Routes {
 
   // Catalog
   static const products        = '/products';
+  static const missingProducts = '/products/missing';
 
   // Marketing
   static const advertisements  = '/advertisements';
   static const landingPages    = '/landing-pages';
   static const offers          = '/offers';
+  static const coupons         = '/coupons';
+  static const couponEdit      = '/coupons/edit';
 
   // Reporting
   static const charts          = '/reports/charts';

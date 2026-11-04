@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../router/routes.dart';
+import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../utils/role_labels.dart';
+import 'error_dialog.dart';
 import 'about_dialog.dart';
 
 // Every screen mounts its own AdminSidebar and each named route owns its own
@@ -41,6 +43,26 @@ class _AdminSidebarState extends State<AdminSidebar> {
   void dispose() {
     _navController.dispose();
     super.dispose();
+  }
+
+  /// Reloads role and permissions from the server; a gone session signs out.
+  Future<void> _refreshSession(BuildContext context) async {
+    final auth = context.read<AuthState>();
+    final nav = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await auth.refreshSession();
+      messenger.showSnackBar(const SnackBar(content: Text('Session refreshed.')));
+    } on ApiException catch (e) {
+      if (e.statusCode == 401) {
+        auth.logout();
+        nav.pushReplacementNamed(Routes.login);
+      } else if (context.mounted) {
+        showErrorDialog(context, e.message);
+      }
+    } catch (e) {
+      if (context.mounted) showErrorDialog(context, 'Could not refresh the session: $e');
+    }
   }
 
   @override
@@ -93,13 +115,30 @@ class _AdminSidebarState extends State<AdminSidebar> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(username,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              color: scheme.onPrimaryContainer,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13)),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(username,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    color: scheme.onPrimaryContainer,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13)),
+                          ),
+                          Tooltip(
+                            message: 'Refresh session (reload permissions)',
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () => _refreshSession(context),
+                              child: Padding(
+                                padding: const EdgeInsets.all(2),
+                                child: Icon(Icons.sync, size: 16, color: scheme.onPrimaryContainer),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -173,6 +212,14 @@ class _AdminSidebarState extends State<AdminSidebar> {
                   current: currentRoute,
                   indent: true,
                 ),
+                if (auth.apiLevel >= 3 && auth.hasPermission('VIEW_COUPONS'))
+                  _NavItem(
+                    icon: Icons.confirmation_number_outlined,
+                    label: 'Coupon Sales',
+                    route: Routes.couponReport,
+                    current: currentRoute,
+                    indent: true,
+                  ),
                 _NavItem(
                   icon: Icons.bar_chart_outlined,
                   label: 'Products Sales',
@@ -226,6 +273,14 @@ class _AdminSidebarState extends State<AdminSidebar> {
                   current: currentRoute,
                   indent: true,
                 ),
+                if (auth.hasPermission('VIEW_PRODUCTS'))
+                  _NavItem(
+                    icon: Icons.search_off_outlined,
+                    label: 'Missing Products',
+                    route: Routes.missingProducts,
+                    current: currentRoute,
+                    indent: true,
+                  ),
                 _NavItem(
                   icon: Icons.category_outlined,
                   label: 'Categories',
@@ -255,6 +310,14 @@ class _AdminSidebarState extends State<AdminSidebar> {
                     icon: Icons.local_offer_outlined,
                     label: 'Offers',
                     route: Routes.offers,
+                    current: currentRoute,
+                    indent: true,
+                  ),
+                if (auth.apiLevel >= 3 && auth.hasPermission('VIEW_COUPONS'))
+                  _NavItem(
+                    icon: Icons.confirmation_number_outlined,
+                    label: 'Coupons',
+                    route: Routes.coupons,
                     current: currentRoute,
                     indent: true,
                   ),

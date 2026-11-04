@@ -42,6 +42,10 @@ import 'screens/resource_explorer_screen.dart';
 import 'screens/charts_screen.dart';
 import 'screens/store_edit_screen.dart';
 import 'screens/offers_screen.dart';
+import 'screens/coupons_screen.dart';
+import 'screens/coupon_form_screen.dart';
+import 'screens/coupon_report_screen.dart';
+import 'screens/missing_products_screen.dart';
 import 'screens/organizations_screen.dart';
 import 'screens/stores_screen.dart';
 import 'screens/system_audit_screen.dart';
@@ -195,6 +199,27 @@ class WahaAdminApp extends StatelessWidget {
             return MaterialPageRoute(
                 builder: (_) => const OffersScreen(), settings: settings);
 
+          case Routes.coupons:
+            return MaterialPageRoute(
+                builder: (_) => const CouponsScreen(), settings: settings);
+
+          case Routes.couponEdit:
+            final cargs = (settings.arguments as Map<String, dynamic>?) ?? const {};
+            return MaterialPageRoute<bool>(
+                builder: (_) => CouponFormScreen(
+                      couponId: cargs['couponId'] as int?,
+                      startInBatch: cargs['batch'] == true,
+                    ),
+                settings: settings);
+
+          case Routes.couponReport:
+            return MaterialPageRoute(
+                builder: (_) => const CouponReportScreen(), settings: settings);
+
+          case Routes.missingProducts:
+            return MaterialPageRoute(
+                builder: (_) => const MissingProductsScreen(), settings: settings);
+
           case Routes.landingPages:
             return MaterialPageRoute(
                 builder: (_) => const LandingPagesScreen(), settings: settings);
@@ -227,6 +252,7 @@ class WahaAdminApp extends StatelessWidget {
                 builder: (_) => ProductEditScreen(
                   productId: args['productId'] as int?,
                   storeSlug: args['storeSlug'] as String,
+                  initialBarcode: args['initialBarcode'] as String?,
                 ),
                 settings: settings);
 

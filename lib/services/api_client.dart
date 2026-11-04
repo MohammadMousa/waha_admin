@@ -88,6 +88,13 @@ class ApiClient {
     } catch (_) {}
   }
 
+  /// The signed-in user's current role and permissions (GET /api/auth/me).
+  Future<Map<String, dynamic>> getMe(String token) async {
+    final resp = await _http.get(_uri('/api/auth/me'), headers: _headers(token: token));
+    if (resp.statusCode == 200) return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
   Future<Map<String, dynamic>> login(String username, String password) async {
     final resp = await _http.post(
       _uri('/api/auth/login'),
@@ -975,6 +982,130 @@ class ApiClient {
   Future<void> deleteOffer(int id, {required String token}) async {
     final resp = await _http.delete(_uri('/api/admin/offers/$id'), headers: _headers(token: token));
     if (resp.statusCode == 204 || resp.statusCode == 200) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  // ── Coupons ──────────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> _getJson(Uri uri, String token) async {
+    final resp = await _http.get(uri, headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<Map<String, dynamic>> getCoupons(String token,
+      {String? q, String? status, int? employeeId, int page = 0, int size = 20}) {
+    final uri = _uri('/api/admin/coupons').replace(queryParameters: {
+      if (q != null && q.isNotEmpty) 'q': q,
+      if (status != null) 'status': status,
+      if (employeeId != null) 'employeeId': '$employeeId',
+      'page': '$page',
+      'size': '$size',
+    });
+    return _getJson(uri, token);
+  }
+
+  Future<Map<String, dynamic>> getCoupon(int id, String token) =>
+      _getJson(_uri('/api/admin/coupons/$id'), token);
+
+  Future<void> saveCoupon(Map<String, dynamic> body, {int? id, required String token}) async {
+    final resp = id == null
+        ? await _http.post(_uri('/api/admin/coupons'),
+            headers: _headers(token: token), body: jsonEncode(body))
+        : await _http.put(_uri('/api/admin/coupons/$id'),
+            headers: _headers(token: token), body: jsonEncode(body));
+    if (resp.statusCode == 200 || resp.statusCode == 201) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<void> setCouponEnabled(int id, bool enabled, {required String token}) async {
+    final resp = await _http.patch(_uri('/api/admin/coupons/$id/enabled'),
+        headers: _headers(token: token), body: jsonEncode({'enabled': enabled}));
+    if (resp.statusCode == 200 || resp.statusCode == 204) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<void> deleteCoupon(int id, {required String token}) async {
+    final resp = await _http.delete(_uri('/api/admin/coupons/$id'), headers: _headers(token: token));
+    if (resp.statusCode == 204 || resp.statusCode == 200) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  /// Batch create: same body as a single coupon plus `codes` or `count`/`prefix`.
+  /// Returns the created codes, `[{id, code}]`.
+  Future<List<Map<String, dynamic>>> generateCoupons(Map<String, dynamic> body, {required String token}) async {
+    final resp = await _http.post(_uri('/api/admin/coupons/generate'),
+        headers: _headers(token: token), body: jsonEncode(body));
+    if (resp.statusCode == 201 || resp.statusCode == 200) {
+      final data = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+      return (data['created'] as List? ?? []).cast<Map<String, dynamic>>();
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<Map<String, dynamic>> getCouponRedemptions(int id, String token, {int page = 0, int size = 20}) =>
+      _getJson(_uri('/api/admin/coupons/$id/redemptions')
+          .replace(queryParameters: {'page': '$page', 'size': '$size'}), token);
+
+  Uri _couponReportUri(String path, Map<String, String?> q) => _uri(path)
+      .replace(queryParameters: {for (final e in q.entries) if (e.value != null && e.value!.isNotEmpty) e.key: e.value!});
+
+  /// Coupon sales report; [filters] holds groupBy, from, to, storeId, couponId,
+  /// employeeId, username, sort, dir, page, size.
+  Future<Map<String, dynamic>> getCouponReport(String token, Map<String, String?> filters) =>
+      _getJson(_couponReportUri('/api/admin/coupons/report', filters), token);
+
+  Future<Uint8List> exportCouponReport(String token, Map<String, String?> filters) async {
+    final resp = await _http.get(_couponReportUri('/api/admin/coupons/report/export', filters),
+        headers: authHeaders(token));
+    if (resp.statusCode == 200) return resp.bodyBytes;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  // ── Missing products ─────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> getMissingProducts(String token,
+      {int? storeId, String? q, String? username, String? from, String? to,
+       String status = 'open', String sort = 'last', String dir = 'desc', String groupBy = 'record',
+       int page = 0, int size = 50}) {
+    final uri = _uri('/api/admin/products/missing').replace(queryParameters: {
+      if (storeId != null) 'storeId': '$storeId',
+      if (q != null && q.isNotEmpty) 'q': q,
+      if (username != null && username.isNotEmpty) 'username': username,
+      if (from != null) 'from': from,
+      if (to != null) 'to': to,
+      'groupBy': groupBy,
+      'status': status,
+      'sort': sort,
+      'dir': dir,
+      'page': '$page',
+      'size': '$size',
+    });
+    return _getJson(uri, token);
+  }
+
+  /// Removes records whose product now exists. Returns `{removed, notFound, items}`.
+  Future<Map<String, dynamic>> cleanMissingProducts(String token, {int? storeId}) async {
+    final uri = _uri('/api/admin/products/missing/clean')
+        .replace(queryParameters: {if (storeId != null) 'storeId': '$storeId'});
+    final resp = await _http.post(uri, headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  /// Removes by record ids, or by barcodes (every record of those barcodes in all branches).
+  Future<int> removeMissingProducts({List<int>? ids, List<String>? barcodes, required String token}) async {
+    final resp = await _http.post(_uri('/api/admin/products/missing/remove'),
+        headers: _headers(token: token),
+        body: jsonEncode(ids != null ? {'ids': ids} : {'barcodes': barcodes}));
+    if (resp.statusCode == 200) {
+      final data = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+      return (data['removed'] as num?)?.toInt() ?? 0;
+    }
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
 

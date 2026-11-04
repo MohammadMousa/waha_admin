@@ -12,6 +12,7 @@ import '../widgets/admin_sidebar.dart';
 import '../widgets/error_dialog.dart';
 import '../widgets/product_search_field.dart';
 import '../widgets/waha_date_picker.dart';
+import '../widgets/waha_filter_controls.dart';
 import '../widgets/waha_pagination_bar.dart';
 
 /// Auto-applied promotions, backed by /api/admin/offers (backend api level 2).
@@ -179,32 +180,27 @@ class _OffersScreenState extends State<OffersScreen> {
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-                  child: Row(
+                  child: Wrap(
+                    spacing: 10,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      Text('Status:', style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
-                      const SizedBox(width: 8),
-                      DropdownButton<String?>(
+                      WahaFilterDropdown<String?>(
                         value: _status,
-                        underline: const SizedBox.shrink(),
+                        hint: 'Select Status',
                         items: [
                           for (final e in _statusFilters.entries)
-                            DropdownMenuItem(value: e.key, child: Text(e.value)),
+                            DropdownMenuItem(
+                                value: e.key, child: Text(e.key == null ? 'Select Status' : e.value)),
                         ],
                         onChanged: (v) { setState(() { _status = v; _page = 0; }); _load(); },
                       ),
-                      const Spacer(),
-                      SizedBox(
-                        width: 240,
-                        child: TextField(
-                          controller: _searchCtrl,
-                          decoration: const InputDecoration(
-                            hintText: 'Search by name',
-                            isDense: true,
-                            prefixIcon: Icon(Icons.search, size: 18),
-                            border: OutlineInputBorder(),
-                          ),
-                          onSubmitted: (_) { _page = 0; _load(); },
-                        ),
+                      WahaSearchField(
+                        controller: _searchCtrl,
+                        hintText: 'Search by name',
+                        width: 260,
+                        onSubmitted: () { _page = 0; _load(); },
+                        onClear: () { _page = 0; _load(); },
                       ),
                     ],
                   ),

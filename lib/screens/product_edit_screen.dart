@@ -14,10 +14,14 @@ class ProductEditScreen extends StatefulWidget {
   final int? productId;
   final String storeSlug;
 
+  /// Create mode only: primary barcode to start with (from Missing Products).
+  final String? initialBarcode;
+
   const ProductEditScreen({
     super.key,
     required this.productId,
     required this.storeSlug,
+    this.initialBarcode,
   });
 
   @override
@@ -58,6 +62,9 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
   @override
   void initState() {
     super.initState();
+    if (_isCreate && widget.initialBarcode != null) {
+      _primaryBarcodeCtrl.text = widget.initialBarcode!;
+    }
     _load();
   }
 

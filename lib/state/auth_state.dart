@@ -130,6 +130,28 @@ class AuthState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Re-reads role and permissions from the server without a new login, so a
+  /// permission change shows up at once. Throws [ApiException] on failure
+  /// (a 401 means the session is gone: the caller signs out).
+  Future<void> refreshSession() async {
+    final token = _token;
+    if (token == null) return;
+    final me = await ApiClient().getMe(token);
+    final permissions = ((me['permissions'] as List?) ?? const []).map((e) => e.toString()).toSet();
+    _permissions = permissions;
+    _roleName = me['roleName']?.toString() ?? _inferRoleName(permissions);
+    final prefs = await SharedPreferences.getInstance();
+    if (_roleName != null) {
+      await prefs.setString('admin_role', _roleName!);
+    } else {
+      await prefs.remove('admin_role');
+    }
+    await prefs.setStringList('admin_permissions', permissions.toList());
+    await _loadApiLevel();
+    await loadOrganizations();
+    notifyListeners();
+  }
+
   // Fallback only — used while the backend doesn't yet return an explicit
   // role name at login. Once it does, `roleName` from the response always
   // wins; this heuristic never overrides it.

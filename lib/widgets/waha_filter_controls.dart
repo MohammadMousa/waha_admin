@@ -92,11 +92,20 @@ class WahaSearchField extends StatelessWidget {
   final String hintText;
   final double width;
 
+  /// Called when the user presses Enter.
+  final VoidCallback? onSubmitted;
+
+  /// When set, a clear (×) button shows while the field has text; the
+  /// callback runs after the field has been emptied.
+  final VoidCallback? onClear;
+
   const WahaSearchField({
     super.key,
     required this.controller,
     this.hintText = 'Search…',
     this.width = 220,
+    this.onSubmitted,
+    this.onClear,
   });
 
   @override
@@ -123,6 +132,7 @@ class WahaSearchField extends StatelessWidget {
           Expanded(
             child: TextField(
               controller: controller,
+              onSubmitted: onSubmitted == null ? null : (_) => onSubmitted!(),
               textAlignVertical: TextAlignVertical.center,
               style: TextStyle(
                   fontSize: kWahaFilterControlFontSize, color: scheme.onSurface),
@@ -136,8 +146,96 @@ class WahaSearchField extends StatelessWidget {
               ),
             ),
           ),
+          if (onClear != null)
+            ListenableBuilder(
+              listenable: controller,
+              builder: (_, __) => controller.text.isEmpty
+                  ? const SizedBox.shrink()
+                  : InkWell(
+                      onTap: () {
+                        controller.clear();
+                        onClear!();
+                      },
+                      child: Icon(Icons.close, size: 16, color: scheme.outline),
+                    ),
+            ),
         ],
       ),
     );
   }
+}
+
+/// Date-range trigger for filter toolbars, drawn like the Orders screen's:
+/// a bordered calendar button that shows the range, plus a × when one is set.
+class WahaFilterDateRange extends StatelessWidget {
+  final DateTimeRange? range;
+  final VoidCallback onTap;
+  final VoidCallback? onClear;
+  final String hint;
+
+  const WahaFilterDateRange({
+    super.key,
+    required this.range,
+    required this.onTap,
+    this.onClear,
+    this.hint = 'Select date range',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    String fmt(DateTime d) =>
+        '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    final r = range;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: kWahaFilterControlRadius,
+      child: Container(
+        height: kWahaFilterControlHeight,
+        padding: kWahaFilterControlPadding,
+        decoration: BoxDecoration(
+          border: Border.all(color: scheme.outline),
+          borderRadius: kWahaFilterControlRadius,
+          color: scheme.surface,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.calendar_today_outlined, size: 16, color: scheme.primary),
+            const SizedBox(width: 8),
+            Text(r == null ? hint : '${fmt(r.start)}  –  ${fmt(r.end)}',
+                style: const TextStyle(fontSize: kWahaFilterControlFontSize)),
+            if (r != null && onClear != null) ...[
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: onClear,
+                child: Icon(Icons.close, size: 16, color: scheme.outline),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Header label for a sortable [DataColumn], drawn like the Orders report: a
+/// faint two-way arrow on every sortable column, and a solid up/down arrow on
+/// the column the table is currently sorted by. Use it without the DataTable's
+/// own sortColumnIndex, which would add a second arrow.
+Widget wahaSortableLabel(BuildContext context, String text,
+    {required bool active, required bool asc}) {
+  final scheme = Theme.of(context).colorScheme;
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(text, style: const TextStyle(fontWeight: FontWeight.w600)),
+      const SizedBox(width: 3),
+      Icon(
+        active ? (asc ? Icons.arrow_upward : Icons.arrow_downward) : Icons.unfold_more,
+        size: 13,
+        color: active ? scheme.primary : scheme.outline.withValues(alpha: 0.5),
+      ),
+    ],
+  );
 }
