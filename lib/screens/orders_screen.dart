@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/app_config.dart';
 import '../models/store.dart';
@@ -16,6 +17,7 @@ import '../widgets/admin_sidebar.dart';
 import '../widgets/error_dialog.dart';
 import '../widgets/waha_date_picker.dart';
 import '../widgets/waha_filter_controls.dart';
+import '../widgets/waha_pagination_bar.dart';
 import '../utils/number_format.dart';
 
 class OrdersScreen extends StatefulWidget {
@@ -32,10 +34,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
   String? _kiosk;
   String? _paymentType;
   bool?   _synced;
+  String  _reference = '';
+  final _refCtrl = TextEditingController();
   DateTimeRange? _dateRange;
 
   // Sort
   int  _sortCol = 0;
+  Set<String> _hidden = {'sub', 'vat', 'synced'};
+  static const _hiddenPrefKey = 'orders_hidden_columns';
   bool _sortAsc = false;
 
   // Lookups
@@ -75,6 +81,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
   };
 
   @override
+  void dispose() {
+    _refCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   void initState() {
     super.initState();
     final now = DateTime.now();
@@ -83,6 +95,20 @@ class _OrdersScreenState extends State<OrdersScreen> {
       end: now,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) => _init());
+    _loadHiddenColumns();
+  }
+
+  Future<void> _loadHiddenColumns() async {
+    try {
+      final saved = (await SharedPreferences.getInstance()).getStringList(_hiddenPrefKey);
+      if (saved != null && mounted) setState(() => _hidden = saved.toSet());
+    } catch (_) {}
+  }
+
+  Future<void> _saveHiddenColumns() async {
+    try {
+      await (await SharedPreferences.getInstance()).setStringList(_hiddenPrefKey, _hidden.toList());
+    } catch (_) {}
   }
 
   Future<void> _init() async {
@@ -120,6 +146,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
         if (_kiosk        != null) 'kiosk':        _kiosk!,
         if (_paymentType  != null) 'paymentType':  _paymentType!,
         if (_synced       != null) 'synced':       '$_synced',
+        if (_reference.isNotEmpty) 'reference': _reference,
         if (_dateRange    != null) 'from': _dateFmt.format(_dateRange!.start),
         if (_dateRange    != null) 'to':   _dateFmt.format(_dateRange!.end),
         'page': '$_page',
@@ -195,6 +222,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
         if (_kiosk       != null) 'kiosk':       _kiosk!,
         if (_paymentType != null) 'paymentType': _paymentType!,
         if (_synced      != null) 'synced':      '$_synced',
+        if (_reference.isNotEmpty) 'reference': _reference,
         if (_dateRange   != null) 'from': _dateFmt.format(_dateRange!.start),
         if (_dateRange   != null) 'to':   _dateFmt.format(_dateRange!.end),
         'page': '0', 'size': '10000',
@@ -206,9 +234,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
         final data  = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
         final rows  = (data['items'] as List? ?? []).cast<Map<String, dynamic>>();
         final lines = [
-          '#ID,Branch,Kiosk,Ref,Date,Sub-Total,VAT,Total,Currency,Payment Type,Status,Synced',
+          '#ID,DID,Branch,Kiosk,Payment Ref,Date,Sub-Total,VAT,Total,Currency,Payment Type,Status,Synced',
           ...rows.map((r) => [
-            r['display_id'] ?? '',
+            r['display_id'] == null ? '' : '${r['display_id']}',
+            r['order_reference'] ?? '',
             '"${_parseBranchName(r)}"',
             '"${r['kiosk'] ?? ''}"',
             r['ref'] ?? '',
@@ -250,6 +279,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
         if (_kiosk       != null) 'kiosk':       _kiosk!,
         if (_paymentType != null) 'paymentType': _paymentType!,
         if (_synced      != null) 'synced':      '$_synced',
+        if (_reference.isNotEmpty) 'reference': _reference,
         if (_dateRange   != null) 'from': _dateFmt.format(_dateRange!.start),
         if (_dateRange   != null) 'to':   _dateFmt.format(_dateRange!.end),
         'page': '0', 'size': '10000',
@@ -260,12 +290,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
       if (resp.statusCode != 200 || !mounted) return;
       final data = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
       final rows = (data['items'] as List? ?? []).cast<Map<String, dynamic>>();
-      final headers = ['#ID', 'Branch', 'Kiosk', 'Ref', 'Date', 'Sub-Total', 'VAT', 'Total', 'Payment', 'Status', 'Synced'];
+      final headers = ['#ID', 'DID', 'Branch', 'Kiosk', 'Payment Ref', 'Date', 'Sub-Total', 'VAT', 'Total', 'Payment', 'Status', 'Synced'];
       final rowsHtml = rows.map((r) {
         final dt = r['created_at'] != null
             ? _dtFmt.format(DateTime.parse(r['created_at'].toString()).toLocal()) : '—';
         return '<tr>'
             '<td>${r['display_id'] ?? ''}</td>'
+            '<td>${r['order_reference'] ?? ''}</td>'
             '<td>${_parseBranchName(r)}</td>'
             '<td>${r['kiosk'] ?? ''}</td>'
             '<td>${r['ref'] ?? '—'}</td>'
@@ -291,14 +322,28 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
     }
   }
 
-  static const _sortKeys = [
-    'display_id', 'branch_name', 'kiosk', 'ref',
-    'created_at', 'subtotal_amount', 'tax_amount', 'total_amount',
-    'payment_type', 'status', 'synced',
+  /// Every grid column. `fixed` ones cannot be hidden; `key` is the row field
+  /// used for sorting (null = not sortable).
+  static const _allCols = <_OrderCol>[
+    _OrderCol('id', '#ID', 'display_id', fixed: true),
+    _OrderCol('did', 'DID', 'order_reference', fixed: true,
+        tip: 'Device order reference, e.g. 5-01-0002 (store - device - serial)'),
+    _OrderCol('branch', 'Branch', 'branch_name'),
+    _OrderCol('kiosk', 'Kiosk', 'kiosk'),
+    _OrderCol('payref', 'Payment Ref', 'ref'),
+    _OrderCol('date', 'Date', 'created_at'),
+    _OrderCol('sub', 'Sub-Total', 'subtotal_amount', numeric: true),
+    _OrderCol('vat', 'VAT', 'tax_amount', numeric: true),
+    _OrderCol('total', 'Total', 'total_amount', numeric: true, fixed: true),
+    _OrderCol('paytype', 'Payment Type', 'payment_type'),
+    _OrderCol('status', 'Status', 'status'),
+    _OrderCol('synced', 'Synced', 'synced'),
+    _OrderCol('invoice', 'Invoice', null),
+    _OrderCol('products', 'Products', null),
   ];
 
   void _applySortToList(List<Map<String, dynamic>> list) {
-    final key = _sortCol < _sortKeys.length ? _sortKeys[_sortCol] : 'display_id';
+    final key = _allCols[_sortCol].key ?? 'display_id';
     list.sort((a, b) {
       final va = a[key], vb = b[key];
       if (va is num && vb is num) return _sortAsc ? va.compareTo(vb) : vb.compareTo(va);
@@ -397,6 +442,11 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
             ),
             const SizedBox(width: 8),
             IconButton(
+              icon: const Icon(Icons.view_column_outlined),
+              tooltip: 'Columns',
+              onPressed: _chooseColumns,
+            ),
+            IconButton(
               icon: const Icon(Icons.refresh_outlined),
               tooltip: 'Refresh',
               onPressed: _load,
@@ -413,6 +463,13 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
         runSpacing: 8,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
+          WahaSearchField(
+            controller: _refCtrl,
+            hintText: 'Order reference',
+            width: 180,
+            onSubmitted: () { setState(() { _reference = _refCtrl.text.trim(); _page = 0; }); _load(); },
+            onClear: () { setState(() { _reference = ''; _page = 0; }); _load(); },
+          ),
           WahaFilterDropdown<int?>(
             value: _storeId,
             hint: 'Select Branch',
@@ -517,23 +574,77 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
     );
   }
 
-  DataColumn _dataColumn(ColorScheme scheme, String label, int i, {bool numeric = false}) {
-    final isActive = _sortCol == i;
-    return DataColumn(
-      numeric: numeric,
-      label: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(width: 3),
-          Icon(
-            isActive ? (_sortAsc ? Icons.arrow_upward : Icons.arrow_downward) : Icons.unfold_more,
-            size: 13,
-            color: isActive ? scheme.primary : scheme.outline.withValues(alpha: 0.5),
+  Widget _orderFlag(String label, Color color, String tip) => Tooltip(
+        message: tip,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: color.withValues(alpha: 0.4)),
           ),
-        ],
+          child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+        ),
+      );
+
+  DataColumn _dataColumn(ColorScheme scheme, int i) {
+    final c = _allCols[i];
+    final label = c.key == null
+        ? Text(c.label, style: const TextStyle(fontWeight: FontWeight.w600))
+        : wahaSortableLabel(context, c.label, active: _sortCol == i, asc: _sortAsc);
+    return DataColumn(
+      numeric: c.numeric,
+      tooltip: c.tip,
+      label: label,
+      onSort: c.key == null ? null : (_, __) => _sort(i, true),
+    );
+  }
+
+  Future<void> _chooseColumns() async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+          title: const Text('Columns'),
+          content: SizedBox(
+            width: 320,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final c in _allCols)
+                    CheckboxListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: Text(c.label),
+                      subtitle: c.fixed ? const Text('Always shown', style: TextStyle(fontSize: 11)) : null,
+                      value: c.fixed || !_hidden.contains(c.id),
+                      onChanged: c.fixed
+                          ? null
+                          : (v) {
+                              setSt(() {});
+                              setState(() => v == true ? _hidden.remove(c.id) : _hidden.add(c.id));
+                              _saveHiddenColumns();
+                            },
+                    ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                setSt(() {});
+                setState(() => _hidden = {'sub', 'vat', 'synced'});
+                _saveHiddenColumns();
+              },
+              child: const Text('Reset'),
+            ),
+            FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Done')),
+          ],
+        ),
       ),
-      onSort: (c, a) => _sort(c, a),
     );
   }
 
@@ -541,9 +652,10 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
     final from = _page * _pageSize + 1;
     final to   = ((_page + 1) * _pageSize).clamp(0, _totalCount);
 
-    final cols = ['#ID', 'Branch', 'Kiosk', 'Ref', 'Date', 'Sub-Total', 'VAT', 'Total', 'Payment Type', 'Status', 'Synced'];
-    const invoiceCol = DataColumn(label: Text('Invoice', style: TextStyle(fontWeight: FontWeight.w600)));
-    const productsCol = DataColumn(label: Text('Products', style: TextStyle(fontWeight: FontWeight.w600)));
+    final visible = [
+      for (var i = 0; i < _allCols.length; i++)
+        if (_allCols[i].fixed || !_hidden.contains(_allCols[i].id)) i,
+    ];
 
     return Container(
       margin: const EdgeInsets.fromLTRB(24, 16, 24, 24),
@@ -569,37 +681,68 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
                   headingRowColor: WidgetStatePropertyAll(scheme.surfaceContainerHighest),
                   dataRowMinHeight: 40,
                   dataRowMaxHeight: 48,
-                  columns: [
-                    ...List.generate(cols.length, (i) =>
-                      _dataColumn(scheme, cols[i], i, numeric: i >= 5 && i <= 7)),
-                    invoiceCol,
-                    productsCol,
-                  ],
+                  columns: [for (final i in visible) _dataColumn(scheme, i)],
                   rows: _items.map((row) {
                     final dt = row['created_at'] != null
                         ? _dtFmt.format(DateTime.parse(row['created_at'].toString()).toLocal())
                         : '—';
                     final synced = row['synced'] == true || row['synced'] == 1;
                     final orderId = row['id'];
-                    return DataRow(cells: [
-                      DataCell(Text('#${row['display_id'] ?? ''}')),
-                      DataCell(SizedBox(width: 140, child: Text(_parseBranchName(row), overflow: TextOverflow.ellipsis))),
-                      DataCell(SizedBox(width: 100, child: Text('${row['kiosk'] ?? ''}',       overflow: TextOverflow.ellipsis))),
-                      DataCell(SizedBox(width: 130, child: Text('${row['ref'] ?? '—'}',         overflow: TextOverflow.ellipsis))),
-                      DataCell(Text(dt)),
-                      DataCell(Text(_fmtNum(row['subtotal_amount']), textAlign: TextAlign.right)),
-                      DataCell(Text(_fmtNum(row['tax_amount']),      textAlign: TextAlign.right)),
-                      DataCell(Text(_fmtNum(row['total_amount']),    textAlign: TextAlign.right)),
-                      DataCell(Text('${row['payment_type'] ?? '—'}')),
-                      DataCell(_StatusChip(row['status']?.toString())),
-                      DataCell(_SyncChip(synced)),
-                      DataCell(_invoiceButtons(orderId)),
-                      DataCell(IconButton(
-                        icon: const Icon(Icons.inventory_2_outlined, size: 20),
-                        tooltip: 'View products',
-                        onPressed: orderId == null ? null : () => _showProductsDialog(orderId.toString()),
-                      )),
-                    ]);
+                    Widget cell(String id) {
+                      switch (id) {
+                        case 'id':
+                          return Text('#${row['display_id'] ?? ''}');
+                        case 'did':
+                          return Row(mainAxisSize: MainAxisSize.min, children: [
+                            Text('${row['order_reference'] ?? '—'}',
+                                style: TextStyle(
+                                    color: row['order_reference'] == null ? scheme.outline : null)),
+                            if (row['offline_pushed'] == true) ...[
+                              const SizedBox(width: 6),
+                              const Tooltip(
+                                message: 'Taken offline: created and paid on a kiosk without the server, then sent later.',
+                                child: Icon(Icons.cloud_off_outlined, size: 16, color: Colors.indigo),
+                              ),
+                            ],
+                            if (row['price_differs'] == true) ...[
+                              const SizedBox(width: 6),
+                              const Tooltip(
+                                message: 'Price differs: prices or tax rate on the kiosk differed from the server when it was sent.',
+                                child: Icon(Icons.price_change_outlined, size: 16, color: Colors.orange),
+                              ),
+                            ],
+                          ]);
+                        case 'branch':
+                          return SizedBox(width: 140, child: Text(_parseBranchName(row), overflow: TextOverflow.ellipsis));
+                        case 'kiosk':
+                          return SizedBox(width: 100, child: Text('${row['kiosk'] ?? ''}', overflow: TextOverflow.ellipsis));
+                        case 'payref':
+                          return SizedBox(width: 130, child: Text('${row['ref'] ?? '—'}', overflow: TextOverflow.ellipsis));
+                        case 'date':
+                          return Text(dt);
+                        case 'sub':
+                          return Text(_fmtNum(row['subtotal_amount']), textAlign: TextAlign.right);
+                        case 'vat':
+                          return Text(_fmtNum(row['tax_amount']), textAlign: TextAlign.right);
+                        case 'total':
+                          return Text(_fmtNum(row['total_amount']), textAlign: TextAlign.right);
+                        case 'paytype':
+                          return Text('${row['payment_type'] ?? '—'}');
+                        case 'status':
+                          return _StatusChip(row['status']?.toString());
+                        case 'synced':
+                          return _SyncChip(synced);
+                        case 'invoice':
+                          return _invoiceButtons(orderId);
+                        default:
+                          return IconButton(
+                            icon: const Icon(Icons.inventory_2_outlined, size: 20),
+                            tooltip: 'View products',
+                            onPressed: orderId == null ? null : () => _showProductsDialog(orderId.toString()),
+                          );
+                      }
+                    }
+                    return DataRow(cells: [for (final i in visible) DataCell(cell(_allCols[i].id))]);
                   }).toList(),
                     ),
                   ),
@@ -619,7 +762,7 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
                   style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
                 ),
                 const Spacer(),
-                _PageSizeSelector(
+                WahaPageSizeSelector(
                   value: _pageSize,
                   options: _pageSizeOptions,
                   onChanged: (v) { setState(() { _pageSize = v; _page = 0; }); _load(); },
@@ -710,7 +853,20 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
           final currency = (order?['currency'] as String?)?.toUpperCase() ?? '';
           final dialogWidth = (MediaQuery.of(context).size.width * 0.7).clamp(500.0, 900.0);
           return AlertDialog(
-            title: Text('Order Products${order?['displayId'] != null ? ' — #${order!['displayId']}' : ''}'),
+            title: Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text('Order Products${order?['displayId'] != null ? ' — #${order!['displayId']}' : ''}${order?['orderReference'] != null ? ' (${order!['orderReference']})' : ''}'),
+                if (order?['offlinePushed'] == true)
+                  _orderFlag('Taken offline', Colors.indigo,
+                      'Created and paid on a kiosk without the server, then sent later.'),
+                if (order?['priceDiffers'] == true)
+                  _orderFlag('Price differs', Colors.orange,
+                      'Prices or tax rate on the kiosk differed from the server when it was sent.'),
+              ],
+            ),
             content: SizedBox(
               width: dialogWidth,
               child: order == null && error == null
@@ -862,34 +1018,6 @@ class _SumTile extends StatelessWidget {
 
 // ── Pagination bar ────────────────────────────────────────────────────────────
 
-class _PageSizeSelector extends StatelessWidget {
-  final int value;
-  final List<int> options;
-  final ValueChanged<int> onChanged;
-
-  const _PageSizeSelector({required this.value, required this.options, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text('Rows per page', style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
-        const SizedBox(width: 8),
-        DropdownButton<int>(
-          value: value,
-          underline: const SizedBox.shrink(),
-          items: options
-              .map((o) => DropdownMenuItem(value: o, child: Text('$o', style: const TextStyle(fontSize: 13))))
-              .toList(),
-          onChanged: (v) { if (v != null) onChanged(v); },
-        ),
-      ],
-    );
-  }
-}
-
 class _PaginationBar extends StatelessWidget {
   final int page;
   final int totalCount;
@@ -964,3 +1092,13 @@ class _Btn extends StatelessWidget {
   }
 }
 
+class _OrderCol {
+  final String id;
+  final String label;
+  final String? key;
+  final bool numeric;
+  final bool fixed;
+  final String? tip;
+  const _OrderCol(this.id, this.label, this.key,
+      {this.numeric = false, this.fixed = false, this.tip});
+}

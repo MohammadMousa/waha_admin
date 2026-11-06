@@ -10,6 +10,11 @@ class Device {
   final bool enabled;
   final String? createdAt;
   final DateTime? lockedUntil;
+  final int? deviceNo;
+  final DateTime? lastPullAt;
+  final DateTime? lastPushAt;
+  final int? pendingOrders;
+  final int? failedOrders;
 
   bool get isLocked => lockedUntil != null && lockedUntil!.isAfter(DateTime.now().toUtc());
 
@@ -25,6 +30,11 @@ class Device {
     required this.enabled,
     this.createdAt,
     this.lockedUntil,
+    this.deviceNo,
+    this.lastPullAt,
+    this.lastPushAt,
+    this.pendingOrders,
+    this.failedOrders,
   });
 
   factory Device.fromJson(Map<String, dynamic> j) => Device(
@@ -41,6 +51,11 @@ class Device {
         lockedUntil: j['lockedUntil'] == null
             ? null
             : DateTime.tryParse(j['lockedUntil'] as String),
+        deviceNo: (j['deviceNo'] as num?)?.toInt(),
+        lastPullAt: DateTime.tryParse(j['lastPullAt']?.toString() ?? ''),
+        lastPushAt: DateTime.tryParse(j['lastPushAt']?.toString() ?? ''),
+        pendingOrders: (j['pendingOrders'] as num?)?.toInt(),
+        failedOrders: (j['failedOrders'] as num?)?.toInt(),
       );
 
   String get displayName => (name != null && name!.isNotEmpty) ? name! : username;

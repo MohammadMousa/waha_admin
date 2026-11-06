@@ -194,9 +194,15 @@ class _DeviceStatusScreenState extends State<DeviceStatusScreen> {
     );
   }
 
+  String _time(dynamic v) {
+    final d = DateTime.tryParse(v?.toString() ?? '');
+    return d == null ? '—' : _dtFmt.format(d.toLocal());
+  }
+
   Widget _buildTableArea(ColorScheme scheme) {
     final rows = _filtered;
     final cols = ['Device', 'Store', 'Status', 'Last Seen', 'App Version', 'Last Order'];
+    const extra = ['No.', 'Last Pull', 'Last Push', 'Pending', 'Failed'];
     return Container(
       margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       decoration: BoxDecoration(
@@ -228,6 +234,8 @@ class _DeviceStatusScreenState extends State<DeviceStatusScreen> {
                           ),
                         DataColumn(label: Text(cols[4], style: const TextStyle(fontWeight: FontWeight.w600))),
                         DataColumn(label: Text(cols[5], style: const TextStyle(fontWeight: FontWeight.w600))),
+                        for (final e in extra)
+                          DataColumn(label: Text(e, style: const TextStyle(fontWeight: FontWeight.w600))),
                       ],
                       rows: rows.map((d) {
                         final name = (d['name'] ?? d['username'] ?? '—').toString();
@@ -245,6 +253,14 @@ class _DeviceStatusScreenState extends State<DeviceStatusScreen> {
                             lastOrderAt: d['lastOrderAt']?.toString(),
                             lastOrderStatus: d['lastOrderStatus']?.toString(),
                           )),
+                          DataCell(Text(d['deviceNo'] == null ? '—' : d['deviceNo'].toString().padLeft(2, '0'))),
+                          DataCell(Text(_time(d['lastPullAt']))),
+                          DataCell(Text(_time(d['lastPushAt']))),
+                          DataCell(Text(d['pendingOrders']?.toString() ?? '—')),
+                          DataCell(Text(d['failedOrders']?.toString() ?? '—',
+                              style: TextStyle(
+                                  color: ((d['failedOrders'] as num?) ?? 0) > 0 ? Colors.red : null,
+                                  fontWeight: ((d['failedOrders'] as num?) ?? 0) > 0 ? FontWeight.w700 : null))),
                         ]);
                       }).toList(),
                     ),

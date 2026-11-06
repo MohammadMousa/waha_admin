@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/branch_group.dart';
@@ -25,6 +26,7 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
   late final TextEditingController _nameArCtrl;
   late final TextEditingController _nameEnCtrl;
   late final TextEditingController _slugCtrl;
+  final _shortCodeCtrl = TextEditingController();
 
   int? _imageResourceId;
   bool _active = true;
@@ -53,6 +55,7 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
     _nameArCtrl.dispose();
     _nameEnCtrl.dispose();
     _slugCtrl.dispose();
+    _shortCodeCtrl.dispose();
     super.dispose();
   }
 
@@ -69,6 +72,7 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
         if (mounted && details != null) {
           setState(() {
             _slugCtrl.text     = details['name'] as String? ?? _slugCtrl.text;
+            _shortCodeCtrl.text = details['shortCode'] as String? ?? '';
             _active   = details['active'] as bool? ?? true;
             _isPublic = details['publicFlag'] as bool? ?? true;
             final imgId = details['imageResourceId'];
@@ -82,6 +86,20 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  /// Suggests a code from the store name: initials of its words, or the first
+  /// three letters of a single word. The user can edit it.
+  String _suggestShortCode() {
+    var base = _nameEnCtrl.text.trim();
+    if (base.isEmpty || !RegExp(r'[A-Za-z0-9]').hasMatch(base)) base = _slugCtrl.text.trim();
+    final words = base.split(RegExp(r'[^A-Za-z0-9]+')).where((w) => w.isNotEmpty).toList();
+    if (words.isEmpty) return '';
+    final code = words.length > 1
+        ? words.map((w) => w[0]).join()
+        : words.first.substring(0, words.first.length < 3 ? words.first.length : 3);
+    final up = code.toUpperCase();
+    return up.length > 10 ? up.substring(0, 10) : up;
   }
 
   Future<void> _pickImage() async {
@@ -111,6 +129,7 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
         await api.patchStore(newId, {
           'active': _active,
           'public': _isPublic,
+          if (_shortCodeCtrl.text.trim().isNotEmpty) 'shortCode': _shortCodeCtrl.text.trim(),
           if (_imageResourceId != null) 'imageResourceId': _imageResourceId,
         }, token: token);
       } else {
@@ -119,6 +138,7 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
           'active': _active,
           'public': _isPublic,
           if (slug.isNotEmpty) 'name': slug,
+          'shortCode': _shortCodeCtrl.text.trim(),
           if (_imageResourceId != null) 'imageResourceId': _imageResourceId,
         };
         await api.patchStore(widget.store!.id, body, token: token);
@@ -251,6 +271,37 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
                                     decoration: const InputDecoration(
                                         labelText: 'Slug (e.g. main-store)',
                                         border: OutlineInputBorder()),
+                                  ),
+                                  const SizedBox(height: 20),
+
+                                  Text('Short code',
+                                      style: Theme.of(context).textTheme.titleSmall),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Prefix of offline order references, for example WH-01-233. '
+                                    'Up to 10 letters or digits. Leave empty to use the store id.',
+                                    style: TextStyle(color: scheme.outline, fontSize: 12),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextField(
+                                    controller: _shortCodeCtrl,
+                                    maxLength: 10,
+                                    textCapitalization: TextCapitalization.characters,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
+                                      TextInputFormatter.withFunction((o, n) =>
+                                          n.copyWith(text: n.text.toUpperCase())),
+                                    ],
+                                    decoration: InputDecoration(
+                                      labelText: 'Short code (e.g. WH)',
+                                      counterText: '',
+                                      border: const OutlineInputBorder(),
+                                      suffixIcon: TextButton(
+                                        onPressed: () => setState(
+                                            () => _shortCodeCtrl.text = _suggestShortCode()),
+                                        child: const Text('Suggest'),
+                                      ),
+                                    ),
                                   ),
                                   const SizedBox(height: 20),
 

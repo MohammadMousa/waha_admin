@@ -99,6 +99,9 @@ class WahaSearchField extends StatelessWidget {
   /// callback runs after the field has been emptied.
   final VoidCallback? onClear;
 
+  /// Called on every keystroke, for filters that apply as the user types.
+  final ValueChanged<String>? onChanged;
+
   const WahaSearchField({
     super.key,
     required this.controller,
@@ -106,6 +109,7 @@ class WahaSearchField extends StatelessWidget {
     this.width = 220,
     this.onSubmitted,
     this.onClear,
+    this.onChanged,
   });
 
   @override
@@ -133,6 +137,7 @@ class WahaSearchField extends StatelessWidget {
             child: TextField(
               controller: controller,
               onSubmitted: onSubmitted == null ? null : (_) => onSubmitted!(),
+              onChanged: onChanged,
               textAlignVertical: TextAlignVertical.center,
               style: TextStyle(
                   fontSize: kWahaFilterControlFontSize, color: scheme.onSurface),

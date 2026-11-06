@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -26,12 +27,14 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
   final _username = TextEditingController();
   final _pinCode = TextEditingController();
   final _name = TextEditingController();
+  final _deviceNo = TextEditingController();
 
   String _deviceType = 'KIOSK';
   bool _enabled = true;
   bool _obscurePin = true;
 
   List<Store>? _stores;
+  final Map<int, String> _shortCodes = {};
   int? _selectedStoreId;
   bool _loadingStores = true;
   bool _saving = false;
@@ -48,6 +51,7 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
       _deviceType = d.deviceType;
       _enabled = d.enabled;
       _selectedStoreId = d.storeId;
+      _deviceNo.text = d.deviceNo?.toString() ?? '';
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadStores());
   }
@@ -57,7 +61,20 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
     _username.dispose();
     _pinCode.dispose();
     _name.dispose();
+    _deviceNo.dispose();
     super.dispose();
+  }
+
+  /// Reads the store's short code (the reference prefix); stores without one
+  /// use their id.
+  Future<void> _loadShortCode(int? storeId) async {
+    if (storeId == null || _shortCodes.containsKey(storeId)) return;
+    final token = context.read<AuthState>().token;
+    if (token == null) return;
+    try {
+      final d = await ApiClient().getStoreAdminDetails(storeId, token: token);
+      if (mounted) setState(() => _shortCodes[storeId] = (d?['shortCode'] as String?) ?? '');
+    } on ApiException catch (_) {}
   }
 
   Future<void> _loadStores() async {
@@ -73,6 +90,7 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
           _stores = stores;
           _loadingStores = false;
         });
+      _loadShortCode(_selectedStoreId);
     } on ApiException catch (_) {
       if (mounted) setState(() => _loadingStores = false);
     }
@@ -94,6 +112,11 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
     }
     if (_isCreate && _selectedStoreId == null) {
       setState(() => _error = 'A store is required.');
+      return;
+    }
+    final deviceNo = int.tryParse(_deviceNo.text.trim());
+    if (_deviceNo.text.trim().isNotEmpty && (deviceNo == null || deviceNo < 1 || deviceNo > 99)) {
+      setState(() => _error = 'Device number must be between 1 and 99.');
       return;
     }
     setState(() {
@@ -118,6 +141,7 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
           'name': _name.text.trim().isNotEmpty ? _name.text.trim() : username,
           'deviceType': _deviceType,
           'enabled': _enabled,
+          if (deviceNo != null) 'deviceNo': deviceNo,
         }, token: token);
         if (mounted) {
           setState(() {
@@ -132,6 +156,7 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
           'name': _name.text.trim().isNotEmpty ? _name.text.trim() : null,
           'deviceType': _deviceType,
           if (_selectedStoreId != null) 'storeId': _selectedStoreId,
+          if (deviceNo != null) 'deviceNo': deviceNo,
           if (_pinCode.text.trim().isNotEmpty) 'pinCode': _pinCode.text.trim(),
         }, token: token);
       }
@@ -403,8 +428,10 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
                                 ),
                               ),
                             ],
-                            onChanged: (v) =>
-                                setState(() => _selectedStoreId = v),
+                            onChanged: (v) {
+                              setState(() => _selectedStoreId = v);
+                              _loadShortCode(v);
+                            },
                           ),
                           const SizedBox(height: 12),
                           DropdownButtonFormField<String>(
@@ -425,6 +452,32 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
                             onChanged: (v) {
                               if (v != null) setState(() => _deviceType = v);
                             },
+                          ),
+                          const Divider(height: 32),
+                          _Label('Order numbers'),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _deviceNo,
+                            keyboardType: TextInputType.number,
+                            maxLength: 2,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            onChanged: (_) => setState(() {}),
+                            decoration: InputDecoration(
+                              labelText: 'Device number (1–99)',
+                              counterText: '',
+                              helperText: _isCreate
+                                  ? 'Leave empty to use the lowest free number in the store.'
+                                  : 'Must be unique in the store. Moving the device to another store keeps the number only if it is free there.',
+                              helperMaxLines: 3,
+                              border: const OutlineInputBorder(),
+                              prefixIcon: const Icon(Icons.pin_outlined),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _OrderNumberPreview(
+                            storeId: _selectedStoreId,
+                            shortCode: _shortCodes[_selectedStoreId],
+                            deviceNo: int.tryParse(_deviceNo.text.trim()),
                           ),
                           const Divider(height: 32),
                           _Label('Details'),
@@ -462,4 +515,84 @@ class _Label extends StatelessWidget {
       letterSpacing: 0.5,
     ),
   );
+}
+
+/// Shows how this device's order references will look: `<store code>-DD-NNN`.
+/// The prefix is the store's short code (or its id when it has none), the
+/// device part follows the number being typed, and only that part is set here.
+class _OrderNumberPreview extends StatelessWidget {
+  final int? storeId;
+  final String? shortCode;
+  final int? deviceNo;
+  const _OrderNumberPreview({required this.storeId, required this.shortCode, required this.deviceNo});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final hasCode = shortCode != null && shortCode!.isNotEmpty;
+    final prefix = hasCode ? shortCode! : (storeId?.toString() ?? '···');
+    final device = deviceNo == null ? '··' : deviceNo!.toString().padLeft(2, '0');
+    Widget segment(String value, String label, {required bool editable}) => Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: editable ? scheme.primaryContainer : scheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: editable ? scheme.primary : scheme.outlineVariant),
+              ),
+              child: Text(value,
+                  style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: editable ? scheme.onPrimaryContainer : scheme.onSurfaceVariant)),
+            ),
+            const SizedBox(height: 4),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: editable ? FontWeight.w700 : FontWeight.w400,
+                    color: editable ? scheme.primary : scheme.outline)),
+          ],
+        );
+    Widget dash() => Padding(
+          padding: const EdgeInsets.fromLTRB(6, 0, 6, 18),
+          child: Text('-', style: TextStyle(fontSize: 20, color: scheme.outline)),
+        );
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Order reference pattern',
+              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              segment(prefix, hasCode ? 'Store code' : 'Store id', editable: false),
+              dash(),
+              segment(device, 'Device', editable: true),
+              dash(),
+              segment('###', 'Serial', editable: false),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Orders taken offline on this device get a reference like this. The first part is the '
+            "store's short code (the store id when it has none), the serial counts 001 to 999 on the "
+            'kiosk; only the device part is set here.',
+            style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
 }

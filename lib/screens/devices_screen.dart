@@ -240,6 +240,8 @@ class _DeviceCard extends StatelessWidget {
                   Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
                     Text(d.displayName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
                     _Badge(d.deviceType, Colors.deepPurple),
+                    if (d.deviceNo != null)
+                      _Badge('Device ${d.deviceNo.toString().padLeft(2, '0')}', Colors.teal),
                     if (!d.enabled) ...[
                         _Badge('Disabled', Colors.grey),
                     ],
@@ -260,6 +262,26 @@ class _DeviceCard extends StatelessWidget {
                     if (d.deviceKey != null)
                       Text('Key: ${d.deviceKey}', style: TextStyle(fontSize: 11, color: scheme.outline)),
                   ]),
+                  if (d.lastPullAt != null || d.lastPushAt != null || d.pendingOrders != null || d.failedOrders != null) ...[
+                    const SizedBox(height: 4),
+                    Wrap(spacing: 12, children: [
+                      if (d.lastPullAt != null)
+                        Text('Last pull: ${_syncFmt.format(d.lastPullAt!.toLocal())}',
+                            style: TextStyle(fontSize: 11, color: scheme.outline)),
+                      if (d.lastPushAt != null)
+                        Text('Last push: ${_syncFmt.format(d.lastPushAt!.toLocal())}',
+                            style: TextStyle(fontSize: 11, color: scheme.outline)),
+                      if (d.pendingOrders != null)
+                        Text('Pending orders: ${d.pendingOrders}',
+                            style: TextStyle(fontSize: 11, color: scheme.outline)),
+                      if (d.failedOrders != null)
+                        Text('Failed orders: ${d.failedOrders}',
+                            style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: d.failedOrders! > 0 ? FontWeight.w700 : FontWeight.w400,
+                                color: d.failedOrders! > 0 ? Colors.red : scheme.outline)),
+                    ]),
+                  ],
                 ],
               ),
             ),
@@ -288,6 +310,8 @@ class _DeviceCard extends StatelessWidget {
     );
   }
 }
+
+final _syncFmt = DateFormat('yyyy-MM-dd HH:mm');
 
 class _Badge extends StatelessWidget {
   final String label;

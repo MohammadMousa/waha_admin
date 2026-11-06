@@ -381,7 +381,7 @@ class _CouponReportScreenState extends State<CouponReportScreen> {
         ];
       default:
         return [
-          _Col('#ID', 'displayId', (r) => '#${r['displayId'] ?? r['orderId']}'),
+          _Col('#ID', 'displayId', (r) => '#${r['displayId'] == null ? r['orderId'] : r['displayId']}'),
           _Col('Branch', null, (r) => r['storeName']?.toString() ?? '—'),
           _Col('Kiosk', 'username', (r) => r['username']?.toString() ?? '—'),
           _Col('Date order', 'paidAt', (r) => time(r['paidAt'] ?? r['createdAt'])),

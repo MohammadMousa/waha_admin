@@ -504,7 +504,7 @@ class _RedemptionsDialogState extends State<_RedemptionsDialog> {
                             rows: [
                               for (final r in items)
                                 DataRow(cells: [
-                                  DataCell(Text('#${r['displayId'] ?? r['orderId']}')),
+                                  DataCell(Text('#${r['displayId'] == null ? r['orderId'] : r['displayId']}')),
                                   DataCell(Text(r['createdAt'] == null
                                       ? '—'
                                       : _dtFmt.format(DateTime.parse(r['createdAt'].toString()).toLocal()))),

@@ -78,3 +78,33 @@ class _Btn extends StatelessWidget {
     );
   }
 }
+
+/// "Rows per page" dropdown shown beside the pager in report footers.
+class WahaPageSizeSelector extends StatelessWidget {
+  final int value;
+  final List<int> options;
+  final ValueChanged<int> onChanged;
+
+  const WahaPageSizeSelector({required this.value, required this.options, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('Rows per page', style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+        const SizedBox(width: 8),
+        DropdownButton<int>(
+          value: value,
+          underline: const SizedBox.shrink(),
+          items: options
+              .map((o) => DropdownMenuItem(value: o, child: Text('$o', style: const TextStyle(fontSize: 13))))
+              .toList(),
+          onChanged: (v) { if (v != null) onChanged(v); },
+        ),
+      ],
+    );
+  }
+}
+
