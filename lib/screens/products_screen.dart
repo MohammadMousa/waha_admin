@@ -12,6 +12,7 @@ import '../models/store.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
+import '../utils/localized_name.dart';
 import '../utils/number_format.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/product_image.dart';
@@ -168,6 +169,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
   // mechanism landing pages use for global (no-branch) resource scope.
   String? get _orgSlug => _stores?.firstOrNull?.orgSlug;
 
+  final _scrollCtrl = ScrollController();
+  // Product just saved: kept in place and shown with a short highlight.
+  int? _highlightId;
+  Timer? _highlightTimer;
+
   final _searchCtrl = TextEditingController();
   Timer? _searchTimer;
 
@@ -184,6 +190,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
     _searchCtrl.removeListener(_onSearchChanged);
     _searchCtrl.dispose();
     _searchTimer?.cancel();
+    _highlightTimer?.cancel();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
@@ -263,16 +271,40 @@ class _ProductsScreenState extends State<ProductsScreen> {
     }
   }
 
-  String _flatName(dynamic name) {
-    if (name == null) return '';
-    if (name is String) return name;
-    if (name is Map) return (name['en'] ?? name['ar'] ?? name.values.firstOrNull ?? '').toString();
-    return name.toString();
-  }
+  String _flatName(dynamic name) => parseLocalizedName(name, fallback: '');
 
   void _logout() {
     context.read<AuthState>().logout();
     Navigator.of(context).pushReplacementNamed(Routes.login);
+  }
+
+  /// After the edit screen saves: keep the page as it is, put the new values
+  /// in the same spot (a new product goes first on this page), and highlight it.
+  Future<void> _afterSave(Object? result, {required bool created}) async {
+    if (result is! int) return; // closed without saving
+    try {
+      final fresh = await ApiClient().getProductDetail(result);
+      if (!mounted) return;
+      setState(() {
+        final i = _products.indexWhere((p) => p['id'] == result);
+        if (i >= 0) {
+          _products[i] = {..._products[i], ...fresh};
+        } else if (created) {
+          _products.insert(0, fresh);
+        }
+        _highlightId = result;
+      });
+      if (created && _scrollCtrl.hasClients) {
+        _scrollCtrl.animateTo(0,
+            duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+      }
+      _highlightTimer?.cancel();
+      _highlightTimer = Timer(const Duration(seconds: 3), () {
+        if (mounted) setState(() => _highlightId = null);
+      });
+    } on ApiException {
+      if (mounted) _loadPage(_page);
+    }
   }
 
   void _openCreate() {
@@ -286,7 +318,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
           'productId': null,
           'storeSlug': orgSlug,
         })
-        .then((_) => _loadPage(_page));
+        .then((r) => _afterSave(r, created: true));
   }
 
   void _openEdit(Map<String, dynamic> p) {
@@ -300,7 +332,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
           'productId': p['id'] as int,
           'storeSlug': orgSlug,
         })
-        .then((_) => _loadPage(_page));
+        .then((r) => _afterSave(r, created: false));
   }
 
   @override
@@ -426,6 +458,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
               WahaSearchField(
                 controller: _searchCtrl,
                 hintText: 'Search products…',
+                onClear: () {
+                  _searchTimer?.cancel();
+                  _loadPage(0);
+                },
               ),
             ],
           ),
@@ -459,6 +495,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       // image square-ish, then room for 2 name lines + price + category + badge
       final textH = _view.nameSize * 1.3 * 2 + _view.priceSize * 1.4 + 10 * 1.4 + 4 + 20 + 16;
       return GridView.builder(
+        controller: _scrollCtrl,
         padding: const EdgeInsets.all(pad),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: cols,
@@ -478,6 +515,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   .firstOrNull;
           return _ProductCard(
             product: p,
+            highlighted: p['id'] == _highlightId,
             categoryName: catName,
             view: _view,
             onEdit: () => _openEdit(p),
@@ -516,12 +554,14 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
 class _ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
+  final bool highlighted;
   final String? categoryName;
   final ProductViewSettings view;
   final VoidCallback onEdit;
 
   const _ProductCard({
     required this.product,
+    this.highlighted = false,
     this.categoryName,
     required this.view,
     required this.onEdit,
@@ -539,7 +579,16 @@ class _ProductCard extends StatelessWidget {
         ? (Colors.green.shade50, Colors.green.shade700, 'Enabled')
         : (Colors.red.shade50, Colors.red.shade700, 'Disabled');
 
-    return Card(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 400),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: highlighted
+            ? [BoxShadow(color: scheme.primary.withValues(alpha: 0.55), blurRadius: 12, spreadRadius: 2)]
+            : const [],
+      ),
+      child: Card(
+      margin: EdgeInsets.zero,
       clipBehavior: Clip.hardEdge,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -639,14 +688,9 @@ class _ProductCard extends StatelessWidget {
           ),
         ],
       ),
+      ),
     );
   }
 
-  String _flatName(dynamic name) {
-    if (name == null) return '';
-    if (name is String) return name;
-    if (name is Map)
-      return (name['en'] ?? name['ar'] ?? name.values.firstOrNull ?? '').toString();
-    return name.toString();
-  }
+  String _flatName(dynamic name) => parseLocalizedName(name, fallback: '');
 }

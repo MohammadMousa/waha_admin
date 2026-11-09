@@ -299,7 +299,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
       }
 
       if (!mounted) return;
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop(productId);
     } catch (e) {
       if (!mounted) return;
       setState(() { _error = e.toString(); _saving = false; });

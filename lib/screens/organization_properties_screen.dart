@@ -209,6 +209,7 @@ class _OrganizationPropertiesScreenState extends State<OrganizationPropertiesScr
     return key.startsWith('offline_') ||
         key.startsWith('sync_') ||
         key.startsWith('scan_') ||
+        key.startsWith('resource_cache_') ||
         key == 'push_paid_orders_only';
   }
 
@@ -682,6 +683,7 @@ class _PropertyEditorDialogState extends State<_PropertyEditorDialog> {
   final Map<String, String> _dropdownValues = {
     'default_language': 'ar',
     'Log_Level': 'Warn',
+    'offline_mode': 'off',
     for (final k in _boolKeys) k: 'false',
   };
   String? _error;
@@ -708,6 +710,10 @@ class _PropertyEditorDialogState extends State<_PropertyEditorDialog> {
       _valueCtrl.text = value;
       if (key == 'default_language' && (value.toLowerCase() == 'ar' || value.toLowerCase() == 'en')) {
         _dropdownValues['default_language'] = value.toLowerCase();
+      } else if (key == 'offline_mode') {
+        // Older values were true/false; "full" is the old true.
+        final v = value.toLowerCase();
+        _dropdownValues[key] = v == 'caching' ? 'caching' : (v == 'full' || v == 'true') ? 'full' : 'off';
       } else if (key == 'Log_Level') {
         // The kiosk accepts any case; show the stored value as one of the three.
         _dropdownValues[key] = const ['Info', 'Warn', 'Error']
@@ -832,6 +838,18 @@ class _PropertyEditorDialogState extends State<_PropertyEditorDialog> {
         onChanged: (v) => setState(() => _dropdownValues['default_language'] = v ?? 'ar'),
       );
     }
+    if (key == 'offline_mode') {
+      return DropdownButtonFormField<String>(
+        value: _dropdownValues['offline_mode'],
+        decoration: const InputDecoration(labelText: 'Value', border: OutlineInputBorder(), isDense: true),
+        items: const [
+          DropdownMenuItem(value: 'off', child: Text('off — online only (default)')),
+          DropdownMenuItem(value: 'caching', child: Text('caching')),
+          DropdownMenuItem(value: 'full', child: Text('full — sell offline and send orders later')),
+        ],
+        onChanged: (v) => setState(() => _dropdownValues['offline_mode'] = v ?? 'off'),
+      );
+    }
     if (key == 'Log_Level') {
       return DropdownButtonFormField<String>(
         value: _dropdownValues['Log_Level'],
@@ -898,6 +916,8 @@ class _PropertyEditorDialogState extends State<_PropertyEditorDialog> {
       value = _dropdownValues['default_language'] ?? 'ar';
     } else if (knownKey == 'Log_Level') {
       value = _dropdownValues['Log_Level'] ?? 'Warn';
+    } else if (knownKey == 'offline_mode') {
+      value = _dropdownValues['offline_mode'] ?? 'off';
     } else if (knownKey != null && _isBoolKey(knownKey)) {
       value = _dropdownValues[knownKey] ?? 'false';
     } else {

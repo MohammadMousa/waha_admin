@@ -11,8 +11,12 @@ String parseLocalizedName(dynamic raw, {String fallback = '—'}) {
       final m = (raw is Map)
           ? Map<String, dynamic>.from(raw)
           : Map<String, dynamic>.from(jsonDecode(raw.toString()) as Map);
-      final name = (m['en'] ?? m['ar'] ?? '').toString().trim();
-      if (name.isNotEmpty) return name;
+      // First non-empty value: an Arabic-only product is saved with an empty
+      // English name, which must not hide the Arabic one.
+      for (final v in [m['en'], m['ar'], ...m.values]) {
+        final name = (v ?? '').toString().trim();
+        if (name.isNotEmpty) return name;
+      }
     } catch (_) {}
   }
   return fallback;

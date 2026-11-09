@@ -102,7 +102,14 @@ class _ReceiptInfoEditScreenState extends State<ReceiptInfoEditScreen> {
         if (_logoResourceId != null) 'logoResourceId': _logoResourceId,
       }, token: token, storeId: widget.store.id);
       if (!mounted) return;
-      Navigator.of(context).pop(true);
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(true);
+      } else {
+        // Opened straight from the sidebar: nothing to go back to, so stay.
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Saved')));
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() { _error = e.toString(); _saving = false; });

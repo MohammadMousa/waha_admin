@@ -10,8 +10,10 @@ import '../widgets/admin_sidebar.dart';
 import '../widgets/error_dialog.dart';
 
 class PaymentMethodsScreen extends StatefulWidget {
-  final Store store;
-  const PaymentMethodsScreen({super.key, required this.store});
+  /// The store whose own on/off setting is edited. Null = the server-wide
+  /// switch (super admin), which applies to every company.
+  final Store? store;
+  const PaymentMethodsScreen({super.key, this.store});
 
   @override
   State<PaymentMethodsScreen> createState() => _PaymentMethodsScreenState();
@@ -21,6 +23,8 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
   bool _loading = false;
   String? _error;
   List<AdminPaymentMethodView> _methods = [];
+
+  bool get _isGlobal => widget.store == null;
 
   @override
   void initState() {
@@ -33,8 +37,9 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
     setState(() { _loading = true; _error = null; });
     final token = context.read<AuthState>().token;
     try {
-      final methods = await ApiClient()
-          .getAdminPaymentMethods(storeId: widget.store.id, token: token);
+      final methods = _isGlobal
+          ? await ApiClient().getGlobalPaymentMethods(token: token)
+          : await ApiClient().getAdminPaymentMethods(storeId: widget.store!.id, token: token);
       if (mounted) setState(() { _methods = methods; _loading = false; });
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
@@ -44,6 +49,21 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
   Future<void> _toggle(AdminPaymentMethodView method) async {
     final newActive = !method.effectiveActive;
     final token = context.read<AuthState>().token;
+    if (_isGlobal) {
+      final name = (method.displayName?['en'] as String?) ?? method.key;
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(newActive ? 'Turn on payment method?' : 'Turn off payment method?'),
+          content: Text('"$name" will be ${newActive ? 'turned on' : 'turned off'}.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Confirm')),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+    }
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -58,8 +78,12 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
       ),
     );
     try {
-      await ApiClient().setPaymentMethodStoreActive(method.id,
-          active: newActive, storeId: widget.store.id, token: token);
+      if (_isGlobal) {
+        await ApiClient().setPaymentMethodGlobalActive(method.id, active: newActive, token: token);
+      } else {
+        await ApiClient().setPaymentMethodStoreActive(method.id,
+            active: newActive, storeId: widget.store!.id, token: token);
+      }
       if (!mounted) return;
       Navigator.of(context).pop();
       await _load();

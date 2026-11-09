@@ -304,8 +304,7 @@ class WahaAdminApp extends StatelessWidget {
 
           case Routes.paymentMethodsGlobal:
             return MaterialPageRoute(
-                builder: (_) => PaymentMethodsScreen(
-                    store: const Store(id: 1, name: 'waha')),
+                builder: (_) => const PaymentMethodsScreen(),
                 settings: settings);
 
           case Routes.receiptInfoGlobal:

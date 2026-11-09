@@ -1250,6 +1250,30 @@ class ApiClient {
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
 
+  /// Every payment method on the server with its server-wide on/off switch,
+  /// including ones switched off. Super admin only.
+  Future<List<AdminPaymentMethodView>> getGlobalPaymentMethods({String? token}) async {
+    final resp = await _http.get(_uri('/api/payment-methods/admin/all'),
+        headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      return (jsonDecode(utf8.decode(resp.bodyBytes)) as List)
+          .map((e) => AdminPaymentMethodView.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  /// Turns a payment method on or off for every company on the server.
+  Future<void> setPaymentMethodGlobalActive(int id,
+      {required bool active, String? token}) async {
+    final resp = await _http.put(
+      _uri('/api/payment-methods/$id/active').replace(queryParameters: {'active': '$active'}),
+      headers: _headers(token: token),
+    );
+    if (resp.statusCode == 200) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
   // ── Receipt info ──────────────────────────────────────────────────────────
 
   Future<ReceiptInfoData?> getReceiptInfo({int? storeId, String? token}) async {

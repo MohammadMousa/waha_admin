@@ -21,7 +21,8 @@ class AdminPaymentMethodView {
         key: json['key'] as String,
         displayName: json['displayName'] as Map<String, dynamic>?,
         provider: json['provider'] as String,
-        effectiveActive: json['effectiveActive'] as bool? ?? true,
+        // The server-wide list sends a plain "active" instead.
+        effectiveActive: json['effectiveActive'] as bool? ?? json['active'] as bool? ?? true,
         hasStoreOverride: json['hasStoreOverride'] as bool? ?? false,
       );
 }
