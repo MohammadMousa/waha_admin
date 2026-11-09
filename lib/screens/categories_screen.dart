@@ -8,6 +8,7 @@ import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/category_card.dart';
+import '../widgets/confirm_delete.dart';
 import '../widgets/framed_card.dart';
 
 class CategoriesScreen extends StatefulWidget {
@@ -38,6 +39,18 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     } on ApiException catch (e) {
       if (mounted) setState(() { _error = e.message; _loading = false; });
     }
+  }
+
+  Future<void> _delete(Category cat) async {
+    final token = context.read<AuthState>().token!;
+    final name = (cat.name['en'] ?? cat.name['ar'] ?? '').toString();
+    final done = await confirmAndDelete(
+      context,
+      title: 'Delete category?',
+      message: 'Delete "$name" permanently? This cannot be undone.',
+      action: () => ApiClient().deleteCategory(cat.id, token: token),
+    );
+    if (done && mounted) _load();
   }
 
   void _openEdit(Category cat) {
@@ -103,6 +116,9 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
             nameAr: (cat.name['ar'] ?? '').toString(),
             imageResourceId: cat.imageResourceId,
             onTap: () => _openEdit(cat),
+            onDelete: context.read<AuthState>().hasPermission('MANAGE_CATEGORIES')
+                ? () => _delete(cat)
+                : null,
           );
         },
       );

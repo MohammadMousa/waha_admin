@@ -47,6 +47,7 @@ class Routes {
 
   // Global admin
   static const paymentMethodsGlobal    = '/payment-methods/global';
+  static const paymentMethodEdit       = '/payment-methods/edit';
   static const receiptInfoGlobal       = '/receipt-info/global';
   static const resourceExplorerGlobal  = '/resources/global';
 

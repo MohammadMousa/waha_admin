@@ -9,6 +9,7 @@ import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/error_dialog.dart';
 import '../widgets/category_card.dart';
+import '../widgets/confirm_delete.dart';
 import '../widgets/framed_card.dart';
 
 /// Global categories screen — always shows categories for the root store (id=1).
@@ -60,6 +61,18 @@ class _CategoriesAdminScreenState extends State<CategoriesAdminScreen> {
   void _logout() {
     context.read<AuthState>().logout();
     Navigator.of(context).pushReplacementNamed(Routes.login);
+  }
+
+  Future<void> _delete(Category cat) async {
+    final token = context.read<AuthState>().token!;
+    final name = (cat.name['en'] ?? cat.name['ar'] ?? '').toString();
+    final done = await confirmAndDelete(
+      context,
+      title: 'Delete category?',
+      message: 'Delete "$name" permanently? This cannot be undone.',
+      action: () => ApiClient().deleteCategory(cat.id, token: token),
+    );
+    if (done && mounted) _load();
   }
 
   void _openEdit(Category cat) {
@@ -168,6 +181,9 @@ class _CategoriesAdminScreenState extends State<CategoriesAdminScreen> {
             nameAr: (cat.name['ar'] ?? '').toString(),
             imageResourceId: cat.imageResourceId,
             onTap: () => _openEdit(cat),
+            onDelete: context.read<AuthState>().hasPermission('MANAGE_CATEGORIES')
+                ? () => _delete(cat)
+                : null,
           );
         },
       ),

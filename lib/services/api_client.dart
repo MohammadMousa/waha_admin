@@ -577,6 +577,13 @@ class ApiClient {
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
 
+  /// Deletes an empty category. The server refuses (409) while it still has products.
+  Future<void> deleteCategory(int id, {required String token}) async {
+    final resp = await _http.delete(_uri('/api/categories/$id'), headers: _headers(token: token));
+    if (resp.statusCode == 200) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
   // ── Products ──────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> getProducts({
@@ -1268,6 +1275,29 @@ class ApiClient {
       {required bool active, String? token}) async {
     final resp = await _http.put(
       _uri('/api/payment-methods/$id/active').replace(queryParameters: {'active': '$active'}),
+      headers: _headers(token: token),
+    );
+    if (resp.statusCode == 200) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  /// Changes only the given fields of a payment method (never the key).
+  Future<AdminPaymentMethodView> updatePaymentMethod(int id, Map<String, dynamic> body,
+      {required String token}) async {
+    final resp = await _http.patch(_uri('/api/payment-methods/$id'),
+        headers: _headers(token: token), body: jsonEncode(body));
+    if (resp.statusCode == 200) {
+      return AdminPaymentMethodView.fromJson(
+          jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>);
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  /// Sets the payment method's icon; a null resourceId clears it.
+  Future<void> setPaymentMethodIcon(int id, int? resourceId, {required String token}) async {
+    final resp = await _http.put(
+      _uri('/api/payment-methods/$id/icon').replace(
+          queryParameters: resourceId == null ? null : {'resourceId': '$resourceId'}),
       headers: _headers(token: token),
     );
     if (resp.statusCode == 200) return;

@@ -8,6 +8,7 @@ import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/error_dialog.dart';
+import '../widgets/product_image.dart';
 
 class PaymentMethodsScreen extends StatefulWidget {
   /// The store whose own on/off setting is edited. Null = the server-wide
@@ -44,6 +45,11 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
     }
+  }
+
+  Future<void> _edit(AdminPaymentMethodView m) async {
+    final changed = await Navigator.of(context).pushNamed(Routes.paymentMethodEdit, arguments: m);
+    if (changed == true) _load();
   }
 
   Future<void> _toggle(AdminPaymentMethodView method) async {
@@ -149,13 +155,38 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                                   itemBuilder: (_, i) {
                                     final m = _methods[i];
                                     final name = (m.displayName?['en'] as String?) ?? m.key;
-                                    return CheckboxListTile(
+                                    return ListTile(
+                                      leading: ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: SizedBox(
+                                          width: 44,
+                                          height: 44,
+                                          child: m.iconResourceId != null
+                                              ? ProductImage(
+                                                  imageResourceId: m.iconResourceId,
+                                                  fit: BoxFit.cover)
+                                              : Container(
+                                                  color: scheme.surfaceContainerHighest,
+                                                  child: Icon(Icons.payments_outlined,
+                                                      color: scheme.onSurfaceVariant)),
+                                        ),
+                                      ),
                                       title: Text(name,
                                           style: const TextStyle(fontWeight: FontWeight.w500)),
                                       subtitle: Text(m.provider,
                                           style: TextStyle(fontSize: 12, color: scheme.outline)),
-                                      value: m.effectiveActive,
-                                      onChanged: (_) => _toggle(m),
+                                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                                        if (_isGlobal)
+                                          IconButton(
+                                            icon: const Icon(Icons.edit_outlined),
+                                            tooltip: 'Edit',
+                                            onPressed: () => _edit(m),
+                                          ),
+                                        Switch(
+                                          value: m.effectiveActive,
+                                          onChanged: (_) => _toggle(m),
+                                        ),
+                                      ]),
                                     );
                                   },
                                 ),

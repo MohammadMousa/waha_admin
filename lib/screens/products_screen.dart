@@ -17,6 +17,7 @@ import '../utils/number_format.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/product_image.dart';
 import '../widgets/waha_filter_controls.dart';
+import '../widgets/confirm_delete.dart';
 import '../widgets/error_dialog.dart';
 import '../widgets/product_view_settings.dart';
 
@@ -280,6 +281,18 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   /// After the edit screen saves: keep the page as it is, put the new values
   /// in the same spot (a new product goes first on this page), and highlight it.
+  Future<void> _deleteProduct(Map<String, dynamic> p) async {
+    final token = context.read<AuthState>().token!;
+    final name = parseLocalizedName(p['name'], fallback: '');
+    final done = await confirmAndDelete(
+      context,
+      title: 'Delete product?',
+      message: 'Delete "$name" permanently? This cannot be undone.',
+      action: () => ApiClient().deleteProduct((p['id'] as num).toInt(), token),
+    );
+    if (done && mounted) _loadPage(_page);
+  }
+
   Future<void> _afterSave(Object? result, {required bool created}) async {
     if (result is! int) return; // closed without saving
     try {
@@ -519,6 +532,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
             categoryName: catName,
             view: _view,
             onEdit: () => _openEdit(p),
+            onDelete: context.read<AuthState>().hasPermission('EDIT_PRODUCTS')
+                ? () => _deleteProduct(p)
+                : null,
           );
         },
       );
@@ -558,6 +574,7 @@ class _ProductCard extends StatelessWidget {
   final String? categoryName;
   final ProductViewSettings view;
   final VoidCallback onEdit;
+  final VoidCallback? onDelete;
 
   const _ProductCard({
     required this.product,
@@ -565,6 +582,7 @@ class _ProductCard extends StatelessWidget {
     this.categoryName,
     required this.view,
     required this.onEdit,
+    this.onDelete,
   });
 
   @override
@@ -629,6 +647,16 @@ class _ProductCard extends StatelessWidget {
                           const BoxConstraints(minWidth: 28, minHeight: 28),
                       onPressed: onEdit,
                     ),
+                    if (onDelete != null)
+                      IconButton(
+                        icon: Icon(Icons.delete_outline, size: 16, color: scheme.error),
+                        tooltip: 'Delete',
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints:
+                            const BoxConstraints(minWidth: 28, minHeight: 28),
+                        onPressed: onDelete,
+                      ),
                   ],
                 ),
                 if (price != null)

@@ -33,6 +33,8 @@ import 'screens/organization_properties_screen.dart';
 import 'screens/profile_screen.dart';
 import 'services/api_client.dart';
 import 'screens/payment_methods_screen.dart';
+import 'screens/payment_method_edit_screen.dart';
+import 'models/payment_method.dart';
 import 'screens/product_edit_screen.dart';
 import 'screens/products_sales_screen.dart';
 import 'screens/products_screen.dart';
@@ -301,6 +303,12 @@ class WahaAdminApp extends StatelessWidget {
           case Routes.charts:
             return MaterialPageRoute(
                 builder: (_) => const ChartsScreen(), settings: settings);
+
+          case Routes.paymentMethodEdit:
+            return MaterialPageRoute(
+                builder: (_) => PaymentMethodEditScreen(
+                    method: settings.arguments as AdminPaymentMethodView),
+                settings: settings);
 
           case Routes.paymentMethodsGlobal:
             return MaterialPageRoute(

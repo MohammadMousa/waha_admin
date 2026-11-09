@@ -9,6 +9,7 @@ class CategoryCard extends StatelessWidget {
   final String nameAr;
   final int? imageResourceId;
   final VoidCallback onTap;
+  final VoidCallback? onDelete;
 
   const CategoryCard({
     super.key,
@@ -16,6 +17,7 @@ class CategoryCard extends StatelessWidget {
     required this.nameAr,
     required this.imageResourceId,
     required this.onTap,
+    this.onDelete,
   });
 
   @override
@@ -58,6 +60,13 @@ class CategoryCard extends StatelessWidget {
             ),
           ),
           Icon(Icons.edit_outlined, size: 18, color: scheme.onSurfaceVariant),
+          if (onDelete != null)
+            IconButton(
+              icon: Icon(Icons.delete_outline, size: 18, color: scheme.error),
+              tooltip: 'Delete',
+              visualDensity: VisualDensity.compact,
+              onPressed: onDelete,
+            ),
         ],
       ),
     );
