@@ -33,7 +33,8 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
   final _lastName = TextEditingController();
   final _phone = TextEditingController();
 
-  String _role = 'ORGANIZATION_OWNER';
+  // null = a regular account with no role (can sign in, can do nothing yet)
+  String? _role;
   bool _enabled = true;
   bool _obscurePass = true;
 
@@ -52,7 +53,7 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
       _firstName.text = u.firstName ?? '';
       _lastName.text = u.lastName ?? '';
       _phone.text = u.phone ?? '';
-      _role = u.roleName ?? 'ORGANIZATION_OWNER';
+      _role = u.roleName;
       _enabled = u.enabled;
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadOrganizations());
@@ -96,7 +97,9 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
       setState(() => _error = 'Password is required for new accounts.');
       return;
     }
-    if (_role == 'ORGANIZATION_OWNER' && _selectedOrgId == null) {
+    // An existing account's organization can't be changed, so only a new
+    // Organization Owner has to pick one.
+    if (_isCreate && _role == 'ORGANIZATION_OWNER' && _selectedOrgId == null) {
       setState(
         () => _error =
             'An organization is required for Organization Owner accounts.',
@@ -127,8 +130,11 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
           if (_lastName.text.trim().isNotEmpty)
             'lastName': _lastName.text.trim(),
           if (_phone.text.trim().isNotEmpty) 'phone': _phone.text.trim(),
-          'role': _role,
-          if (_role == 'ORGANIZATION_OWNER') 'organizationId': _selectedOrgId,
+          if (_role != null) 'role': _role,
+          // Super admins are system-wide; everyone else belongs to the chosen
+          // organization (the server uses its default one when none is sent).
+          if (_role != 'SUPER_ADMIN' && _selectedOrgId != null)
+            'organizationId': _selectedOrgId,
         }, token: token);
       } else {
         await api.patchAdminAccount(widget.account!.id, {
@@ -142,9 +148,8 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
           'phone': _phone.text.trim().isNotEmpty ? _phone.text.trim() : null,
           if (_password.text.trim().isNotEmpty)
             'password': _password.text.trim(),
-          'role': _role,
-          if (_role == 'ORGANIZATION_OWNER' && _selectedOrgId != null)
-            'organizationId': _selectedOrgId,
+          // Only when it changed; the server can switch a role but not remove it.
+          if (_role != null && _role != widget.account!.roleName) 'role': _role,
         }, token: token);
       }
       if (mounted) Navigator.of(context).pop(true);
@@ -166,9 +171,12 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
     final scheme = Theme.of(context).colorScheme;
     final roles = <String>{
       ..._kAccountRoles,
-      if (_role.isNotEmpty)
-        _role, // keep showing a legacy role even if no longer offered
+      if (_role != null && _role!.isNotEmpty)
+        _role!, // keep showing a legacy role even if no longer offered
     }.toList();
+    // The server can switch an existing role but never clear it, so "No role"
+    // is only offered for new accounts and for accounts that have none.
+    final canPickNoRole = _isCreate || widget.account!.roleName == null;
 
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
@@ -282,78 +290,64 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
                                   const Divider(height: 32),
                                   _Label('Role & Organization'),
                                   const SizedBox(height: 12),
-                                  DropdownButtonFormField<String>(
-                                    value: roles.contains(_role)
-                                        ? _role
-                                        : roles.first,
+                                  DropdownButtonFormField<String?>(
+                                    value: roles.contains(_role) ? _role : null,
                                     decoration: const InputDecoration(
                                       labelText: 'Role',
                                       border: OutlineInputBorder(),
                                       prefixIcon: Icon(Icons.badge_outlined),
                                     ),
-                                    items: roles
-                                        .map(
-                                          (r) => DropdownMenuItem(
-                                            value: r,
-                                            child: Text(r),
-                                          ),
-                                        )
-                                        .toList(),
-                                    onChanged: (v) {
-                                      if (v != null) setState(() => _role = v);
-                                    },
+                                    items: [
+                                      if (canPickNoRole)
+                                        const DropdownMenuItem<String?>(
+                                          value: null,
+                                          child: Text('No role assigned'),
+                                        ),
+                                      ...roles.map(
+                                        (r) => DropdownMenuItem<String?>(
+                                          value: r,
+                                          child: Text(r),
+                                        ),
+                                      ),
+                                    ],
+                                    onChanged: (v) => setState(() => _role = v),
                                   ),
                                   const SizedBox(height: 12),
-                                  if (_role == 'ORGANIZATION_OWNER')
-                                    DropdownButtonFormField<int?>(
-                                      value: _selectedOrgId,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Organization *',
-                                        border: OutlineInputBorder(),
-                                        prefixIcon: Icon(
-                                          Icons.apartment_outlined,
-                                        ),
-                                      ),
-                                      items: [
-                                        const DropdownMenuItem<int?>(
-                                          value: null,
-                                          child: Text('Select organization'),
-                                        ),
-                                        ...(_organizations ?? []).map(
-                                          (o) => DropdownMenuItem<int?>(
-                                            value: o.id,
-                                            child: Text(o.name),
-                                          ),
-                                        ),
-                                      ],
-                                      onChanged: (v) =>
-                                          setState(() => _selectedOrgId = v),
-                                    )
-                                  else
-                                    Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: scheme.surfaceContainerHighest,
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.public_outlined,
-                                            size: 18,
-                                            color: scheme.outline,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            'System-wide account — no organization',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              color: scheme.onSurfaceVariant,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
+                                  // Always shown. Disabled when it does not apply:
+                                  // super admins are system-wide and an existing
+                                  // account's organization can't be changed.
+                                  DropdownButtonFormField<int?>(
+                                    value: _selectedOrgId,
+                                    decoration: InputDecoration(
+                                      labelText: _role == 'ORGANIZATION_OWNER'
+                                          ? 'Organization *'
+                                          : 'Organization',
+                                      helperText: _role == 'SUPER_ADMIN'
+                                          ? 'System-wide account — no organization'
+                                          : (!_isCreate
+                                              ? 'The organization of an existing account cannot be changed'
+                                              : null),
+                                      border: const OutlineInputBorder(),
+                                      prefixIcon: const Icon(Icons.apartment_outlined),
                                     ),
+                                    items: [
+                                      DropdownMenuItem<int?>(
+                                        value: null,
+                                        child: Text(_isCreate
+                                            ? 'Select organization'
+                                            : 'Current organization'),
+                                      ),
+                                      ...(_organizations ?? []).map(
+                                        (o) => DropdownMenuItem<int?>(
+                                          value: o.id,
+                                          child: Text(o.name),
+                                        ),
+                                      ),
+                                    ],
+                                    onChanged: (!_isCreate || _role == 'SUPER_ADMIN')
+                                        ? null
+                                        : (v) => setState(() => _selectedOrgId = v),
+                                  ),
                                   const Divider(height: 32),
                                   _Label('Personal Info'),
                                   const SizedBox(height: 12),

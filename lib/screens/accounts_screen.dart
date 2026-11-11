@@ -7,6 +7,7 @@ import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/error_dialog.dart';
+import '../widgets/framed_card.dart';
 
 class AccountsScreen extends StatefulWidget {
   const AccountsScreen({super.key});
@@ -133,8 +134,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
                               ? const Center(child: Text('No accounts found.'))
                               : RefreshIndicator(
                                   onRefresh: _load,
-                                  child: ListView.builder(
-                                    padding: const EdgeInsets.fromLTRB(24, 4, 24, 100),
+                                  child: CardGrid(
                                     itemCount: _accounts!.length,
                                     itemBuilder: (_, i) => _AccountCard(
                                       account: _accounts![i],
@@ -170,17 +170,14 @@ class _AccountCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final u = account;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
+    return FramedCard(
+      child: Row(
           children: [
             CircleAvatar(
               radius: 24,
-              backgroundColor: _typeColor(u.accountType, scheme).withValues(alpha: 0.15),
+              backgroundColor: scheme.primary.withValues(alpha: 0.15),
               child: Text(u.initials, style: TextStyle(
-                color: _typeColor(u.accountType, scheme),
+                color: scheme.primary,
                 fontWeight: FontWeight.w700, fontSize: 18,
               )),
             ),
@@ -189,14 +186,9 @@ class _AccountCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(children: [
+                  Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
                     Text(u.username, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-                    const SizedBox(width: 8),
-                    _TypeBadge(u.accountType),
-                    if (!u.enabled) ...[
-                      const SizedBox(width: 6),
-                      _Badge('Disabled', Colors.grey),
-                    ],
+                    if (!u.enabled) _Badge('Disabled', Colors.grey),
                   ]),
                   if (u.displayName != u.username) ...[
                     const SizedBox(height: 2),
@@ -231,16 +223,9 @@ class _AccountCard extends StatelessWidget {
               ],
             ),
           ],
-        ),
       ),
     );
   }
-
-  Color _typeColor(String type, ColorScheme scheme) => switch (type) {
-        'KIOSK' => Colors.deepPurple,
-        'SYSTEM' => Colors.orange,
-        _ => scheme.primary,
-      };
 
   String _fmtDate(String iso) {
     try {
@@ -249,25 +234,6 @@ class _AccountCard extends StatelessWidget {
     } catch (_) {
       return iso.length > 10 ? iso.substring(0, 10) : iso;
     }
-  }
-}
-
-class _TypeBadge extends StatelessWidget {
-  final String type;
-  const _TypeBadge(this.type);
-  @override
-  Widget build(BuildContext context) {
-    final (bg, fg) = switch (type) {
-      'KIOSK' => (Colors.deepPurple.shade50, Colors.deepPurple),
-      'SYSTEM' => (Colors.orange.shade50, Colors.orange.shade800),
-      _ => (Theme.of(context).colorScheme.primaryContainer,
-            Theme.of(context).colorScheme.onPrimaryContainer),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
-      child: Text(type, style: TextStyle(fontSize: 10, color: fg, fontWeight: FontWeight.w600)),
-    );
   }
 }
 

@@ -93,6 +93,26 @@ class AuthState extends ChangeNotifier {
     _roleName = prefs.getString('admin_role');
     _permissions = (prefs.getStringList('admin_permissions') ?? const []).toSet();
     await _loadApiLevel();
+    // The saved role and permissions are only a copy from the last login or
+    // refresh. A backend release can add permissions (e.g. coupons) that an
+    // already-saved session never received, so those menu entries stayed
+    // hidden until the user signed in again. Whenever the backend's feature
+    // level differs from the level the copy was saved at, re-read it once.
+    // Normal starts cost nothing extra: the level is fetched above anyway.
+    // A saved copy without a level (older app version) counts as different,
+    // so it refreshes once on the first start after this change.
+    if (_token != null && _apiLevel > 0 && prefs.getInt('admin_permissions_level') != _apiLevel) {
+      try {
+        await refreshSession();
+        return;
+      } on ApiException catch (e) {
+        if (e.statusCode == 401) {
+          await logout(); // the session is gone on the server
+          return;
+        }
+        // Any other failure: keep the saved copy and try again next start.
+      } catch (_) {}
+    }
     await loadOrganizations();
     notifyListeners();
   }
@@ -126,6 +146,7 @@ class AuthState extends ChangeNotifier {
     }
     await prefs.setStringList('admin_permissions', permissions.toList());
     await _loadApiLevel();
+    if (_apiLevel > 0) await prefs.setInt('admin_permissions_level', _apiLevel);
     await loadOrganizations();
     notifyListeners();
   }
@@ -148,6 +169,7 @@ class AuthState extends ChangeNotifier {
     }
     await prefs.setStringList('admin_permissions', permissions.toList());
     await _loadApiLevel();
+    if (_apiLevel > 0) await prefs.setInt('admin_permissions_level', _apiLevel);
     await loadOrganizations();
     notifyListeners();
   }
@@ -178,6 +200,7 @@ class AuthState extends ChangeNotifier {
     await prefs.remove('admin_username');
     await prefs.remove('admin_role');
     await prefs.remove('admin_permissions');
+    await prefs.remove('admin_permissions_level');
     await prefs.remove('admin_acting_org'); // a new login starts with no pick
     notifyListeners();
     // Delete the session row on the server too (tokens never expire).
