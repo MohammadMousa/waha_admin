@@ -8,6 +8,7 @@ import '../models/device.dart';
 import '../models/employee.dart';
 import '../models/payment_method.dart';
 import '../models/receipt_info.dart';
+import '../models/role.dart';
 import '../models/resource.dart';
 import '../models/branch_group.dart';
 import 'app_info.dart';
@@ -845,6 +846,83 @@ class ApiClient {
         headers: _headers(token: token));
     if (resp.statusCode == 200) return;
     throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  // ── Roles & permissions ──────────────────────────────────────────────────────
+
+  Future<List<PermissionInfo>> getPermissions(String token) async {
+    final resp = await _http.get(_uri('/api/admin/permissions'), headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      return (jsonDecode(utf8.decode(resp.bodyBytes)) as List)
+          .map((e) => PermissionInfo.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<List<RoleInfo>> getRoles(String token) async {
+    final resp = await _http.get(_uri('/api/admin/roles'), headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      return (jsonDecode(utf8.decode(resp.bodyBytes)) as List)
+          .map((e) => RoleInfo.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<RoleInfo> createRole(Map<String, dynamic> body, {required String token}) async {
+    final resp = await _http.post(_uri('/api/admin/roles'),
+        headers: _headers(token: token), body: jsonEncode(body));
+    if (resp.statusCode == 200 || resp.statusCode == 201) {
+      return RoleInfo.fromJson(jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>);
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<RoleInfo> updateRole(int id, Map<String, dynamic> body, {required String token}) async {
+    final resp = await _http.put(_uri('/api/admin/roles/$id'),
+        headers: _headers(token: token), body: jsonEncode(body));
+    if (resp.statusCode == 200) {
+      return RoleInfo.fromJson(jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>);
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<void> deleteRole(int id, {required String token}) async {
+    final resp = await _http.delete(_uri('/api/admin/roles/$id'), headers: _headers(token: token));
+    if (resp.statusCode == 200 || resp.statusCode == 204) return;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  List<RoleAssignment> _parseAssignments(http.Response resp) {
+    if (resp.statusCode == 200) {
+      return (jsonDecode(utf8.decode(resp.bodyBytes)) as List)
+          .map((e) => RoleAssignment.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  /// [kind] is 'users' or 'employees'.
+  Future<List<RoleAssignment>> getPersonRoles(String kind, int id, {required String token}) async {
+    final resp = await _http.get(_uri('/api/admin/$kind/$id/roles'), headers: _headers(token: token));
+    return _parseAssignments(resp);
+  }
+
+  Future<List<RoleAssignment>> addPersonRole(String kind, int id,
+      {required int roleId, required String scopeType, required int scopeId, required String token}) async {
+    final resp = await _http.post(_uri('/api/admin/$kind/$id/roles'),
+        headers: _headers(token: token),
+        body: jsonEncode({'roleId': roleId, 'scopeType': scopeType, 'scopeId': scopeId}));
+    return _parseAssignments(resp);
+  }
+
+  Future<List<RoleAssignment>> removePersonRole(String kind, int id, RoleAssignment a,
+      {required String token}) async {
+    final resp = await _http.delete(
+        _uri('/api/admin/$kind/$id/roles/${a.roleId}?scopeType=${a.scopeType}&scopeId=${a.scopeId}'),
+        headers: _headers(token: token));
+    return _parseAssignments(resp);
   }
 
   // ── Devices (kiosks — org owner manages) ─────────────────────────────────────

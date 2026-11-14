@@ -5,7 +5,10 @@ import 'models/account_user.dart';
 import 'models/category.dart';
 import 'models/device.dart';
 import 'models/employee.dart';
+import 'models/role.dart';
 import 'models/store.dart';
+import 'screens/roles_screen.dart';
+import 'screens/role_edit_screen.dart';
 import 'router/routes.dart';
 import 'screens/account_edit_screen.dart';
 import 'screens/accounts_screen.dart';
@@ -147,6 +150,15 @@ class WahaAdminApp extends StatelessWidget {
             final employee = settings.arguments as Employee?;
             return MaterialPageRoute(
                 builder: (_) => EmployeeEditScreen(employee: employee), settings: settings);
+
+          case Routes.roles:
+            return MaterialPageRoute(
+                builder: (_) => const RolesScreen(), settings: settings);
+
+          case Routes.roleEdit:
+            final role = settings.arguments as RoleInfo?;
+            return MaterialPageRoute(
+                builder: (_) => RoleEditScreen(role: role), settings: settings);
 
           case Routes.devices:
             return MaterialPageRoute(

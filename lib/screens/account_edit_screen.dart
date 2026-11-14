@@ -7,6 +7,7 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
+import '../widgets/person_roles_section.dart';
 import '../widgets/error_dialog.dart';
 
 // Accounts (the `users` table) is platform/organization level only now —
@@ -26,6 +27,12 @@ class AccountEditScreen extends StatefulWidget {
 
 class _AccountEditScreenState extends State<AccountEditScreen> {
   bool get _isCreate => widget.account == null;
+
+  /// With the permission to give roles, an existing account's roles are managed
+  /// in the roles list (saved at once). Owners and super admins keep the single
+  /// dropdown, because those roles cannot be given through the roles list.
+  bool get _roleListMode => !_isCreate && context.read<AuthState>().hasPermission('ASSIGN_ROLES');
+  bool get _hasBuiltInTopRole => _role == 'ORGANIZATION_OWNER' || _role == 'SUPER_ADMIN';
 
   final _username = TextEditingController();
   final _password = TextEditingController();
@@ -290,6 +297,7 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
                                   const Divider(height: 32),
                                   _Label('Role & Organization'),
                                   const SizedBox(height: 12),
+                                  if (!_roleListMode || _hasBuiltInTopRole)
                                   DropdownButtonFormField<String?>(
                                     value: roles.contains(_role) ? _role : null,
                                     decoration: const InputDecoration(
@@ -348,6 +356,13 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
                                         ? null
                                         : (v) => setState(() => _selectedOrgId = v),
                                   ),
+                                  if (_roleListMode) ...[
+                                    const SizedBox(height: 16),
+                                    _Label('Roles'),
+                                    const SizedBox(height: 8),
+                                    PersonRolesSection(
+                                        kind: 'users', personId: widget.account!.id),
+                                  ],
                                   const Divider(height: 32),
                                   _Label('Personal Info'),
                                   const SizedBox(height: 12),

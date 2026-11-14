@@ -174,9 +174,8 @@ class AuthState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Fallback only — used while the backend doesn't yet return an explicit
-  // role name at login. Once it does, `roleName` from the response always
-  // wins; this heuristic never overrides it.
+  // Fallback only — used when the server sends no role name (old servers). A
+  // custom role's name always comes from the server, never from this guess.
   String? _inferRoleName(Set<String> permissions) {
     if (permissions.contains('MANAGE_SYSTEM')) return 'SUPER_ADMIN';
     if (permissions.contains('MANAGE_USERS')) return 'ORGANIZATION_OWNER';

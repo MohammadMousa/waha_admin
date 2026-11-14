@@ -8,6 +8,7 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/admin_sidebar.dart';
+import '../widgets/person_roles_section.dart';
 import '../widgets/resource_picker_modal.dart';
 import '../widgets/error_dialog.dart';
 
@@ -23,6 +24,10 @@ class EmployeeEditScreen extends StatefulWidget {
 }
 
 class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
+  /// With the permission to give roles, an existing employee's roles are managed
+  /// in the roles list (saved at once) instead of the single role dropdown.
+  bool get _roleListMode => !_isCreate && context.read<AuthState>().hasPermission('ASSIGN_ROLES');
+
   bool get _isCreate => widget.employee == null;
 
   // Org-wide asset bucket for avatar uploads — same real org slug the
@@ -163,7 +168,7 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
       setState(() => _error = 'PIN must be exactly 6 digits');
       return;
     }
-    if (_role != null && _selectedBranchIds.isEmpty) {
+    if (_role != null && !_roleListMode && _selectedBranchIds.isEmpty) {
       setState(
         () => _error = 'At least one branch is required when assigning a role.',
       );
@@ -228,7 +233,7 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
           'notes': _notes.text.trim().isNotEmpty ? _notes.text.trim() : null,
           if (_avatarResourceId != null) 'avatarResourceId': _avatarResourceId,
           if (_pinCode.text.trim().isNotEmpty) 'pinCode': _pinCode.text.trim(),
-          if (_role != null) ...{'role': _role, 'storeId': roleStoreId},
+          if (_role != null && !_roleListMode) ...{'role': _role, 'storeId': roleStoreId},
         }, token: token);
       }
       // Sync branch assignments (INSERT IGNORE server-side, so re-adding the
@@ -434,6 +439,10 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
                                   const Divider(height: 32),
                                   _Label('Role & Branches'),
                                   const SizedBox(height: 12),
+                                  if (_roleListMode)
+                                    PersonRolesSection(
+                                        kind: 'employees', personId: widget.employee!.id)
+                                  else
                                   DropdownButtonFormField<String?>(
                                     value: _role,
                                     decoration: const InputDecoration(

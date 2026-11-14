@@ -14,6 +14,8 @@ class Routes {
   static const organizationProperties = '/organization/properties';
   static const employees       = '/employees';
   static const employeeEdit    = '/employees/edit';
+  static const roles           = '/roles';
+  static const roleEdit        = '/roles/edit';
   static const devices         = '/devices';
   static const deviceEdit      = '/devices/edit';
   static const deviceLogs      = '/devices/logs';

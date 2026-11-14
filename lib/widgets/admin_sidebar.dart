@@ -85,6 +85,7 @@ class _AdminSidebarState extends State<AdminSidebar> {
     // permission-gated so BRANCH_ADMIN and ORGANIZATION_OWNER both see them.
     final canManageUsers = auth.hasPermission('MANAGE_USERS');
     final canManageEmployees = auth.hasPermission('MANAGE_EMPLOYEES');
+    final canManageRoles = auth.hasPermission('MANAGE_ROLES');
     final canManageDevices = auth.hasPermission('MANAGE_DEVICES');
     final canManageStores = auth.hasPermission('MANAGE_STORES');
 
@@ -351,6 +352,14 @@ class _AdminSidebarState extends State<AdminSidebar> {
                     icon: Icons.badge_outlined,
                     label: 'Employees',
                     route: Routes.employees,
+                    current: currentRoute,
+                    indent: true,
+                  ),
+                if (canManageRoles)
+                  _NavItem(
+                    icon: Icons.admin_panel_settings_outlined,
+                    label: 'Roles',
+                    route: Routes.roles,
                     current: currentRoute,
                     indent: true,
                   ),
