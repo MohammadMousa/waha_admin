@@ -34,7 +34,6 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
   bool _obscurePin = true;
 
   List<Store>? _stores;
-  final Map<int, String> _shortCodes = {};
   int? _selectedStoreId;
   bool _loadingStores = true;
   bool _saving = false;
@@ -65,18 +64,6 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
     super.dispose();
   }
 
-  /// Reads the store's short code (the reference prefix); stores without one
-  /// use their id.
-  Future<void> _loadShortCode(int? storeId) async {
-    if (storeId == null || _shortCodes.containsKey(storeId)) return;
-    final token = context.read<AuthState>().token;
-    if (token == null) return;
-    try {
-      final d = await ApiClient().getStoreAdminDetails(storeId, token: token);
-      if (mounted) setState(() => _shortCodes[storeId] = (d?['shortCode'] as String?) ?? '');
-    } on ApiException catch (_) {}
-  }
-
   Future<void> _loadStores() async {
     final token = context.read<AuthState>().token;
     if (token == null) {
@@ -90,7 +77,6 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
           _stores = stores;
           _loadingStores = false;
         });
-      _loadShortCode(_selectedStoreId);
     } on ApiException catch (_) {
       if (mounted) setState(() => _loadingStores = false);
     }
@@ -428,10 +414,7 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
                                 ),
                               ),
                             ],
-                            onChanged: (v) {
-                              setState(() => _selectedStoreId = v);
-                              _loadShortCode(v);
-                            },
+                            onChanged: (v) => setState(() => _selectedStoreId = v),
                           ),
                           const SizedBox(height: 12),
                           DropdownButtonFormField<String>(
@@ -476,7 +459,6 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
                           const SizedBox(height: 12),
                           _OrderNumberPreview(
                             storeId: _selectedStoreId,
-                            shortCode: _shortCodes[_selectedStoreId],
                             deviceNo: int.tryParse(_deviceNo.text.trim()),
                           ),
                           const Divider(height: 32),
@@ -522,15 +504,13 @@ class _Label extends StatelessWidget {
 /// device part follows the number being typed, and only that part is set here.
 class _OrderNumberPreview extends StatelessWidget {
   final int? storeId;
-  final String? shortCode;
   final int? deviceNo;
-  const _OrderNumberPreview({required this.storeId, required this.shortCode, required this.deviceNo});
+  const _OrderNumberPreview({required this.storeId, required this.deviceNo});
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final hasCode = shortCode != null && shortCode!.isNotEmpty;
-    final prefix = hasCode ? shortCode! : (storeId?.toString() ?? '···');
+    final prefix = storeId?.toString() ?? '···';
     final device = deviceNo == null ? '··' : deviceNo!.toString().padLeft(2, '0');
     Widget segment(String value, String label, {required bool editable}) => Column(
           children: [
@@ -577,7 +557,7 @@ class _OrderNumberPreview extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              segment(prefix, hasCode ? 'Store code' : 'Store id', editable: false),
+              segment(prefix, 'Store id', editable: false),
               dash(),
               segment(device, 'Device', editable: true),
               dash(),
@@ -587,8 +567,7 @@ class _OrderNumberPreview extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             'Orders taken offline on this device get a reference like this. The first part is the '
-            "store's short code (the store id when it has none), the serial counts 001 to 999 on the "
-            'kiosk; only the device part is set here.',
+            "store's id, the serial counts 001 to 999 on the kiosk; only the device part is set here.",
             style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
           ),
         ],
