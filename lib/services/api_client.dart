@@ -513,6 +513,29 @@ class ApiClient {
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
 
+  /// Store list for names and dropdowns. The full list needs the stores
+  /// permission; people without it get the id/name list that the report
+  /// screens already use, so those screens still load.
+  Future<List<Store>> getStoresForPicker(String token) async {
+    try {
+      return await getAdminStores(token);
+    } on ApiException catch (e) {
+      if (e.statusCode != 403) rethrow;
+      // The id/name list needs the orders permission; without it the screen
+      // still loads, just without store names.
+      final List<Map<String, dynamic>> rows;
+      try {
+        rows = await getReportStores(token);
+      } on ApiException {
+        return <Store>[];
+      }
+      return rows
+          .where((r) => r['id'] != null && r['name'] != null)
+          .map((r) => Store(id: (r['id'] as num).toInt(), name: r['name'].toString()))
+          .toList();
+    }
+  }
+
   Future<Map<String, dynamic>?> getStoreAdminDetails(int storeId, {required String token}) async {
     final resp = await _http.get(_uri('/api/stores/$storeId/admin'), headers: _headers(token: token));
     if (resp.statusCode == 404) return null;

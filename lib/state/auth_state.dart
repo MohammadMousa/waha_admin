@@ -31,6 +31,29 @@ class AuthState extends ChangeNotifier {
   Organization? _acting;
 
   bool get isSuperAdmin => hasPermission('MANAGE_SYSTEM');
+
+  // Permissions split out of broader ones on newer servers. A server that
+  // does not know them sends none, so then the screens stay shown as before
+  // (settings fall back to the old store permission).
+  static const _splitKeys = {
+    'VIEW_REPORTS',
+    'EXPORT_REPORTS',
+    'MANAGE_PAYMENT_METHODS',
+    'MANAGE_INTEGRATIONS',
+    'MANAGE_SETTINGS',
+    'VIEW_INVENTORY_REPORTS',
+  };
+  bool get _serverSplitsPermissions => _permissions.any(_splitKeys.contains);
+  bool get canViewReports => !_serverSplitsPermissions || hasPermission('VIEW_REPORTS');
+  bool get canViewInventoryReports =>
+      !_serverSplitsPermissions || hasPermission('VIEW_INVENTORY_REPORTS');
+  bool get canExportReports => !_serverSplitsPermissions || hasPermission('EXPORT_REPORTS');
+  bool get canManagePaymentMethods =>
+      !_serverSplitsPermissions || hasPermission('MANAGE_PAYMENT_METHODS');
+  bool get canManageIntegrations =>
+      !_serverSplitsPermissions || hasPermission('MANAGE_INTEGRATIONS');
+  bool get canManageSettings =>
+      _serverSplitsPermissions ? hasPermission('MANAGE_SETTINGS') : hasPermission('MANAGE_STORES');
   List<Organization> get organizations => _organizations;
   Organization? get actingOrganization => _acting;
 

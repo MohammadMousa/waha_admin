@@ -119,7 +119,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
         ApiClient().getReportStores(token),
         ApiClient().getReportKiosks(token),
         ApiClient().getReportPaymentMethods(token),
-        ApiClient().getAdminStores(token),
+        ApiClient().getStoresForPicker(token),
       ]);
       if (!mounted) return;
       setState(() {

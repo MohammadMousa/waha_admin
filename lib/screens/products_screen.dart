@@ -214,7 +214,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
           size: 24,
           token: token,
         ),
-        ApiClient().getAdminStores(token).catchError((_) => <Store>[]),
+        ApiClient().getStoresForPicker(token).catchError((_) => <Store>[]),
       ]);
       if (!mounted) return;
       final cats = results[0] as List<Category>;

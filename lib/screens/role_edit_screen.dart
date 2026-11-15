@@ -105,18 +105,48 @@ class _RoleEditScreenState extends State<RoleEditScreen> {
     }
   }
 
-  /// Groups permissions by the part of the name before the first underscore
-  /// (EDIT_PRODUCTS -> EDIT), so the list reads in sections.
+  // Named sections for the permissions that belong together; every other
+  // permission is grouped by the part of its name before the first underscore
+  // (EDIT_PRODUCTS -> EDIT).
+  static const _sections = {
+    'VIEW_REPORTS': 'Reports',
+    'EXPORT_REPORTS': 'Reports',
+    'VIEW_ALL_ORDERS': 'Reports',
+    'VIEW_INVENTORY_REPORTS': 'Reports',
+    'MANAGE_SETTINGS': 'Settings',
+    'MANAGE_PAYMENT_METHODS': 'Settings',
+    'MANAGE_INTEGRATIONS': 'Settings',
+    'MANAGE_STORES': 'Stores',
+  };
+
+  // Shown when the server sends no description.
+  static const _fallbackLabels = {
+    'VIEW_REPORTS': 'View the dashboard and reports',
+    'EXPORT_REPORTS': 'Export reports to files',
+    'VIEW_INVENTORY_REPORTS': 'View inventory stock, transfers, returns and visits',
+    'MANAGE_PAYMENT_METHODS': 'Switch payment methods per store',
+    'MANAGE_INTEGRATIONS': 'Odoo and other integrations and their logs',
+    'MANAGE_SETTINGS': 'Receipt info, organization info and properties',
+  };
+
   Map<String, List<PermissionInfo>> _grouped() {
-    final map = <String, List<PermissionInfo>>{};
+    final map = <String, List<PermissionInfo>>{
+      'Reports': [],
+      'Settings': [],
+      'Stores': [],
+    };
     for (final p in _all ?? const <PermissionInfo>[]) {
       if (!p.assignableToRoles) continue;
       final i = p.key.indexOf('_');
-      final group = i > 0 ? p.key.substring(0, i) : 'OTHER';
+      final group = _sections[p.key] ?? (i > 0 ? p.key.substring(0, i) : 'OTHER');
       map.putIfAbsent(group, () => []).add(p);
     }
+    map.removeWhere((_, v) => v.isEmpty);
     return map;
   }
+
+  String _describe(PermissionInfo p) =>
+      p.description.isNotEmpty ? p.description : (_fallbackLabels[p.key] ?? '');
 
   @override
   Widget build(BuildContext context) {
@@ -217,8 +247,8 @@ class _RoleEditScreenState extends State<RoleEditScreen> {
                                         fontFamily: 'monospace', fontSize: 13)),
                                 subtitle: Text(
                                   auth.hasPermission(p.key) || _selected.contains(p.key)
-                                      ? p.description
-                                      : '${p.description} — you do not hold this permission',
+                                      ? _describe(p)
+                                      : '${_describe(p)} — you do not hold this permission',
                                 ),
                                 // Can't tick what you don't hold; an already
                                 // ticked one can still be removed.

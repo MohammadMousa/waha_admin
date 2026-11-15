@@ -46,7 +46,7 @@ class _CategoriesAdminScreenState extends State<CategoriesAdminScreen> {
     try {
       final results = await Future.wait([
         ApiClient().getCategories(storeId: _kRootStoreId, token: token),
-        ApiClient().getAdminStores(token).catchError((_) => <Store>[]),
+        ApiClient().getStoresForPicker(token).catchError((_) => <Store>[]),
       ]);
       if (!mounted) return;
       final cats = results[0] as List<Category>;

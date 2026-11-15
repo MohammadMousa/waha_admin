@@ -106,7 +106,7 @@ class _ResourceExplorerScreenState extends State<ResourceExplorerScreen> {
 
   Future<void> _loadOrgSlugThenDirs() async {
     try {
-      final stores = await ApiClient().getAdminStores(_token);
+      final stores = await ApiClient().getStoresForPicker(_token);
       _fetchedOrgSlug = stores.firstOrNull?.orgSlug;
     } catch (_) { /* falls through to _loadDirs, which will surface the error */ }
     if (mounted) await _loadDirs();

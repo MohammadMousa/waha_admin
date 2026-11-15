@@ -66,7 +66,7 @@ class _InventoryStockScreenState extends State<InventoryStockScreen> {
       final results = await Future.wait([
         ApiClient().getReportStores(token),
         ApiClient().getReportCategories(token),
-        ApiClient().getAdminStores(token),
+        ApiClient().getStoresForPicker(token),
       ]);
       if (!mounted) return;
       setState(() {
@@ -283,6 +283,7 @@ class _InventoryStockScreenState extends State<InventoryStockScreen> {
                 padding: EdgeInsets.only(right: 12),
                 child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
               ),
+            if (context.watch<AuthState>().canExportReports) ...[
             FilledButton.icon(
               icon: _exporting
                   ? const SizedBox(width: 14, height: 14,
@@ -293,6 +294,7 @@ class _InventoryStockScreenState extends State<InventoryStockScreen> {
               style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8)),
             ),
             const SizedBox(width: 8),
+            ],
             IconButton(icon: const Icon(Icons.refresh_outlined), tooltip: 'Refresh', onPressed: _load),
           ],
         ),

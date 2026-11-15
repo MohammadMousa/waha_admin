@@ -62,7 +62,7 @@ class _PaymentMethodEditScreenState extends State<PaymentMethodEditScreen> {
     final token = context.read<AuthState>().token;
     if (token == null) return;
     try {
-      final stores = await ApiClient().getAdminStores(token);
+      final stores = await ApiClient().getStoresForPicker(token);
       final slug = stores.firstOrNull?.orgSlug;
       if (slug == null) {
         if (mounted) showErrorDialog(context, 'No organization found to browse images from.');

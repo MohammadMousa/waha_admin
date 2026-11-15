@@ -84,7 +84,7 @@ class _CouponReportScreenState extends State<CouponReportScreen> {
     final token = context.read<AuthState>().token;
     if (token == null) return;
     try {
-      final stores = await ApiClient().getAdminStores(token);
+      final stores = await ApiClient().getStoresForPicker(token);
       if (mounted) setState(() => _stores = stores);
     } catch (_) {}
     try {
@@ -223,6 +223,7 @@ class _CouponReportScreenState extends State<CouponReportScreen> {
                       ),
                       const Spacer(),
                       IconButton(icon: const Icon(Icons.refresh), tooltip: 'Refresh', onPressed: _load),
+                      if (context.watch<AuthState>().canExportReports) ...[
                       const SizedBox(width: 8),
                       PopupMenuButton<String>(
                         enabled: !_exporting,
@@ -239,6 +240,7 @@ class _CouponReportScreenState extends State<CouponReportScreen> {
                           ),
                         ),
                       ),
+                      ],
                     ],
                   ),
                 ),

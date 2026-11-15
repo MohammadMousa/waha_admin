@@ -67,7 +67,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         api.getDashboardMonthly(token, _monthlyPeriod, storeId: _storeId),
         api.getRecentOrders(token, storeId: _storeId),
         if (_stores.isEmpty) api.getReportStores(token),
-        if (_stores.isEmpty) api.getAdminStores(token),
+        if (_stores.isEmpty) api.getStoresForPicker(token),
       ]);
       if (!mounted) return;
       // ignore: unnecessary_cast

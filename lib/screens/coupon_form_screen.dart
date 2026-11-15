@@ -110,7 +110,7 @@ class _CouponFormScreenState extends State<CouponFormScreen> {
     if (token == null) { _redirectLogin(); return; }
     final api = ApiClient();
     try {
-      _stores = await api.getAdminStores(token);
+      _stores = await api.getStoresForPicker(token);
     } catch (_) {}
     try {
       _employees = await api.getEmployees(token);

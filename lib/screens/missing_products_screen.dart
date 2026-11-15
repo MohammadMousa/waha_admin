@@ -78,7 +78,7 @@ class _MissingProductsScreenState extends State<MissingProductsScreen> {
     final token = context.read<AuthState>().token;
     if (token == null) return;
     try {
-      final stores = await ApiClient().getAdminStores(token);
+      final stores = await ApiClient().getStoresForPicker(token);
       if (mounted) setState(() => _stores = stores);
     } catch (_) {}
   }

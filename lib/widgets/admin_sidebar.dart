@@ -87,7 +87,6 @@ class _AdminSidebarState extends State<AdminSidebar> {
     final canManageEmployees = auth.hasPermission('MANAGE_EMPLOYEES');
     final canManageRoles = auth.hasPermission('MANAGE_ROLES');
     final canManageDevices = auth.hasPermission('MANAGE_DEVICES');
-    final canManageStores = auth.hasPermission('MANAGE_STORES');
 
     return Container(
       width: 220,
@@ -199,14 +198,15 @@ class _AdminSidebarState extends State<AdminSidebar> {
               controller: _navController,
               padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
-                _NavItem(
-                  icon: Icons.dashboard_outlined,
-                  label: 'Dashboard',
-                  route: Routes.dashboard,
-                  current: currentRoute,
-                ),
+                if (auth.canViewReports)
+                  _NavItem(
+                    icon: Icons.dashboard_outlined,
+                    label: 'Dashboard',
+                    route: Routes.dashboard,
+                    current: currentRoute,
+                  ),
                 _NavGroup('Reporting', current: currentRoute, children: [
-                _NavItem(
+                if (auth.hasPermission('VIEW_ALL_ORDERS')) _NavItem(
                   icon: Icons.receipt_long_outlined,
                   label: 'Orders',
                   route: Routes.orders,
@@ -221,44 +221,46 @@ class _AdminSidebarState extends State<AdminSidebar> {
                     current: currentRoute,
                     indent: true,
                   ),
-                _NavItem(
-                  icon: Icons.bar_chart_outlined,
-                  label: 'Products Sales',
-                  route: Routes.productsSales,
-                  current: currentRoute,
-                  indent: true,
-                ),
-                _NavItem(
-                  icon: Icons.insert_chart_outlined,
-                  label: 'Charts',
-                  route: Routes.charts,
-                  current: currentRoute,
-                  indent: true,
-                ),
+                if (auth.canViewReports) ...[
+                  _NavItem(
+                    icon: Icons.bar_chart_outlined,
+                    label: 'Products Sales',
+                    route: Routes.productsSales,
+                    current: currentRoute,
+                    indent: true,
+                  ),
+                  _NavItem(
+                    icon: Icons.insert_chart_outlined,
+                    label: 'Charts',
+                    route: Routes.charts,
+                    current: currentRoute,
+                    indent: true,
+                  ),
+                ],
                 ]),
                 _NavGroup('Inventory', current: currentRoute, children: [
-                _NavItem(
+                if (auth.canViewInventoryReports) _NavItem(
                   icon: Icons.inventory_2_outlined,
                   label: 'Stock',
                   route: Routes.inventoryStock,
                   current: currentRoute,
                   indent: true,
                 ),
-                _NavItem(
+                if (auth.canViewInventoryReports) _NavItem(
                   icon: Icons.north_east_outlined,
                   label: 'Transfers',
                   route: Routes.inventoryTransfers,
                   current: currentRoute,
                   indent: true,
                 ),
-                _NavItem(
+                if (auth.canViewInventoryReports) _NavItem(
                   icon: Icons.south_west_outlined,
                   label: 'Returns',
                   route: Routes.inventoryReturns,
                   current: currentRoute,
                   indent: true,
                 ),
-                _NavItem(
+                if (auth.canViewInventoryReports) _NavItem(
                   icon: Icons.badge_outlined,
                   label: 'Visits',
                   route: Routes.inventoryVisits,
@@ -267,7 +269,7 @@ class _AdminSidebarState extends State<AdminSidebar> {
                 ),
                 ]),
                 _NavGroup('Catalog', current: currentRoute, children: [
-                _NavItem(
+                if (auth.hasPermission('VIEW_PRODUCTS')) _NavItem(
                   icon: Icons.grid_view_outlined,
                   label: 'Products',
                   route: Routes.products,
@@ -291,14 +293,14 @@ class _AdminSidebarState extends State<AdminSidebar> {
                 ),
                 ]),
                 _NavGroup('Marketing', current: currentRoute, children: [
-                _NavItem(
+                if (auth.hasPermission('EDIT_RESOURCES')) _NavItem(
                   icon: Icons.burst_mode_outlined,
                   label: 'Advertisements',
                   route: Routes.advertisements,
                   current: currentRoute,
                   indent: true,
                 ),
-                _NavItem(
+                if (auth.hasPermission('EDIT_RESOURCES')) _NavItem(
                   icon: Icons.web_outlined,
                   label: 'Pages',
                   route: Routes.landingPages,
@@ -324,7 +326,7 @@ class _AdminSidebarState extends State<AdminSidebar> {
                   ),
                 ]),
                 _NavGroup('Administration', current: currentRoute, children: [
-                if (canManageStores)
+                if (auth.canManageSettings)
                   _NavItem(
                     icon: Icons.tune,
                     label: 'Organization Settings',
@@ -332,7 +334,7 @@ class _AdminSidebarState extends State<AdminSidebar> {
                     current: currentRoute,
                     indent: true,
                   ),
-                _NavItem(
+                if (auth.hasPermission('MANAGE_STORES')) _NavItem(
                   icon: Icons.store_outlined,
                   label: 'Stores',
                   route: Routes.stores,
@@ -363,21 +365,23 @@ class _AdminSidebarState extends State<AdminSidebar> {
                     current: currentRoute,
                     indent: true,
                   ),
-                _NavItem(
-                  icon: Icons.payment_outlined,
-                  label: 'Payment Methods',
-                  route: Routes.paymentMethodsGlobal,
-                  current: currentRoute,
-                  indent: true,
-                ),
-                _NavItem(
-                  icon: Icons.receipt_outlined,
-                  label: 'Receipt Info',
-                  route: Routes.receiptInfoGlobal,
-                  current: currentRoute,
-                  indent: true,
-                ),
-                _NavItem(
+                if (auth.canManagePaymentMethods)
+                  _NavItem(
+                    icon: Icons.payment_outlined,
+                    label: 'Payment Methods',
+                    route: Routes.paymentMethodsGlobal,
+                    current: currentRoute,
+                    indent: true,
+                  ),
+                if (auth.canManageSettings)
+                  _NavItem(
+                    icon: Icons.receipt_outlined,
+                    label: 'Receipt Info',
+                    route: Routes.receiptInfoGlobal,
+                    current: currentRoute,
+                    indent: true,
+                  ),
+                if (auth.hasPermission('EDIT_RESOURCES')) _NavItem(
                   icon: Icons.folder_outlined,
                   label: 'Files Manager',
                   route: Routes.resourceExplorerGlobal,
@@ -408,7 +412,7 @@ class _AdminSidebarState extends State<AdminSidebar> {
                     indent: true,
                   ),
                 ]),
-                _NavGroup('Integrations', current: currentRoute, children: [
+                if (auth.canManageIntegrations) _NavGroup('Integrations', current: currentRoute, children: [
                 _NavItem(
                   icon: Icons.hub_outlined,
                   label: 'Odoo',
@@ -504,6 +508,8 @@ class _NavGroupState extends State<_NavGroup> {
 
   @override
   Widget build(BuildContext context) {
+    // A group whose items are all hidden by permissions is not shown at all.
+    if (widget.children.isEmpty) return const SizedBox.shrink();
     final scheme = Theme.of(context).colorScheme;
     final open = _openGroups.contains(widget.title);
     final active = _holdsCurrent;

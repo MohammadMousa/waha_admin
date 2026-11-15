@@ -69,7 +69,7 @@ class _LandingPagesScreenState extends State<LandingPagesScreen> {
     final token = context.read<AuthState>().token;
     if (token == null) { _logout(); return; }
     try {
-      final stores = await ApiClient().getAdminStores(token);
+      final stores = await ApiClient().getStoresForPicker(token);
       if (!mounted) return;
       setState(() { _stores = stores; _loadingStores = false; });
       // Load pages for global scope by default (no branch selected)

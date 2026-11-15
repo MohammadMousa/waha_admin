@@ -71,7 +71,7 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
       return;
     }
     try {
-      final stores = await ApiClient().getAdminStores(token);
+      final stores = await ApiClient().getStoresForPicker(token);
       if (mounted)
         setState(() {
           _stores = stores;

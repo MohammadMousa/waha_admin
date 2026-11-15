@@ -493,7 +493,7 @@ class _OfferFormDialogState extends State<_OfferFormDialog> {
     final token = context.read<AuthState>().token;
     if (token == null) return;
     try {
-      _stores = await ApiClient().getAdminStores(token);
+      _stores = await ApiClient().getStoresForPicker(token);
       if (_isEdit) {
         final o = await ApiClient().getOffer(widget.offerId!, token);
         _nameCtrl.text = o['name']?.toString() ?? '';

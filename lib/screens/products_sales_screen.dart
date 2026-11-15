@@ -78,7 +78,7 @@ class _ProductsSalesScreenState extends State<ProductsSalesScreen> {
       final results = await Future.wait([
         api.getReportStores(token),
         api.getReportCategories(token),
-        api.getAdminStores(token),
+        api.getStoresForPicker(token),
       ]);
       if (!mounted) return;
       setState(() {
@@ -331,6 +331,7 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
                 child: SizedBox(width: 16, height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2)),
               ),
+            if (context.watch<AuthState>().canExportReports) ...[
             FilledButton.icon(
               icon: _exporting
                   ? const SizedBox(width: 14, height: 14,
@@ -352,6 +353,7 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
               ),
             ),
             const SizedBox(width: 8),
+            ],
             IconButton(
               icon: const Icon(Icons.refresh_outlined),
               tooltip: 'Refresh',

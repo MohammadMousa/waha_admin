@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../models/employee.dart';
 import '../models/store.dart';
+import '../models/role.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
@@ -24,9 +25,11 @@ class EmployeeEditScreen extends StatefulWidget {
 }
 
 class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
-  /// With the permission to give roles, an existing employee's roles are managed
-  /// in the roles list (saved at once) instead of the single role dropdown.
-  bool get _roleListMode => !_isCreate && context.read<AuthState>().hasPermission('ASSIGN_ROLES');
+  /// With the permission to give roles, roles are managed in the roles list
+  /// instead of the single role dropdown: saved at once for an existing
+  /// employee, given right after saving for a new one.
+  bool get _roleListMode => context.read<AuthState>().hasPermission('ASSIGN_ROLES');
+  final List<RoleAssignment> _pendingRoles = [];
 
   bool get _isCreate => widget.employee == null;
 
@@ -105,7 +108,7 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
       return;
     }
     try {
-      final stores = await ApiClient().getAdminStores(token);
+      final stores = await ApiClient().getStoresForPicker(token);
       if (mounted)
         setState(() {
           _stores = stores;
@@ -235,6 +238,10 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
           if (_pinCode.text.trim().isNotEmpty) 'pinCode': _pinCode.text.trim(),
           if (_role != null && !_roleListMode) ...{'role': _role, 'storeId': roleStoreId},
         }, token: token);
+      }
+      if (_isCreate && _pendingRoles.isNotEmpty) {
+        final problem = await givePendingRoles('employees', employeeId, _pendingRoles, token);
+        if (problem != null && mounted) await showErrorDialog(context, problem);
       }
       // Sync branch assignments (INSERT IGNORE server-side, so re-adding the
       // role's own store here is harmless).
@@ -441,7 +448,9 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
                                   const SizedBox(height: 12),
                                   if (_roleListMode)
                                     PersonRolesSection(
-                                        kind: 'employees', personId: widget.employee!.id)
+                                        kind: 'employees',
+                                        personId: widget.employee?.id,
+                                        pending: _isCreate ? _pendingRoles : null)
                                   else
                                   DropdownButtonFormField<String?>(
                                     value: _role,

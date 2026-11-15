@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../models/account_user.dart';
 import '../models/organization.dart';
+import '../models/role.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
@@ -32,6 +33,9 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
   /// in the roles list (saved at once). Owners and super admins keep the single
   /// dropdown, because those roles cannot be given through the roles list.
   bool get _roleListMode => !_isCreate && context.read<AuthState>().hasPermission('ASSIGN_ROLES');
+  final List<RoleAssignment> _pendingRoles = [];
+  bool get _canAssignRoles => context.read<AuthState>().hasPermission('ASSIGN_ROLES');
+
   bool get _hasBuiltInTopRole => _role == 'ORGANIZATION_OWNER' || _role == 'SUPER_ADMIN';
 
   final _username = TextEditingController();
@@ -128,7 +132,7 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
     try {
       final api = ApiClient();
       if (_isCreate) {
-        await api.createAdminAccount({
+        final newId = await api.createAdminAccount({
           'username': username,
           'password': _password.text.trim(),
           'enabled': _enabled,
@@ -143,6 +147,10 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
           if (_role != 'SUPER_ADMIN' && _selectedOrgId != null)
             'organizationId': _selectedOrgId,
         }, token: token);
+        if (_pendingRoles.isNotEmpty) {
+          final problem = await givePendingRoles('users', newId, _pendingRoles, token);
+          if (problem != null && mounted) await showErrorDialog(context, problem);
+        }
       } else {
         await api.patchAdminAccount(widget.account!.id, {
           'enabled': _enabled,
@@ -295,13 +303,13 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
                                         setState(() => _enabled = v),
                                   ),
                                   const Divider(height: 32),
-                                  _Label('Role & Organization'),
+                                  _Label('Account level & Organization'),
                                   const SizedBox(height: 12),
                                   if (!_roleListMode || _hasBuiltInTopRole)
                                   DropdownButtonFormField<String?>(
                                     value: roles.contains(_role) ? _role : null,
                                     decoration: const InputDecoration(
-                                      labelText: 'Role',
+                                      labelText: 'Account level',
                                       border: OutlineInputBorder(),
                                       prefixIcon: Icon(Icons.badge_outlined),
                                     ),
@@ -309,7 +317,7 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
                                       if (canPickNoRole)
                                         const DropdownMenuItem<String?>(
                                           value: null,
-                                          child: Text('No role assigned'),
+                                          child: Text('None'),
                                         ),
                                       ...roles.map(
                                         (r) => DropdownMenuItem<String?>(
@@ -356,12 +364,20 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
                                         ? null
                                         : (v) => setState(() => _selectedOrgId = v),
                                   ),
-                                  if (_roleListMode) ...[
+                                  if (_roleListMode || (_isCreate && _canAssignRoles)) ...[
                                     const SizedBox(height: 16),
-                                    _Label('Roles'),
+                                    _Label('Additional roles'),
                                     const SizedBox(height: 8),
                                     PersonRolesSection(
-                                        kind: 'users', personId: widget.account!.id),
+                                      kind: 'users',
+                                      personId: widget.account?.id,
+                                      pending: _isCreate ? _pendingRoles : null,
+                                      canAdd: !_isCreate ||
+                                          !context.read<AuthState>().isSuperAdmin ||
+                                          _selectedOrgId != null,
+                                      disabledHint: 'Choose the organization first.',
+                                      note: 'Added on top of the account level. Permissions add up across all roles.',
+                                    ),
                                   ],
                                   const Divider(height: 32),
                                   _Label('Personal Info'),

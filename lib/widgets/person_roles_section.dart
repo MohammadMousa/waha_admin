@@ -13,11 +13,48 @@ import 'error_dialog.dart';
 class PersonRolesSection extends StatefulWidget {
   /// 'users' for accounts, 'employees' for POS employees.
   final String kind;
-  final int personId;
-  const PersonRolesSection({super.key, required this.kind, required this.personId});
+
+  /// Null while the person is still being created: roles are then only held in
+  /// [pending] (owned by the form) and given by [givePendingRoles] after save.
+  final int? personId;
+  final List<RoleAssignment>? pending;
+
+  /// False disables "Add role" (shown with [disabledHint]).
+  final bool canAdd;
+  final String? disabledHint;
+
+  /// Line shown above the list.
+  final String note;
+  const PersonRolesSection({
+    super.key,
+    required this.kind,
+    this.personId,
+    this.pending,
+    this.canAdd = true,
+    this.disabledHint,
+    this.note = 'Permissions add up across all roles.',
+  });
 
   @override
   State<PersonRolesSection> createState() => _PersonRolesSectionState();
+}
+
+/// Gives the roles chosen on a new person's form. Returns an error text naming
+/// every role the server refused, or null when all were given.
+Future<String?> givePendingRoles(
+    String kind, int personId, List<RoleAssignment> pending, String token) async {
+  final failures = <String>[];
+  for (final a in pending) {
+    try {
+      await ApiClient().addPersonRole(kind, personId,
+          roleId: a.roleId, scopeType: a.scopeType, scopeId: a.scopeId, token: token);
+    } on ApiException catch (e) {
+      failures.add('${a.roleName ?? 'Role #${a.roleId}'}: ${e.message}');
+    }
+  }
+  if (failures.isEmpty) return null;
+  return 'The account was saved, but these roles could not be given. '
+      'Open it again to add them.\n${failures.join('\n')}';
 }
 
 // These can never be given through the roles calls.
@@ -46,8 +83,11 @@ class _PersonRolesSectionState extends State<PersonRolesSection> {
     if (token == null) return;
     try {
       final api = ApiClient();
+      final id = widget.personId;
       final results = await Future.wait([
-        api.getPersonRoles(widget.kind, widget.personId, token: token),
+        id == null
+            ? Future.value(widget.pending ?? <RoleAssignment>[])
+            : api.getPersonRoles(widget.kind, id, token: token),
         api.getRoles(token),
         api.getAdminStores(token),
         api.getBranchGroups(token),
@@ -86,8 +126,12 @@ class _PersonRolesSectionState extends State<PersonRolesSection> {
   Future<void> _remove(RoleAssignment a) async {
     final token = _token;
     if (token == null) return;
+    if (widget.personId == null) {
+      setState(() => widget.pending?.remove(a));
+      return;
+    }
     try {
-      final list = await ApiClient().removePersonRole(widget.kind, widget.personId, a, token: token);
+      final list = await ApiClient().removePersonRole(widget.kind, widget.personId!, a, token: token);
       if (mounted) setState(() => _assignments = list);
     } on ApiException catch (e) {
       if (mounted) showErrorDialog(context, e.message);
@@ -108,8 +152,24 @@ class _PersonRolesSectionState extends State<PersonRolesSection> {
     if (picked == null || !mounted) return;
     final token = _token;
     if (token == null) return;
+    if (widget.personId == null) {
+      final dup = widget.pending?.any((a) =>
+              a.roleId == picked.roleId &&
+              a.scopeType == picked.scopeType &&
+              a.scopeId == picked.scopeId) ??
+          false;
+      if (!dup) {
+        final name = _roles.where((r) => r.id == picked.roleId).map((r) => r.name).firstOrNull;
+        setState(() => widget.pending?.add(RoleAssignment(
+            roleId: picked.roleId,
+            roleName: name,
+            scopeType: picked.scopeType,
+            scopeId: picked.scopeId)));
+      }
+      return;
+    }
     try {
-      final list = await ApiClient().addPersonRole(widget.kind, widget.personId,
+      final list = await ApiClient().addPersonRole(widget.kind, widget.personId!,
           roleId: picked.roleId, scopeType: picked.scopeType, scopeId: picked.scopeId, token: token);
       if (mounted) setState(() => _assignments = list);
     } on ApiException catch (e) {
@@ -130,18 +190,26 @@ class _PersonRolesSectionState extends State<PersonRolesSection> {
       children: [
         Row(children: [
           Expanded(
-            child: Text('Permissions add up across all roles.',
+            child: Text(widget.note,
                 style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
           ),
           OutlinedButton.icon(
-            onPressed: _add,
+            onPressed: widget.canAdd ? _add : null,
             icon: const Icon(Icons.add, size: 18),
             label: const Text('Add role'),
           ),
         ]),
+        if (!widget.canAdd && widget.disabledHint != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(widget.disabledHint!,
+                style: TextStyle(fontSize: 12, color: scheme.outline)),
+          ),
         const SizedBox(height: 8),
         if (list.isEmpty)
-          Text('No roles given yet.', style: TextStyle(color: scheme.outline))
+          Text(widget.personId == null
+                  ? 'No roles chosen. They are given when you save.'
+                  : 'No roles given yet.', style: TextStyle(color: scheme.outline))
         else
           for (final a in list)
             Container(
