@@ -6,6 +6,7 @@ import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../utils/role_labels.dart';
 import '../widgets/account_sessions_dialog.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/error_dialog.dart';
 
@@ -104,6 +105,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.profile),
           Expanded(
@@ -111,7 +113,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+                  padding: EdgeInsets.fromLTRB(pagePad(context), 24, pagePad(context), 8),
                   child: Text('My Profile',
                       style: Theme.of(context)
                           .textTheme

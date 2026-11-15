@@ -8,6 +8,7 @@ import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../utils/localized_name.dart';
 import '../utils/number_format.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/error_dialog.dart';
 import '../widgets/waha_date_picker.dart';
@@ -233,6 +234,7 @@ class _MissingProductsScreenState extends State<MissingProductsScreen> {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.missingProducts),
           Expanded(
@@ -240,8 +242,8 @@ class _MissingProductsScreenState extends State<MissingProductsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-                  child: Row(
+                  padding: EdgeInsets.fromLTRB(pagePad(context), 24, pagePad(context), 8),
+                  child: adaptiveRow(context,
                     children: [
                       Text('Missing Products',
                           style: Theme.of(context)
@@ -298,8 +300,9 @@ class _MissingProductsScreenState extends State<MissingProductsScreen> {
   }
 
   Widget _cards(ColorScheme scheme) {
-    Widget card(String label, dynamic value, IconData icon) => Expanded(
-          child: Container(
+    final narrow = MediaQuery.sizeOf(context).width < kNarrowWidth;
+    Widget card(String label, dynamic value, IconData icon) {
+      final c = Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: scheme.surface,
@@ -310,20 +313,46 @@ class _MissingProductsScreenState extends State<MissingProductsScreen> {
               children: [
                 Icon(icon, color: scheme.primary),
                 const SizedBox(width: 12),
-                Column(
+                Flexible(child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(fmtCount(value),
                         style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
-                    Text(label, style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+                    Text(label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
                   ],
-                ),
+                )),
               ],
             ),
+          );
+      return narrow ? c : Expanded(child: c);
+    }
+    if (narrow) {
+      // Phones: the four counters in a 2 x 2 grid.
+      final tiles = [
+        ('Missing products', _summary['missingProducts'], Icons.search_off_outlined),
+        ('Scans missed', _summary['scansMissed'], Icons.qr_code_scanner),
+        ('Missed in last 7 days', _summary['missedLast7Days'], Icons.schedule),
+        ('Created since', _summary['created'], Icons.check_circle_outline),
+      ];
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: LayoutBuilder(
+          builder: (_, box) => Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final t in tiles)
+                SizedBox(width: (box.maxWidth - 8) / 2, child: card(t.$1, t.$2, t.$3)),
+            ],
           ),
-        );
+        ),
+      );
+    }
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+      padding: EdgeInsets.fromLTRB(pagePad(context), 0, pagePad(context), 12),
       child: Row(
         children: [
           card('Missing products', _summary['missingProducts'], Icons.search_off_outlined),
@@ -347,7 +376,7 @@ class _MissingProductsScreenState extends State<MissingProductsScreen> {
           onClear: () { _page = 0; _load(); },
         );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+      padding: EdgeInsets.fromLTRB(pagePad(context), 0, pagePad(context), 8),
       child: Wrap(
         spacing: 10,
         runSpacing: 8,
@@ -393,7 +422,7 @@ class _MissingProductsScreenState extends State<MissingProductsScreen> {
           onSort: (_, __) => _sortBy(key),
         );
     return Container(
-      margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      margin: EdgeInsets.fromLTRB(pagePad(context), 0, pagePad(context), 24),
       decoration: BoxDecoration(
         color: scheme.surface,
         borderRadius: BorderRadius.circular(12),

@@ -7,6 +7,7 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/account_sessions_dialog.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/reset_pin_dialog.dart';
 import '../widgets/error_dialog.dart';
@@ -149,6 +150,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.employees),
           Expanded(
@@ -156,8 +158,8 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-                  child: Row(
+                  padding: EdgeInsets.fromLTRB(pagePad(context), 24, pagePad(context), 8),
+                  child: adaptiveRow(context,
                     children: [
                       Text('Employees',
                           style: Theme.of(context)

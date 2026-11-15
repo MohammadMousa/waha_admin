@@ -11,6 +11,7 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../utils/resource_scope.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/resource_picker_modal.dart';
 import '../widgets/error_dialog.dart';
@@ -255,6 +256,7 @@ $slideHtml
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.landingPages),
           Expanded(
@@ -262,7 +264,7 @@ $slideHtml
               children: [
                 // Header bar
                 Container(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+                  padding: EdgeInsets.fromLTRB(pagePad(context), 16, pagePad(context), 16),
                   decoration: BoxDecoration(
                     color: scheme.surface,
                     border: Border(bottom: BorderSide(color: scheme.outlineVariant)),

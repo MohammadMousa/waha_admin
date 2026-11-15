@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/organization.dart';
 import '../router/routes.dart';
 import '../state/auth_state.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/framed_card.dart';
 
@@ -25,6 +26,7 @@ class OrganizationsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.organizations),
           Expanded(
@@ -32,8 +34,8 @@ class OrganizationsScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-                  child: Row(
+                  padding: EdgeInsets.fromLTRB(pagePad(context), 24, pagePad(context), 8),
+                  child: adaptiveRow(context,
                     children: [
                       Text('Organizations',
                           style: Theme.of(context)

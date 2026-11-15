@@ -14,6 +14,7 @@ import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../utils/localized_name.dart';
 import '../utils/number_format.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/product_image.dart';
 import '../widgets/waha_filter_controls.dart';
@@ -354,6 +355,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.products),
           Expanded(child: _buildContent(scheme)),
@@ -376,11 +378,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   Widget _buildHeader(ColorScheme scheme) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      padding: EdgeInsets.fromLTRB(pagePad(context), 20, pagePad(context), 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          adaptiveRow(context,
             children: [
               Text('Products',
                   style: Theme.of(context)

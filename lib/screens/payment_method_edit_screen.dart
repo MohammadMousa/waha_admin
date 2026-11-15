@@ -155,6 +155,7 @@ class _PaymentMethodEditScreenState extends State<PaymentMethodEditScreen> {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.paymentMethodsGlobal),
           Expanded(

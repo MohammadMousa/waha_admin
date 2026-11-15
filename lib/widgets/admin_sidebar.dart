@@ -15,7 +15,10 @@ double _navScrollOffset = 0;
 
 class AdminSidebar extends StatefulWidget {
   final String currentRoute;
-  const AdminSidebar({super.key, required this.currentRoute});
+
+  /// True when shown inside the phone slide-out panel (full width).
+  final bool inDrawer;
+  const AdminSidebar({super.key, required this.currentRoute, this.inDrawer = false});
 
   @override
   State<AdminSidebar> createState() => _AdminSidebarState();
@@ -88,9 +91,15 @@ class _AdminSidebarState extends State<AdminSidebar> {
     final canManageRoles = auth.hasPermission('MANAGE_ROLES');
     final canManageDevices = auth.hasPermission('MANAGE_DEVICES');
 
+    // On phones the screens do not get a pinned sidebar; the shell shows this
+    // same content in a slide-out panel instead.
+    if (!widget.inDrawer && MediaQuery.sizeOf(context).width < 700) {
+      return const SizedBox.shrink();
+    }
+
     return Container(
-      width: 220,
-      color: scheme.surface,
+      width: widget.inDrawer ? double.infinity : 220,
+      color: widget.inDrawer ? scheme.surfaceContainerHigh : scheme.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -518,7 +527,10 @@ class _NavGroupState extends State<_NavGroup> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Material(
-          color: active && !open ? scheme.primaryContainer : Colors.transparent,
+          // Group titles are tinted so they stand out from the items below.
+          color: active && !open
+              ? scheme.primaryContainer
+              : scheme.primary.withValues(alpha: 0.16),
           child: InkWell(
             onTap: () => setState(() {
               if (open) {
@@ -534,8 +546,8 @@ class _NavGroupState extends State<_NavGroup> {
                   Expanded(
                     child: Text(widget.title,
                         style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
                             color: color)),
                   ),
                   Icon(open ? Icons.expand_more : Icons.chevron_right,

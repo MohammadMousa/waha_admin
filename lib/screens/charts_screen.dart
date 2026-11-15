@@ -7,6 +7,7 @@ import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../utils/chart_ticks.dart';
 import '../widgets/error_dialog.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/waha_date_picker.dart';
 
@@ -157,6 +158,7 @@ class _ChartsScreenState extends State<ChartsScreen> {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.charts),
           Expanded(
@@ -164,7 +166,7 @@ class _ChartsScreenState extends State<ChartsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                  padding: EdgeInsets.fromLTRB(pagePad(context), 24, pagePad(context), 16),
                   child: Text('Charts',
                       style: Theme.of(context)
                           .textTheme
@@ -173,7 +175,7 @@ class _ChartsScreenState extends State<ChartsScreen> {
                 ),
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+                    padding: EdgeInsets.fromLTRB(pagePad(context), 0, pagePad(context), 32),
                     child: Column(
                       children: [
                         _GroupSection(

@@ -14,6 +14,7 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../utils/resource_scope.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import 'package:provider/provider.dart';
 import '../widgets/error_dialog.dart';
@@ -355,6 +356,32 @@ class _ResourceExplorerScreenState extends State<ResourceExplorerScreen> {
             const SizedBox(height: 12),
             OutlinedButton(onPressed: _loadDirs, child: const Text('Retry')),
           ]))
+        : MediaQuery.sizeOf(context).width < kNarrowWidth
+            // Phones: one pane at a time - the folder list, then the files of
+            // the chosen folder with a back button.
+            ? (_selectedDir == null
+                ? _DirectoryPanel(
+                    dirs: _dirs, selected: _selectedDir,
+                    loading: _loadingDirs, onSelect: _selectDir, onNew: _createDir,
+                  )
+                : Column(children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        icon: const Icon(Icons.arrow_back, size: 18),
+                        label: Text(_selectedDir!.name),
+                        onPressed: () => setState(() { _selectedDir = null; _assets = []; }),
+                      ),
+                    ),
+                    Expanded(child: _AssetPanel(
+                      dir: _selectedDir, assets: _assets, loading: _loadingAssets,
+                      onUpload: _upload, onUploadMultiple: _uploadMultiple,
+                      onDelete: _delete, onCopyUrl: _copyUrl, onMove: _move, onRename: _rename,
+                      onPreviewKiosk: _previewKiosk, onDuplicate: _duplicateAsset,
+                      resourceBase: _resourceBase, layout: _layout, onLayoutChange: _setLayout,
+                      scrollController: _scrollController, onScrollEnd: _saveScrollOffset,
+                    )),
+                  ]))
         : Row(children: [
             SizedBox(width: 220, child: _DirectoryPanel(
               dirs: _dirs, selected: _selectedDir,
@@ -374,6 +401,7 @@ class _ResourceExplorerScreenState extends State<ResourceExplorerScreen> {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           AdminSidebar(currentRoute: _currentRoute),
           Expanded(

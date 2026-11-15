@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/product_image.dart';
 import '../widgets/resource_picker_modal.dart';
@@ -320,6 +321,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.products),
           Expanded(
@@ -327,7 +329,7 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
               children: [
                 // Header bar
                 Container(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+                  padding: EdgeInsets.fromLTRB(pagePad(context), 16, pagePad(context), 16),
                   decoration: BoxDecoration(
                     color: scheme.surface,
                     border: Border(bottom: BorderSide(color: scheme.outlineVariant)),

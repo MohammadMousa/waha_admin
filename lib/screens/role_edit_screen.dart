@@ -157,6 +157,7 @@ class _RoleEditScreenState extends State<RoleEditScreen> {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.roles),
           Expanded(

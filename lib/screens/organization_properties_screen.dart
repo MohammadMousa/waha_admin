@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/error_dialog.dart';
 import '../widgets/framed_card.dart';
@@ -276,7 +277,7 @@ class _OrganizationPropertiesScreenState extends State<OrganizationPropertiesScr
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+          padding: EdgeInsets.fromLTRB(pagePad(context), 12, pagePad(context), 0),
           child: Wrap(
             spacing: 10,
             runSpacing: 8,
@@ -309,7 +310,7 @@ class _OrganizationPropertiesScreenState extends State<OrganizationPropertiesScr
         ),
         Expanded(
           child: Container(
-            margin: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+            margin: EdgeInsets.fromLTRB(pagePad(context), 16, pagePad(context), 24),
             decoration: BoxDecoration(
               color: scheme.surface,
               borderRadius: BorderRadius.circular(12),
@@ -451,6 +452,7 @@ class _OrganizationPropertiesScreenState extends State<OrganizationPropertiesScr
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.organizationProperties),
           Expanded(
@@ -458,7 +460,7 @@ class _OrganizationPropertiesScreenState extends State<OrganizationPropertiesScr
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                  padding: EdgeInsets.fromLTRB(pagePad(context), 24, pagePad(context), 0),
                   child: Text('Organization Settings',
                       style: Theme.of(context)
                           .textTheme
@@ -466,7 +468,7 @@ class _OrganizationPropertiesScreenState extends State<OrganizationPropertiesScr
                           ?.copyWith(fontWeight: FontWeight.w700)),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 4, 24, 0),
+                  padding: EdgeInsets.fromLTRB(pagePad(context), 4, pagePad(context), 0),
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: TabBar(
@@ -490,7 +492,7 @@ class _OrganizationPropertiesScreenState extends State<OrganizationPropertiesScr
                             RefreshIndicator(
                               onRefresh: _load,
                               child: ListView(
-                                padding: const EdgeInsets.fromLTRB(24, 16, 24, 100),
+                                padding: EdgeInsets.fromLTRB(pagePad(context), 16, pagePad(context), 100),
                                 children: [if (_orgInfo != null) ..._orgInfoRows(scheme)],
                               ),
                             ),

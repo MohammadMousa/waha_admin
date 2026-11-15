@@ -6,6 +6,7 @@ import 'models/category.dart';
 import 'models/device.dart';
 import 'models/employee.dart';
 import 'models/role.dart';
+import 'widgets/adaptive_shell.dart';
 import 'models/store.dart';
 import 'screens/roles_screen.dart';
 import 'screens/role_edit_screen.dart';
@@ -82,264 +83,276 @@ class WahaAdminApp extends StatelessWidget {
       theme: _buildTheme(Brightness.light),
       darkTheme: _buildTheme(Brightness.dark),
       themeMode: ThemeMode.system,
-      onGenerateRoute: (settings) {
-        switch (settings.name) {
-          case Routes.login:
-            return MaterialPageRoute(
-                builder: (_) => const LoginScreen(), settings: settings);
-
-          case Routes.dashboard:
-            return MaterialPageRoute(
-                builder: (_) => const DashboardScreen(), settings: settings);
-
-          case Routes.organizationProperties:
-            return MaterialPageRoute(
-                builder: (_) => const OrganizationPropertiesScreen(), settings: settings);
-
-          case Routes.deviceLogs:
-            return MaterialPageRoute(
-                builder: (_) => const DeviceLogsScreen(), settings: settings);
-
-          case Routes.organizations:
-            return MaterialPageRoute(
-                builder: (_) => const OrganizationsScreen(), settings: settings);
-
-          case Routes.systemConfig:
-            return MaterialPageRoute(
-                builder: (_) => const SystemConfigScreen(), settings: settings);
-
-          case Routes.systemAudit:
-            return MaterialPageRoute(
-                builder: (_) => const SystemAuditScreen(), settings: settings);
-
-          case Routes.deviceStatus:
-            return MaterialPageRoute(
-                builder: (_) => const DeviceStatusScreen(), settings: settings);
-
-          case Routes.profile:
-            return MaterialPageRoute(
-                builder: (_) => const ProfileScreen(), settings: settings);
-
-          case Routes.productsSales:
-            return MaterialPageRoute(
-                builder: (_) => const ProductsSalesScreen(), settings: settings);
-
-          case Routes.stores:
-            return MaterialPageRoute(
-                builder: (_) => const StoresScreen(), settings: settings);
-
-          case Routes.storeEdit:
-            final store = settings.arguments as Store?;
-            return MaterialPageRoute(
-                builder: (_) => StoreEditScreen(store: store), settings: settings);
-
-          case Routes.accounts:
-            return MaterialPageRoute(
-                builder: (_) => const AccountsScreen(), settings: settings);
-
-          case Routes.accountEdit:
-            final account = settings.arguments as AccountUser?;
-            return MaterialPageRoute(
-                builder: (_) => AccountEditScreen(account: account), settings: settings);
-
-          case Routes.employees:
-            return MaterialPageRoute(
-                builder: (_) => const EmployeesScreen(), settings: settings);
-
-          case Routes.employeeEdit:
-            final employee = settings.arguments as Employee?;
-            return MaterialPageRoute(
-                builder: (_) => EmployeeEditScreen(employee: employee), settings: settings);
-
-          case Routes.roles:
-            return MaterialPageRoute(
-                builder: (_) => const RolesScreen(), settings: settings);
-
-          case Routes.roleEdit:
-            final role = settings.arguments as RoleInfo?;
-            return MaterialPageRoute(
-                builder: (_) => RoleEditScreen(role: role), settings: settings);
-
-          case Routes.devices:
-            return MaterialPageRoute(
-                builder: (_) => const DevicesScreen(), settings: settings);
-
-          case Routes.deviceEdit:
-            final device = settings.arguments as Device?;
-            return MaterialPageRoute(
-                builder: (_) => DeviceEditScreen(device: device), settings: settings);
-
-          case Routes.register:
-            return MaterialPageRoute(
-                builder: (_) => const RegisterScreen(), settings: settings);
-
-          case Routes.orders:
-            return MaterialPageRoute(
-                builder: (_) => const OrdersScreen(), settings: settings);
-
-          case Routes.inventoryVisits:
-            return MaterialPageRoute(
-                builder: (_) => const InventoryVisitsScreen(), settings: settings);
-
-          case Routes.inventoryTransfers:
-            return MaterialPageRoute(
-                builder: (_) => InventoryOperationsScreen(
-                      title: 'Inventory Transfers',
-                      route: Routes.inventoryTransfers,
-                      exportFilePrefix: 'inventory_transfers',
-                      fetcher: ApiClient().getInventoryTransfers,
-                    ),
-                settings: settings);
-
-          case Routes.inventoryReturns:
-            return MaterialPageRoute(
-                builder: (_) => InventoryOperationsScreen(
-                      title: 'Inventory Returns',
-                      route: Routes.inventoryReturns,
-                      exportFilePrefix: 'inventory_returns',
-                      fetcher: ApiClient().getInventoryReturns,
-                    ),
-                settings: settings);
-
-          case Routes.inventoryStock:
-            return MaterialPageRoute(
-                builder: (_) => const InventoryStockScreen(), settings: settings);
-
-          case Routes.advertisements:
-            return MaterialPageRoute(
-                builder: (_) => const AdvertisementsScreen(), settings: settings);
-
-          case Routes.offers:
-            return MaterialPageRoute(
-                builder: (_) => const OffersScreen(), settings: settings);
-
-          case Routes.coupons:
-            return MaterialPageRoute(
-                builder: (_) => const CouponsScreen(), settings: settings);
-
-          case Routes.couponEdit:
-            final cargs = (settings.arguments as Map<String, dynamic>?) ?? const {};
-            return MaterialPageRoute<bool>(
-                builder: (_) => CouponFormScreen(
-                      couponId: cargs['couponId'] as int?,
-                      startInBatch: cargs['batch'] == true,
-                    ),
-                settings: settings);
-
-          case Routes.couponReport:
-            return MaterialPageRoute(
-                builder: (_) => const CouponReportScreen(), settings: settings);
-
-          case Routes.missingProducts:
-            return MaterialPageRoute(
-                builder: (_) => const MissingProductsScreen(), settings: settings);
-
-          case Routes.landingPages:
-            return MaterialPageRoute(
-                builder: (_) => const LandingPagesScreen(), settings: settings);
-
-          case Routes.products:
-            return MaterialPageRoute(
-                builder: (_) => const ProductsScreen(), settings: settings);
-
-          case Routes.categories:
-            // With a Store argument → store-scoped view (from Stores screen)
-            // Without argument → global picker view (from sidebar)
-            return MaterialPageRoute(
-                builder: (_) => settings.arguments is Store
-                    ? CategoriesScreen(store: settings.arguments as Store)
-                    : const CategoriesAdminScreen(),
-                settings: settings);
-
-          case Routes.categoryEdit:
-            final args = settings.arguments as Map<String, dynamic>;
-            return MaterialPageRoute(
-                builder: (_) => CategoryEditScreen(
-                  category: args['category'] as Category,
-                  storeSlug: (args['store'] as Store?)?.name ?? args['storeSlug'] as String,
-                ),
-                settings: settings);
-
-          case Routes.productEdit:
-            final args = settings.arguments as Map<String, dynamic>;
-            return MaterialPageRoute(
-                builder: (_) => ProductEditScreen(
-                  productId: args['productId'] as int?,
-                  storeSlug: args['storeSlug'] as String,
-                  initialBarcode: args['initialBarcode'] as String?,
-                ),
-                settings: settings);
-
-          case Routes.paymentMethods:
-            return MaterialPageRoute(
-                builder: (_) => PaymentMethodsScreen(
-                    store: settings.arguments as Store),
-                settings: settings);
-
-          case Routes.receiptInfoEdit:
-            return MaterialPageRoute(
-                builder: (_) => ReceiptInfoEditScreen(
-                    store: settings.arguments as Store),
-                settings: settings);
-
-          case Routes.odooAdmin:
-            return MaterialPageRoute(
-                builder: (_) => const OdooAdminScreen(),
-                settings: settings);
-
-          case Routes.integrationLogs:
-            return MaterialPageRoute(
-                builder: (_) => const IntegrationLogsScreen(),
-                settings: settings);
-
-          case Routes.resourceExplorerGlobal:
-            return MaterialPageRoute(
-                builder: (_) => const ResourceExplorerScreen(),
-                settings: settings);
-
-          case Routes.resourceExplorer:
-            return MaterialPageRoute(
-                builder: (_) => ResourceExplorerScreen(
-                    store: settings.arguments as Store),
-                settings: settings);
-
-          case Routes.landingEditor:
-            final editorArgs = settings.arguments as Map<String, dynamic>;
-            return MaterialPageRoute(
-                builder: (_) => LandingEditorScreen(
-                    store: editorArgs['store'] as Store?,
-                    orgSlug: editorArgs['orgSlug'] as String,
-                    pageKey: editorArgs['pageKey'] as String? ?? 'KIOSK_LANDING'),
-                settings: settings);
-
-          case Routes.charts:
-            return MaterialPageRoute(
-                builder: (_) => const ChartsScreen(), settings: settings);
-
-          case Routes.paymentMethodEdit:
-            return MaterialPageRoute(
-                builder: (_) => PaymentMethodEditScreen(
-                    method: settings.arguments as AdminPaymentMethodView),
-                settings: settings);
-
-          case Routes.paymentMethodsGlobal:
-            return MaterialPageRoute(
-                builder: (_) => const PaymentMethodsScreen(),
-                settings: settings);
-
-          case Routes.receiptInfoGlobal:
-            return MaterialPageRoute(
-                builder: (_) => ReceiptInfoEditScreen(
-                    store: const Store(id: 1, name: 'waha')),
-                settings: settings);
-
-          default:
-            return MaterialPageRoute(
-                builder: (_) => const LoginScreen(), settings: settings);
-        }
-      },
+      onGenerateRoute: (settings) => _withShell(settings, _route(settings)),
       home: const _Initializer(),
     );
+  }
+
+  /// On narrow (phone) widths every signed-in screen gets a top bar with a menu
+  /// button and a slide-out navigation panel; wide screens are left untouched.
+  Route<dynamic>? _withShell(RouteSettings settings, Route<dynamic>? route) {
+    if (route is! MaterialPageRoute || settings.name == Routes.login) return route;
+    return MaterialPageRoute(
+      settings: settings,
+      builder: (c) => AdaptiveShell(currentRoute: settings.name ?? '', child: route.builder(c)),
+    );
+  }
+
+  Route<dynamic>? _route(RouteSettings settings) {
+      switch (settings.name) {
+        case Routes.login:
+          return MaterialPageRoute(
+              builder: (_) => const LoginScreen(), settings: settings);
+
+        case Routes.dashboard:
+          return MaterialPageRoute(
+              builder: (_) => const DashboardScreen(), settings: settings);
+
+        case Routes.organizationProperties:
+          return MaterialPageRoute(
+              builder: (_) => const OrganizationPropertiesScreen(), settings: settings);
+
+        case Routes.deviceLogs:
+          return MaterialPageRoute(
+              builder: (_) => const DeviceLogsScreen(), settings: settings);
+
+        case Routes.organizations:
+          return MaterialPageRoute(
+              builder: (_) => const OrganizationsScreen(), settings: settings);
+
+        case Routes.systemConfig:
+          return MaterialPageRoute(
+              builder: (_) => const SystemConfigScreen(), settings: settings);
+
+        case Routes.systemAudit:
+          return MaterialPageRoute(
+              builder: (_) => const SystemAuditScreen(), settings: settings);
+
+        case Routes.deviceStatus:
+          return MaterialPageRoute(
+              builder: (_) => const DeviceStatusScreen(), settings: settings);
+
+        case Routes.profile:
+          return MaterialPageRoute(
+              builder: (_) => const ProfileScreen(), settings: settings);
+
+        case Routes.productsSales:
+          return MaterialPageRoute(
+              builder: (_) => const ProductsSalesScreen(), settings: settings);
+
+        case Routes.stores:
+          return MaterialPageRoute(
+              builder: (_) => const StoresScreen(), settings: settings);
+
+        case Routes.storeEdit:
+          final store = settings.arguments as Store?;
+          return MaterialPageRoute(
+              builder: (_) => StoreEditScreen(store: store), settings: settings);
+
+        case Routes.accounts:
+          return MaterialPageRoute(
+              builder: (_) => const AccountsScreen(), settings: settings);
+
+        case Routes.accountEdit:
+          final account = settings.arguments as AccountUser?;
+          return MaterialPageRoute(
+              builder: (_) => AccountEditScreen(account: account), settings: settings);
+
+        case Routes.employees:
+          return MaterialPageRoute(
+              builder: (_) => const EmployeesScreen(), settings: settings);
+
+        case Routes.employeeEdit:
+          final employee = settings.arguments as Employee?;
+          return MaterialPageRoute(
+              builder: (_) => EmployeeEditScreen(employee: employee), settings: settings);
+
+        case Routes.roles:
+          return MaterialPageRoute(
+              builder: (_) => const RolesScreen(), settings: settings);
+
+        case Routes.roleEdit:
+          final role = settings.arguments as RoleInfo?;
+          return MaterialPageRoute(
+              builder: (_) => RoleEditScreen(role: role), settings: settings);
+
+        case Routes.devices:
+          return MaterialPageRoute(
+              builder: (_) => const DevicesScreen(), settings: settings);
+
+        case Routes.deviceEdit:
+          final device = settings.arguments as Device?;
+          return MaterialPageRoute(
+              builder: (_) => DeviceEditScreen(device: device), settings: settings);
+
+        case Routes.register:
+          return MaterialPageRoute(
+              builder: (_) => const RegisterScreen(), settings: settings);
+
+        case Routes.orders:
+          return MaterialPageRoute(
+              builder: (_) => const OrdersScreen(), settings: settings);
+
+        case Routes.inventoryVisits:
+          return MaterialPageRoute(
+              builder: (_) => const InventoryVisitsScreen(), settings: settings);
+
+        case Routes.inventoryTransfers:
+          return MaterialPageRoute(
+              builder: (_) => InventoryOperationsScreen(
+                    title: 'Inventory Transfers',
+                    route: Routes.inventoryTransfers,
+                    exportFilePrefix: 'inventory_transfers',
+                    fetcher: ApiClient().getInventoryTransfers,
+                  ),
+              settings: settings);
+
+        case Routes.inventoryReturns:
+          return MaterialPageRoute(
+              builder: (_) => InventoryOperationsScreen(
+                    title: 'Inventory Returns',
+                    route: Routes.inventoryReturns,
+                    exportFilePrefix: 'inventory_returns',
+                    fetcher: ApiClient().getInventoryReturns,
+                  ),
+              settings: settings);
+
+        case Routes.inventoryStock:
+          return MaterialPageRoute(
+              builder: (_) => const InventoryStockScreen(), settings: settings);
+
+        case Routes.advertisements:
+          return MaterialPageRoute(
+              builder: (_) => const AdvertisementsScreen(), settings: settings);
+
+        case Routes.offers:
+          return MaterialPageRoute(
+              builder: (_) => const OffersScreen(), settings: settings);
+
+        case Routes.coupons:
+          return MaterialPageRoute(
+              builder: (_) => const CouponsScreen(), settings: settings);
+
+        case Routes.couponEdit:
+          final cargs = (settings.arguments as Map<String, dynamic>?) ?? const {};
+          return MaterialPageRoute<bool>(
+              builder: (_) => CouponFormScreen(
+                    couponId: cargs['couponId'] as int?,
+                    startInBatch: cargs['batch'] == true,
+                  ),
+              settings: settings);
+
+        case Routes.couponReport:
+          return MaterialPageRoute(
+              builder: (_) => const CouponReportScreen(), settings: settings);
+
+        case Routes.missingProducts:
+          return MaterialPageRoute(
+              builder: (_) => const MissingProductsScreen(), settings: settings);
+
+        case Routes.landingPages:
+          return MaterialPageRoute(
+              builder: (_) => const LandingPagesScreen(), settings: settings);
+
+        case Routes.products:
+          return MaterialPageRoute(
+              builder: (_) => const ProductsScreen(), settings: settings);
+
+        case Routes.categories:
+          // With a Store argument → store-scoped view (from Stores screen)
+          // Without argument → global picker view (from sidebar)
+          return MaterialPageRoute(
+              builder: (_) => settings.arguments is Store
+                  ? CategoriesScreen(store: settings.arguments as Store)
+                  : const CategoriesAdminScreen(),
+              settings: settings);
+
+        case Routes.categoryEdit:
+          final args = settings.arguments as Map<String, dynamic>;
+          return MaterialPageRoute(
+              builder: (_) => CategoryEditScreen(
+                category: args['category'] as Category,
+                storeSlug: (args['store'] as Store?)?.name ?? args['storeSlug'] as String,
+              ),
+              settings: settings);
+
+        case Routes.productEdit:
+          final args = settings.arguments as Map<String, dynamic>;
+          return MaterialPageRoute(
+              builder: (_) => ProductEditScreen(
+                productId: args['productId'] as int?,
+                storeSlug: args['storeSlug'] as String,
+                initialBarcode: args['initialBarcode'] as String?,
+              ),
+              settings: settings);
+
+        case Routes.paymentMethods:
+          return MaterialPageRoute(
+              builder: (_) => PaymentMethodsScreen(
+                  store: settings.arguments as Store),
+              settings: settings);
+
+        case Routes.receiptInfoEdit:
+          return MaterialPageRoute(
+              builder: (_) => ReceiptInfoEditScreen(
+                  store: settings.arguments as Store),
+              settings: settings);
+
+        case Routes.odooAdmin:
+          return MaterialPageRoute(
+              builder: (_) => const OdooAdminScreen(),
+              settings: settings);
+
+        case Routes.integrationLogs:
+          return MaterialPageRoute(
+              builder: (_) => const IntegrationLogsScreen(),
+              settings: settings);
+
+        case Routes.resourceExplorerGlobal:
+          return MaterialPageRoute(
+              builder: (_) => const ResourceExplorerScreen(),
+              settings: settings);
+
+        case Routes.resourceExplorer:
+          return MaterialPageRoute(
+              builder: (_) => ResourceExplorerScreen(
+                  store: settings.arguments as Store),
+              settings: settings);
+
+        case Routes.landingEditor:
+          final editorArgs = settings.arguments as Map<String, dynamic>;
+          return MaterialPageRoute(
+              builder: (_) => LandingEditorScreen(
+                  store: editorArgs['store'] as Store?,
+                  orgSlug: editorArgs['orgSlug'] as String,
+                  pageKey: editorArgs['pageKey'] as String? ?? 'KIOSK_LANDING'),
+              settings: settings);
+
+        case Routes.charts:
+          return MaterialPageRoute(
+              builder: (_) => const ChartsScreen(), settings: settings);
+
+        case Routes.paymentMethodEdit:
+          return MaterialPageRoute(
+              builder: (_) => PaymentMethodEditScreen(
+                  method: settings.arguments as AdminPaymentMethodView),
+              settings: settings);
+
+        case Routes.paymentMethodsGlobal:
+          return MaterialPageRoute(
+              builder: (_) => const PaymentMethodsScreen(),
+              settings: settings);
+
+        case Routes.receiptInfoGlobal:
+          return MaterialPageRoute(
+              builder: (_) => ReceiptInfoEditScreen(
+                  store: const Store(id: 1, name: 'waha')),
+              settings: settings);
+
+        default:
+          return MaterialPageRoute(
+              builder: (_) => const LoginScreen(), settings: settings);
+      }
   }
 
   ThemeData _buildTheme(Brightness brightness) {

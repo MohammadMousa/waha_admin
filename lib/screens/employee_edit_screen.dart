@@ -8,6 +8,7 @@ import '../models/role.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/person_roles_section.dart';
 import '../widgets/resource_picker_modal.dart';
@@ -280,13 +281,14 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.employees),
           Expanded(
             child: Column(
               children: [
                 Container(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+                  padding: EdgeInsets.fromLTRB(pagePad(context), 16, pagePad(context), 16),
                   decoration: BoxDecoration(
                     color: scheme.surface,
                     border: Border(

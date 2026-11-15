@@ -6,6 +6,7 @@ import '../models/store.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/error_dialog.dart';
 import '../widgets/category_card.dart';
@@ -109,6 +110,7 @@ class _CategoriesAdminScreenState extends State<CategoriesAdminScreen> {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.categories),
           Expanded(child: _buildContent(scheme)),
@@ -122,8 +124,8 @@ class _CategoriesAdminScreenState extends State<CategoriesAdminScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-          child: Row(
+          padding: EdgeInsets.fromLTRB(pagePad(context), 24, pagePad(context), 8),
+          child: adaptiveRow(context,
             children: [
               Text('Categories',
                   style: Theme.of(context)

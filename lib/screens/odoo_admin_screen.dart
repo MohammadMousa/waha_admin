@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../utils/number_format.dart';
 import '../widgets/error_dialog.dart';
@@ -381,14 +382,15 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.odooAdmin),
           Expanded(
             child: Column(
               children: [
                 Container(
-                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
-                  child: Row(
+                  padding: EdgeInsets.fromLTRB(pagePad(context), 20, pagePad(context), 12),
+                  child: adaptiveRow(context,
                     children: [
                       Text('Odoo Integration',
                           style: Theme.of(context)
@@ -410,7 +412,7 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
                       : RefreshIndicator(
                           onRefresh: _loadStatus,
                           child: ListView(
-                            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                            padding: EdgeInsets.fromLTRB(pagePad(context), 0, pagePad(context), 24),
                             children: [
                   _StatusCard(
                     configured: _configured,

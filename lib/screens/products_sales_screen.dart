@@ -12,6 +12,7 @@ import '../models/store.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/waha_date_picker.dart';
 import '../widgets/waha_filter_controls.dart';
@@ -279,9 +280,11 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final narrow = MediaQuery.sizeOf(context).width < kNarrowWidth;
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.productsSales),
           Expanded(
@@ -298,7 +301,15 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
                           ],
                         ),
                       )
-                    : Column(
+                    : narrow
+                        // Phones: the whole page scrolls, so the filters never push the table out of sight.
+                        ? ListView(children: [
+_buildHeader(scheme),
+_buildFilters(scheme),
+_buildSummaryPanel(scheme),
+                            SizedBox(height: 560, child: _buildTableArea(scheme)),
+                          ])
+                        : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildHeader(scheme),
@@ -316,8 +327,8 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
   // ── Header ────────────────────────────────────────────────────────────────
 
   Widget _buildHeader(ColorScheme scheme) => Container(
-        padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-        child: Row(
+        padding: EdgeInsets.fromLTRB(pagePad(context), 20, pagePad(context), 0),
+        child: adaptiveRow(context,
           children: [
             Text('Products Sales',
                 style: Theme.of(context)
@@ -367,8 +378,8 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
 
   Widget _buildFilters(ColorScheme scheme) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
-      child: Row(
+      padding: EdgeInsets.fromLTRB(pagePad(context), 12, pagePad(context), 0),
+      child: adaptiveRow(context,
         children: [
           WahaFilterDropdown<int?>(
             hint: 'Select Branch',
@@ -429,8 +440,38 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
 
   Widget _buildSummaryPanel(ColorScheme scheme) {
     final s = _summary ?? {};
+    if (MediaQuery.sizeOf(context).width < kNarrowWidth) {
+      // Phones: the four totals in a 2 x 2 grid.
+      final tiles = [
+        (Icons.inventory_2_outlined, '${s['total_products'] ?? 0}', 'Number of products'),
+        (Icons.storefront_outlined, '${s['total_branches'] ?? 0}', 'Number of branches'),
+        (Icons.shopping_cart_outlined, fmtCount(s['total_qty_sold']), 'Total Qty sold'),
+        (Icons.attach_money_outlined, _fmtNum(s['total_sales']), 'Total Sales'),
+      ];
+      return Container(
+        margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: LayoutBuilder(
+          builder: (_, box) => Wrap(
+            runSpacing: 14,
+            children: [
+              for (final t in tiles)
+                SizedBox(
+                  width: box.maxWidth / 2,
+                  child: _SummaryTile(t.$1, t.$2, t.$3, expand: false),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
     return Container(
-      margin: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+      margin: EdgeInsets.fromLTRB(pagePad(context), 16, pagePad(context), 0),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       decoration: BoxDecoration(
         color: scheme.surface,
@@ -457,7 +498,7 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
     final to   = ((_page + 1) * _pageSize).clamp(0, _totalCount);
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+      margin: EdgeInsets.fromLTRB(pagePad(context), 16, pagePad(context), 24),
       decoration: BoxDecoration(
         color: scheme.surface,
         borderRadius: BorderRadius.circular(12),
@@ -500,8 +541,8 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
           ),
           Divider(height: 1, color: scheme.outlineVariant),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            child: Row(
+            padding: EdgeInsets.symmetric(horizontal: pagePad(context) - 4, vertical: 10),
+            child: adaptiveRow(context,
               children: [
                 Text(
                   _totalCount == 0
@@ -579,26 +620,37 @@ class _SummaryTile extends StatelessWidget {
   final IconData icon;
   final String value;
   final String label;
-  const _SummaryTile(this.icon, this.value, this.label);
+  final bool expand;
+  const _SummaryTile(this.icon, this.value, this.label, {this.expand = true});
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Expanded(
-      child: Row(
-        children: [
-          Icon(icon, size: 28, color: scheme.onSurfaceVariant),
-          const SizedBox(width: 10),
-          Column(
+    final tile = Row(
+      children: [
+        Icon(icon, size: 28, color: scheme.onSurfaceVariant),
+        const SizedBox(width: 10),
+        Flexible(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-              Text(label, style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(value,
+                    maxLines: 1,
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+              ),
+              Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
             ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
+    return expand ? Expanded(child: tile) : tile;
   }
 }
 

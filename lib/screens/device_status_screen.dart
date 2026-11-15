@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/error_dialog.dart';
 import '../utils/number_format.dart';
@@ -128,6 +129,7 @@ class _DeviceStatusScreenState extends State<DeviceStatusScreen> {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.deviceStatus),
           Expanded(
@@ -135,8 +137,8 @@ class _DeviceStatusScreenState extends State<DeviceStatusScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-                  child: Row(
+                  padding: EdgeInsets.fromLTRB(pagePad(context), 24, pagePad(context), 8),
+                  child: adaptiveRow(context,
                     children: [
                       Text('Device Status',
                           style: Theme.of(context)
@@ -162,7 +164,7 @@ class _DeviceStatusScreenState extends State<DeviceStatusScreen> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                  padding: EdgeInsets.fromLTRB(pagePad(context), 0, pagePad(context), 8),
                   child: Row(
                     children: [
                       Text('Filter:', style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
@@ -204,7 +206,7 @@ class _DeviceStatusScreenState extends State<DeviceStatusScreen> {
     final cols = ['Device', 'Store', 'Status', 'Last Seen', 'App Version', 'Last Order'];
     const extra = ['No.', 'Last Pull', 'Last Push', 'Pending', 'Failed'];
     return Container(
-      margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      margin: EdgeInsets.fromLTRB(pagePad(context), 0, pagePad(context), 24),
       decoration: BoxDecoration(
         color: scheme.surface,
         borderRadius: BorderRadius.circular(12),

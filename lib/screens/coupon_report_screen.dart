@@ -10,6 +10,7 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../utils/number_format.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/error_dialog.dart';
 import '../widgets/waha_date_picker.dart';
@@ -193,6 +194,7 @@ class _CouponReportScreenState extends State<CouponReportScreen> {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.couponReport),
           Expanded(
@@ -200,8 +202,8 @@ class _CouponReportScreenState extends State<CouponReportScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-                  child: Row(
+                  padding: EdgeInsets.fromLTRB(pagePad(context), 24, pagePad(context), 8),
+                  child: adaptiveRow(context,
                     children: [
                       Text('Coupon Sales',
                           style: Theme.of(context)
@@ -260,8 +262,9 @@ class _CouponReportScreenState extends State<CouponReportScreen> {
   }
 
   Widget _cards(ColorScheme scheme) {
-    Widget card(String label, String value, IconData icon) => Expanded(
-          child: Container(
+    final narrow = MediaQuery.sizeOf(context).width < kNarrowWidth;
+    Widget card(String label, String value, IconData icon) {
+      final c = Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: scheme.surface,
@@ -272,19 +275,46 @@ class _CouponReportScreenState extends State<CouponReportScreen> {
               children: [
                 Icon(icon, color: scheme.primary),
                 const SizedBox(width: 12),
-                Column(
+                Flexible(child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-                    Text(label, style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+                    Text(label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
                   ],
-                ),
+                )),
               ],
             ),
+          );
+      return narrow ? c : Expanded(child: c);
+    }
+    if (narrow) {
+      // Phones: the counters two per row.
+      final tiles = [
+        ('Number of orders', fmtCount(_summary['orders']), Icons.grid_view_outlined),
+        ('Sub-total', fmtMoney(_summary['subTotal']), Icons.attach_money),
+        ('VAT', fmtMoney(_summary['vat']), Icons.percent),
+        ('Total', fmtMoney(_summary['total']), Icons.payments_outlined),
+        ('Coupon discount', fmtMoney(_summary['discount']), Icons.sell_outlined),
+      ];
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: LayoutBuilder(
+          builder: (_, box) => Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final t in tiles)
+                SizedBox(width: (box.maxWidth - 8) / 2, child: card(t.$1, t.$2, t.$3)),
+            ],
           ),
-        );
+        ),
+      );
+    }
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+      padding: EdgeInsets.fromLTRB(pagePad(context), 0, pagePad(context), 12),
       child: Row(
         children: [
           card('Number of orders', fmtCount(_summary['orders']), Icons.grid_view_outlined),
@@ -313,7 +343,7 @@ class _CouponReportScreenState extends State<CouponReportScreen> {
           },
         );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+      padding: EdgeInsets.fromLTRB(pagePad(context), 0, pagePad(context), 8),
       child: Wrap(
         spacing: 10,
         runSpacing: 8,
@@ -400,7 +430,7 @@ class _CouponReportScreenState extends State<CouponReportScreen> {
     final sortKey = _sort ?? (_groupBy == 'orders' ? 'paidAt' : 'total');
     final asc = _sort == null ? false : _asc;
     return Container(
-      margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      margin: EdgeInsets.fromLTRB(pagePad(context), 0, pagePad(context), 24),
       decoration: BoxDecoration(
         color: scheme.surface,
         borderRadius: BorderRadius.circular(12),

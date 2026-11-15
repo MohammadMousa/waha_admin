@@ -9,6 +9,7 @@ class MonthlyBarChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final narrow = MediaQuery.sizeOf(context).width < 700;
     if (series.isEmpty) return const Center(child: Text('No data'));
 
     final maxVal = series
@@ -60,7 +61,17 @@ class MonthlyBarChart extends StatelessWidget {
               getTitlesWidget: (v, _) {
                 final i = v.toInt();
                 if (i < 0 || i >= series.length) return const SizedBox.shrink();
-                final label = series[i]['label'] as String? ?? '';
+                var label = series[i]['label'] as String? ?? '';
+                // Phones: "Jun 2026" becomes "Jun 26" and long ranges show
+                // only some months, so the labels never overlap.
+                if (narrow) {
+                  final step = (series.length / 6).ceil();
+                  if (i % (step < 1 ? 1 : step) != 0) return const SizedBox.shrink();
+                  final parts = label.split(' ');
+                  if (parts.length == 2 && parts[1].length == 4) {
+                    label = '${parts[0]} ${parts[1].substring(2)}';
+                  }
+                }
                 return Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(label,

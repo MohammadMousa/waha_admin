@@ -5,6 +5,7 @@ import '../models/store.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/kpi_card.dart';
 import '../widgets/revenue_chart.dart';
@@ -119,6 +120,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final narrow = MediaQuery.sizeOf(context).width < kNarrowWidth;
 
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
@@ -145,7 +147,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     : RefreshIndicator(
                         onRefresh: _load,
                         child: SingleChildScrollView(
-                          padding: const EdgeInsets.all(24),
+                          padding: EdgeInsets.all(narrow ? 12 : 24),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -167,30 +169,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               const SizedBox(height: 24),
 
                               // ── Overview + Revenue line chart ────────────
-                              IntrinsicHeight(
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                                  children: [
-                                    Expanded(
-                                      flex: 1,
-                                      child: _OverviewCard(kpis: _kpis ?? {}),
-                                    ),
-                                    const SizedBox(width: 20),
-                                    Expanded(
-                                      flex: 3,
-                                      child: _ChartCard(
-                                        title: 'Revenue',
-                                        periods: const ['7d', '15d', '1m', '3m'],
-                                        selected: _revenuePeriod,
-                                        onPeriod: (p) {
-                                          setState(() => _revenuePeriod = p);
-                                          _loadSeries();
-                                        },
-                                        child: RevenueChart(series: _revenueSeries),
-                                      ),
-                                    ),
-                                  ],
+                              _pair(
+                                narrow,
+                                _OverviewCard(kpis: _kpis ?? {}),
+                                _ChartCard(
+                                  title: 'Revenue',
+                                  periods: const ['7d', '15d', '1m', '3m'],
+                                  selected: _revenuePeriod,
+                                  onPeriod: (p) {
+                                    setState(() => _revenuePeriod = p);
+                                    _loadSeries();
+                                  },
+                                  child: RevenueChart(series: _revenueSeries),
                                 ),
+                                aFlex: 1,
+                                bFlex: 3,
                               ),
                               const SizedBox(height: 20),
 
@@ -208,29 +201,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               const SizedBox(height: 20),
 
                               // ── Orders chart + Recent orders ─────────────
-                              IntrinsicHeight(
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                                  children: [
-                                    Expanded(
-                                      child: _ChartCard(
-                                        title: 'Orders',
-                                        periods: const ['7d', '15d', '1m', '3m'],
-                                        selected: _ordersPeriod,
-                                        onPeriod: (p) {
-                                          setState(() => _ordersPeriod = p);
-                                          _loadSeries();
-                                        },
-                                        child: OrdersChart(series: _ordersSeries),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 20),
-                                    Expanded(
-                                      child: RecentOrdersTable(
-                                        orders: _recentOrders.take(5).toList(),
-                                      ),
-                                    ),
-                                  ],
+                              _pair(
+                                narrow,
+                                _ChartCard(
+                                  title: 'Orders',
+                                  periods: const ['7d', '15d', '1m', '3m'],
+                                  selected: _ordersPeriod,
+                                  onPeriod: (p) {
+                                    setState(() => _ordersPeriod = p);
+                                    _loadSeries();
+                                  },
+                                  child: OrdersChart(series: _ordersSeries),
+                                ),
+                                RecentOrdersTable(
+                                  orders: _recentOrders.take(5).toList(),
                                 ),
                               ),
 
@@ -244,6 +228,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
   }
+}
+
+/// Two cards side by side on wide screens; stacked, each at full width, on
+/// phones.
+Widget _pair(bool narrow, Widget a, Widget b, {int aFlex = 1, int bFlex = 1}) {
+  return LayoutBuilder(builder: (_, box) {
+    // Side by side only when there is room; otherwise each card takes a full row.
+    if (narrow || box.maxWidth < 800) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [a, const SizedBox(height: 16), b],
+      );
+    }
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(flex: aFlex, child: a),
+          const SizedBox(width: 20),
+          Expanded(flex: bFlex, child: b),
+        ],
+      ),
+    );
+  });
 }
 
 // ── Header ────────────────────────────────────────────────────────────────────
@@ -313,7 +321,8 @@ class _KpiRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
         builder: (_, box) {
-          final narrow = box.maxWidth < 700;
+          final w = box.maxWidth;
+          final narrow = w < 560;
           final revSpark = _spark(revenueSeries);
           final ordSpark = _spark(ordersSeries);
 
@@ -346,6 +355,16 @@ class _KpiRow extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 12),
               child: c,
             )).toList());
+          }
+          if (w < 900) {
+            // Medium width: two cards per row.
+            return Wrap(
+              spacing: 16,
+              runSpacing: 12,
+              children: [
+                for (final c in cards) SizedBox(width: (w - 16) / 2, child: c),
+              ],
+            );
           }
           return Row(
             children: cards

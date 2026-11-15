@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../utils/number_format.dart';
+import 'adaptive_shell.dart';
 
 class RecentOrdersTable extends StatelessWidget {
   final List<Map<String, dynamic>> orders;
@@ -68,6 +69,7 @@ class RecentOrdersTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final compact = MediaQuery.sizeOf(context).width < kNarrowWidth;
 
     return Card(
       elevation: 0,
@@ -100,17 +102,19 @@ class RecentOrdersTable extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            // Header row
-            _buildRow(
-              id: '#',
-              branch: 'Branch',
-              date: 'Date',
-              total: 'Total',
-              status: 'Status',
-              isHeader: true,
-              scheme: scheme,
-            ),
-            const Divider(height: 1),
+            // Header row (wide screens only; phones show two lines per order)
+            if (!compact) ...[
+              _buildRow(
+                id: '#',
+                branch: 'Branch',
+                date: 'Date',
+                total: 'Total',
+                status: 'Status',
+                isHeader: true,
+                scheme: scheme,
+              ),
+              const Divider(height: 1),
+            ],
             if (orders.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 24),
@@ -122,6 +126,16 @@ class RecentOrdersTable extends StatelessWidget {
             else
               ...orders.map((o) => Column(
                     children: [
+                      if (compact)
+                        _compactRow(
+                          id: _displayId(o),
+                          branch: _branchName(o),
+                          date: _date(o),
+                          total: '${fmtMoney(o['total'])} ${o['currency'] ?? 'SAR'}',
+                          statusValue: o['status'] as String?,
+                          scheme: scheme,
+                        )
+                      else
                       _buildRow(
                         id: _displayId(o),
                         branch: _branchName(o),
@@ -137,6 +151,53 @@ class RecentOrdersTable extends StatelessWidget {
                   )),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Phone layout: id and branch with the status on the first line, the date
+  /// and the total on the second, so nothing is cut or broken across lines.
+  Widget _compactRow({
+    required String id,
+    required String branch,
+    required String date,
+    required String total,
+    required String? statusValue,
+    required ColorScheme scheme,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(id, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(branch,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 14)),
+              ),
+              const SizedBox(width: 8),
+              _StatusBadge(statusValue ?? ''),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: Text(date,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+              ),
+              const SizedBox(width: 8),
+              Text(total, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -222,6 +283,8 @@ class _StatusBadge extends StatelessWidget {
       ),
       child: Text(
         s,
+        maxLines: 1,
+        softWrap: false,
         style: TextStyle(fontSize: 11, color: fg, fontWeight: FontWeight.w600),
       ),
     );

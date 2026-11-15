@@ -12,6 +12,7 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../utils/resource_scope.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/resource_picker_modal.dart';
 
@@ -304,6 +305,7 @@ $slideHtml
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.advertisements),
           Expanded(child: _buildContent(scheme)),
@@ -328,11 +330,11 @@ $slideHtml
     final busy = _loadingSlides || _saving;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      padding: EdgeInsets.fromLTRB(pagePad(context), 20, pagePad(context), 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          adaptiveRow(context,
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -562,7 +564,8 @@ $slideHtml
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 4),
-                Row(
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     _Btn(Icons.stay_current_portrait_outlined, 'Preview',
                         () => _showPreview(context, slide)),
@@ -572,7 +575,6 @@ $slideHtml
                         _Slide(resourceId: slide.resourceId,
                             label: slide.label.isEmpty ? 'copy' : '${slide.label} copy',
                             publicUrl: slide.publicUrl)))),
-                    const Spacer(),
                     InkWell(
                       onTap: () async {
                         final ok = await showDialog<bool>(

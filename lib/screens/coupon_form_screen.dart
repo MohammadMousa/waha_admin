@@ -14,6 +14,7 @@ import '../state/auth_state.dart';
 import '../utils/code_import.dart';
 import '../utils/localized_name.dart';
 import '../utils/number_format.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/error_dialog.dart';
 import '../widgets/product_search_field.dart';
@@ -287,6 +288,7 @@ class _CouponFormScreenState extends State<CouponFormScreen> {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.coupons),
           Expanded(
@@ -295,8 +297,8 @@ class _CouponFormScreenState extends State<CouponFormScreen> {
                 : Column(
                     children: [
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
-                        child: Row(
+                        padding: EdgeInsets.fromLTRB(pagePad(context), 20, pagePad(context), 8),
+                        child: adaptiveRow(context,
                           children: [
                             IconButton(
                               icon: const Icon(Icons.arrow_back),
@@ -327,7 +329,7 @@ class _CouponFormScreenState extends State<CouponFormScreen> {
                       ),
                       Expanded(
                         child: SingleChildScrollView(
-                          padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+                          padding: EdgeInsets.fromLTRB(pagePad(context), 8, pagePad(context), 32),
                           child: Align(
                             alignment: Alignment.topCenter,
                             child: ConstrainedBox(

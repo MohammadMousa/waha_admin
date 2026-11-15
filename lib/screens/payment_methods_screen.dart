@@ -6,6 +6,7 @@ import '../models/store.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/error_dialog.dart';
 import '../widgets/product_image.dart';
@@ -106,6 +107,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.paymentMethodsGlobal),
           Expanded(
@@ -114,12 +116,12 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
               children: [
                 // Header
                 Container(
-                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+                  padding: EdgeInsets.fromLTRB(pagePad(context), 20, pagePad(context), 16),
                   decoration: BoxDecoration(
                     color: scheme.surface,
                     border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
                   ),
-                  child: Row(
+                  child: adaptiveRow(context,
                     children: [
                       Text('Payment Methods',
                           style: Theme.of(context)

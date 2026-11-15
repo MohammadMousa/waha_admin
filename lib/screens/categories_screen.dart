@@ -127,6 +127,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.categories),
           Expanded(

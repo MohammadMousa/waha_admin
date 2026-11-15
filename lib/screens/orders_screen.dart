@@ -13,6 +13,7 @@ import '../models/store.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/error_dialog.dart';
 import '../widgets/waha_date_picker.dart';
@@ -368,9 +369,11 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final narrow = MediaQuery.sizeOf(context).width < kNarrowWidth;
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.orders),
           Expanded(
@@ -378,7 +381,18 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
                 ? const Center(child: CircularProgressIndicator())
                 : _error != null && _summary == null
                     ? _buildError(scheme)
-                    : Column(
+                    : narrow
+                        // Phones: the whole page scrolls, so the filters never
+                        // push the table out of sight.
+                        ? ListView(
+                            children: [
+                              _buildHeader(scheme),
+                              _buildFilters(scheme),
+                              _buildSummaryPanel(scheme),
+                              SizedBox(height: 560, child: _buildTableArea(scheme)),
+                            ],
+                          )
+                        : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildHeader(scheme),
@@ -404,9 +418,70 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
         ),
       );
 
-  Widget _buildHeader(ColorScheme scheme) => Container(
-        padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-        child: Row(
+  Widget _buildHeader(ColorScheme scheme) {
+    final narrow = MediaQuery.sizeOf(context).width < kNarrowWidth;
+    if (!narrow) return _buildHeaderWide(scheme);
+    final exportStyle = FilledButton.styleFrom(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+    );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('Orders',
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineSmall
+                      ?.copyWith(fontWeight: FontWeight.w700)),
+              const Spacer(),
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.only(right: 12),
+                  child: SizedBox(width: 16, height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2)),
+                ),
+              IconButton(
+                icon: const Icon(Icons.view_column_outlined),
+                tooltip: 'Columns',
+                onPressed: _chooseColumns,
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh_outlined),
+                tooltip: 'Refresh',
+                onPressed: _load,
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.icon(
+                icon: const Icon(Icons.download_outlined, size: 16),
+                label: const Text('Export CSV'),
+                onPressed: _exporting ? null : _exportCsv,
+                style: exportStyle,
+              ),
+              FilledButton.icon(
+                icon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
+                label: const Text('Export PDF'),
+                onPressed: _exporting ? null : _exportPdf,
+                style: exportStyle,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderWide(ColorScheme scheme) => Container(
+        padding: EdgeInsets.fromLTRB(pagePad(context), 20, pagePad(context), 0),
+        child: adaptiveRow(context,
           children: [
             Text('Orders',
                 style: Theme.of(context)
@@ -456,8 +531,9 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
       );
 
   Widget _buildFilters(ColorScheme scheme) {
+    final narrow = MediaQuery.sizeOf(context).width < kNarrowWidth;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+      padding: EdgeInsets.fromLTRB(narrow ? 12 : 24, 12, narrow ? 12 : 24, 0),
       child: Wrap(
         spacing: 10,
         runSpacing: 8,
@@ -552,8 +628,38 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
 
   Widget _buildSummaryPanel(ColorScheme scheme) {
     final s = _summary ?? {};
+    if (MediaQuery.sizeOf(context).width < kNarrowWidth) {
+      // Phones: the four totals in a 2 x 2 grid.
+      final tiles = [
+        (Icons.receipt_long_outlined, '${s['total_orders'] ?? 0}', 'Number of orders'),
+        (Icons.attach_money_outlined, _fmtNum(s['sub_total']), 'Sub-Total'),
+        (Icons.percent_outlined, _fmtNum(s['vat']), 'VAT'),
+        (Icons.paid_outlined, _fmtNum(s['total']), 'Total'),
+      ];
+      return Container(
+        margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: LayoutBuilder(
+          builder: (_, box) => Wrap(
+            runSpacing: 14,
+            children: [
+              for (final t in tiles)
+                SizedBox(
+                  width: box.maxWidth / 2,
+                  child: _SumTile(t.$1, t.$2, t.$3, expand: false),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
     return Container(
-      margin: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+      margin: EdgeInsets.fromLTRB(pagePad(context), 16, pagePad(context), 0),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       decoration: BoxDecoration(
         color: scheme.surface,
@@ -657,8 +763,9 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
         if (_allCols[i].fixed || !_hidden.contains(_allCols[i].id)) i,
     ];
 
+    final narrow = MediaQuery.sizeOf(context).width < kNarrowWidth;
     return Container(
-      margin: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+      margin: narrow ? const EdgeInsets.fromLTRB(12, 12, 12, 16) : const EdgeInsets.fromLTRB(24, 16, 24, 24),
       decoration: BoxDecoration(
         color: scheme.surface,
         borderRadius: BorderRadius.circular(12),
@@ -752,8 +859,12 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
           ),
           Divider(height: 1, color: scheme.outlineVariant),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            child: Row(
+            padding: EdgeInsets.symmetric(horizontal: narrow ? 12 : 20, vertical: 10),
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              runSpacing: 8,
+              spacing: 16,
               children: [
                 Text(
                   _totalCount == 0
@@ -761,13 +872,11 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
                       : 'Showing $from–$to of $_totalCount entries',
                   style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
                 ),
-                const Spacer(),
                 WahaPageSizeSelector(
                   value: _pageSize,
                   options: _pageSizeOptions,
                   onChanged: (v) { setState(() { _pageSize = v; _page = 0; }); _load(); },
                 ),
-                const SizedBox(width: 16),
                 _PaginationBar(
                   page: _page,
                   totalCount: _totalCount,
@@ -993,26 +1102,37 @@ class _SumTile extends StatelessWidget {
   final IconData icon;
   final String value;
   final String label;
-  const _SumTile(this.icon, this.value, this.label);
+  final bool expand;
+  const _SumTile(this.icon, this.value, this.label, {this.expand = true});
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Expanded(
-      child: Row(
-        children: [
-          Icon(icon, size: 28, color: scheme.onSurfaceVariant),
-          const SizedBox(width: 10),
-          Column(
+    final tile = Row(
+      children: [
+        Icon(icon, size: 28, color: scheme.onSurfaceVariant),
+        const SizedBox(width: 10),
+        Flexible(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-              Text(label, style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(value,
+                    maxLines: 1,
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+              ),
+              Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
             ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
+    return expand ? Expanded(child: tile) : tile;
   }
 }
 

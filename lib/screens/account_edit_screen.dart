@@ -7,6 +7,7 @@ import '../models/role.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/person_roles_section.dart';
 import '../widgets/error_dialog.dart';
@@ -196,6 +197,7 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.accounts),
           Expanded(
@@ -203,7 +205,7 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
               children: [
                 // Header bar
                 Container(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+                  padding: EdgeInsets.fromLTRB(pagePad(context), 16, pagePad(context), 16),
                   decoration: BoxDecoration(
                     color: scheme.surface,
                     border: Border(

@@ -6,6 +6,7 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../utils/number_format.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/error_dialog.dart';
 import '../widgets/waha_date_picker.dart';
@@ -188,6 +189,7 @@ class _SystemAuditScreenState extends State<SystemAuditScreen> {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.systemAudit),
           Expanded(
@@ -195,8 +197,8 @@ class _SystemAuditScreenState extends State<SystemAuditScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-                  child: Row(
+                  padding: EdgeInsets.fromLTRB(pagePad(context), 24, pagePad(context), 8),
+                  child: adaptiveRow(context,
                     children: [
                       Text('System Audit',
                           style: Theme.of(context)
@@ -216,7 +218,7 @@ class _SystemAuditScreenState extends State<SystemAuditScreen> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                  padding: EdgeInsets.fromLTRB(pagePad(context), 0, pagePad(context), 8),
                   child: Wrap(
                     spacing: 12,
                     runSpacing: 8,
@@ -277,7 +279,7 @@ class _SystemAuditScreenState extends State<SystemAuditScreen> {
 
   Widget _table(ColorScheme scheme) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      margin: EdgeInsets.fromLTRB(pagePad(context), 0, pagePad(context), 24),
       decoration: BoxDecoration(
         color: scheme.surface,
         borderRadius: BorderRadius.circular(12),

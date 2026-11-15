@@ -6,6 +6,7 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../utils/number_format.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/error_dialog.dart';
 
@@ -185,6 +186,7 @@ class _SystemConfigScreenState extends State<SystemConfigScreen> {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.systemConfig),
           Expanded(
@@ -192,8 +194,8 @@ class _SystemConfigScreenState extends State<SystemConfigScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-                  child: Row(
+                  padding: EdgeInsets.fromLTRB(pagePad(context), 24, pagePad(context), 8),
+                  child: adaptiveRow(context,
                     children: [
                       Text('System Configuration',
                           style: Theme.of(context)
@@ -209,7 +211,7 @@ class _SystemConfigScreenState extends State<SystemConfigScreen> {
                   child: _loading
                       ? const Center(child: CircularProgressIndicator())
                       : SingleChildScrollView(
-                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                          padding: EdgeInsets.fromLTRB(pagePad(context), 0, pagePad(context), 24),
                           child: ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 980),
                             child: Column(
@@ -327,42 +329,58 @@ class _SystemConfigScreenState extends State<SystemConfigScreen> {
             decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
             onChanged: (_) => setState(() {}),
           );
+    final info = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(key, style: const TextStyle(fontWeight: FontWeight.w600)),
+        if ((s['description'] ?? '').toString().isNotEmpty)
+          Text(s['description'].toString(), style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+        Text(
+          [
+            if ((s['constraints'] ?? '').toString().isNotEmpty) s['constraints'].toString(),
+            'Default: ${def.isEmpty ? '(none)' : _hint(s, def)}',
+          ].join('  ·  '),
+          style: TextStyle(fontSize: 11, color: scheme.outline),
+        ),
+      ],
+    );
+    final saveBtn = FilledButton(
+      onPressed: _busy || !changed ? null : () => _saveSetting(s, ctrl.text.trim()),
+      child: const Text('Save'),
+    );
+    final resetBtn = TextButton(
+      // Reset = send the default.
+      onPressed: _busy || ctrl.text.trim() == def ? null : () => _saveSetting(s, def),
+      child: const Text('Reset'),
+    );
+    if (MediaQuery.sizeOf(context).width < kNarrowWidth) {
+      // Phones: description on top, then the field with its buttons below.
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            info,
+            const SizedBox(height: 8),
+            field,
+            const SizedBox(height: 8),
+            Row(children: [saveBtn, const SizedBox(width: 8), resetBtn]),
+          ],
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            flex: 5,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(key, style: const TextStyle(fontWeight: FontWeight.w600)),
-                if ((s['description'] ?? '').toString().isNotEmpty)
-                  Text(s['description'].toString(), style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
-                Text(
-                  [
-                    if ((s['constraints'] ?? '').toString().isNotEmpty) s['constraints'].toString(),
-                    'Default: ${def.isEmpty ? '(none)' : _hint(s, def)}',
-                  ].join('  ·  '),
-                  style: TextStyle(fontSize: 11, color: scheme.outline),
-                ),
-              ],
-            ),
-          ),
+          Expanded(flex: 5, child: info),
           const SizedBox(width: 16),
           Expanded(flex: 4, child: field),
           const SizedBox(width: 8),
-          FilledButton(
-            onPressed: _busy || !changed ? null : () => _saveSetting(s, ctrl.text.trim()),
-            child: const Text('Save'),
-          ),
+          saveBtn,
           const SizedBox(width: 4),
-          TextButton(
-            // Reset = send the default.
-            onPressed: _busy || ctrl.text.trim() == def ? null : () => _saveSetting(s, def),
-            child: const Text('Reset'),
-          ),
+          resetBtn,
         ],
       ),
     );

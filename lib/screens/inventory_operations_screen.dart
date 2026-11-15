@@ -12,6 +12,7 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../utils/localized_name.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/product_search_field.dart';
 import '../widgets/waha_date_picker.dart';
@@ -296,9 +297,11 @@ class _InventoryOperationsScreenState extends State<InventoryOperationsScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final narrow = MediaQuery.sizeOf(context).width < kNarrowWidth;
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           AdminSidebar(currentRoute: widget.route),
           Expanded(
@@ -306,7 +309,14 @@ class _InventoryOperationsScreenState extends State<InventoryOperationsScreen> {
                 ? const Center(child: CircularProgressIndicator())
                 : _error != null && _items.isEmpty
                     ? _buildError(scheme)
-                    : Column(
+                    : narrow
+                        // Phones: the whole page scrolls, so the filters never push the table out of sight.
+                        ? ListView(children: [
+_buildHeader(scheme),
+_buildFilters(scheme),
+                            SizedBox(height: 560, child: _buildTableArea(scheme)),
+                          ])
+                        : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildHeader(scheme),
@@ -332,8 +342,8 @@ class _InventoryOperationsScreenState extends State<InventoryOperationsScreen> {
       );
 
   Widget _buildHeader(ColorScheme scheme) => Container(
-        padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-        child: Row(
+        padding: EdgeInsets.fromLTRB(pagePad(context), 20, pagePad(context), 0),
+        child: adaptiveRow(context,
           children: [
             Text(widget.title,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
@@ -362,7 +372,7 @@ class _InventoryOperationsScreenState extends State<InventoryOperationsScreen> {
 
   Widget _buildFilters(ColorScheme scheme) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+      padding: EdgeInsets.fromLTRB(pagePad(context), 12, pagePad(context), 0),
       child: Wrap(
         spacing: 10,
         runSpacing: 8,
@@ -461,7 +471,7 @@ class _InventoryOperationsScreenState extends State<InventoryOperationsScreen> {
     final cols = ['Visit ID', 'Date', 'Branch', 'Product', 'Quantity', 'Employee'];
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+      margin: EdgeInsets.fromLTRB(pagePad(context), 16, pagePad(context), 24),
       decoration: BoxDecoration(
         color: scheme.surface,
         borderRadius: BorderRadius.circular(12),
@@ -506,8 +516,8 @@ class _InventoryOperationsScreenState extends State<InventoryOperationsScreen> {
           ),
           Divider(height: 1, color: scheme.outlineVariant),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            child: Row(
+            padding: EdgeInsets.symmetric(horizontal: pagePad(context) - 4, vertical: 10),
+            child: adaptiveRow(context,
               children: [
                 Text(
                   _totalCount == 0 ? 'No entries' : 'Showing ${fmtCount(from)}–${fmtCount(to)} of ${fmtCount(_totalCount)} entries',

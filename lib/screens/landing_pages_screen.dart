@@ -12,6 +12,7 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../utils/resource_scope.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/error_dialog.dart';
 
@@ -193,6 +194,7 @@ class _LandingPagesScreenState extends State<LandingPagesScreen> {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.landingPages),
           Expanded(child: _buildContent(scheme)),
@@ -214,7 +216,7 @@ class _LandingPagesScreenState extends State<LandingPagesScreen> {
 
   Widget _buildHeader(ColorScheme scheme) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      padding: EdgeInsets.fromLTRB(pagePad(context), 20, pagePad(context), 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

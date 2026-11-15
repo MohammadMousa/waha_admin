@@ -7,6 +7,7 @@ import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../utils/number_format.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/error_dialog.dart';
 import '../widgets/waha_filter_controls.dart';
@@ -199,6 +200,7 @@ class _CouponsScreenState extends State<CouponsScreen> {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.coupons),
           Expanded(
@@ -206,8 +208,8 @@ class _CouponsScreenState extends State<CouponsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-                  child: Row(
+                  padding: EdgeInsets.fromLTRB(pagePad(context), 24, pagePad(context), 8),
+                  child: adaptiveRow(context,
                     children: [
                       Text('Coupons',
                           style: Theme.of(context)
@@ -234,7 +236,7 @@ class _CouponsScreenState extends State<CouponsScreen> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                  padding: EdgeInsets.fromLTRB(pagePad(context), 0, pagePad(context), 8),
                   child: Wrap(
                     spacing: 10,
                     runSpacing: 8,
@@ -286,7 +288,7 @@ class _CouponsScreenState extends State<CouponsScreen> {
   Widget _buildTable(ColorScheme scheme, bool canManage) {
     const head = TextStyle(fontWeight: FontWeight.w600);
     return Container(
-      margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      margin: EdgeInsets.fromLTRB(pagePad(context), 0, pagePad(context), 24),
       decoration: BoxDecoration(
         color: scheme.surface,
         borderRadius: BorderRadius.circular(12),

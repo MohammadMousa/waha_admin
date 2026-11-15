@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
+import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/error_dialog.dart';
 import '../utils/number_format.dart';
@@ -286,6 +287,7 @@ td{padding:5px 8px;border-bottom:1px solid #eee}
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AdminSidebar(currentRoute: Routes.integrationLogs),
           Expanded(
@@ -304,8 +306,8 @@ td{padding:5px 8px;border-bottom:1px solid #eee}
   }
 
   Widget _buildHeader(ColorScheme scheme) => Container(
-        padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-        child: Row(
+        padding: EdgeInsets.fromLTRB(pagePad(context), 20, pagePad(context), 0),
+        child: adaptiveRow(context,
           children: [
             Text('Sync Logs',
                 style: Theme.of(context).textTheme.headlineSmall
@@ -343,7 +345,7 @@ td{padding:5px 8px;border-bottom:1px solid #eee}
       );
 
   Widget _buildFilters(ColorScheme scheme) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+        padding: EdgeInsets.fromLTRB(pagePad(context), 12, pagePad(context), 0),
         child: Wrap(
           spacing: 10,
           runSpacing: 8,
@@ -377,7 +379,7 @@ td{padding:5px 8px;border-bottom:1px solid #eee}
     final to   = ((_page + 1) * _pageSize).clamp(0, _totalCount);
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+      margin: EdgeInsets.fromLTRB(pagePad(context), 16, pagePad(context), 24),
       decoration: BoxDecoration(
         color: scheme.surface,
         borderRadius: BorderRadius.circular(12),
@@ -478,7 +480,7 @@ td{padding:5px 8px;border-bottom:1px solid #eee}
           Divider(height: 1, color: scheme.outlineVariant),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            child: Row(
+            child: adaptiveRow(context,
               children: [
                 Text(
                   _totalCount == 0
