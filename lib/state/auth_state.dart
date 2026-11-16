@@ -42,6 +42,7 @@ class AuthState extends ChangeNotifier {
     'MANAGE_INTEGRATIONS',
     'MANAGE_SETTINGS',
     'VIEW_INVENTORY_REPORTS',
+    'VIEW_ORGANIZATION_AUDIT',
   };
   bool get _serverSplitsPermissions => _permissions.any(_splitKeys.contains);
   bool get canViewReports => !_serverSplitsPermissions || hasPermission('VIEW_REPORTS');
@@ -54,6 +55,9 @@ class AuthState extends ChangeNotifier {
       !_serverSplitsPermissions || hasPermission('MANAGE_INTEGRATIONS');
   bool get canManageSettings =>
       _serverSplitsPermissions ? hasPermission('MANAGE_SETTINGS') : hasPermission('MANAGE_STORES');
+  /// Audit menu: super admin, or VIEW_ORGANIZATION_AUDIT (api level 6).
+  bool get canViewAudit =>
+      _apiLevel >= 6 ? (isSuperAdmin || hasPermission('VIEW_ORGANIZATION_AUDIT')) : (_apiLevel >= 3 && isSuperAdmin);
   List<Organization> get organizations => _organizations;
   Organization? get actingOrganization => _acting;
 

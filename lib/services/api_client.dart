@@ -1292,6 +1292,15 @@ class ApiClient {
   Future<Map<String, dynamic>> putSystemProperties(String token, Map<String, String> values) =>
       _systemRequest('PUT', '/api/admin/system/properties', token, body: values);
 
+  // Data cleanup (api level 5, MANAGE_SYSTEM).
+  Future<Map<String, dynamic>> getSystemCleanup(String token) =>
+      _systemRequest('GET', '/api/admin/system/cleanup', token);
+
+  /// Runs one task (by key) or, with no key, every task that is on.
+  Future<Map<String, dynamic>> runSystemCleanup(String token, {String? table}) =>
+      _systemRequest('POST', '/api/admin/system/cleanup/run', token,
+          body: table == null ? null : {'table': table});
+
   Future<Map<String, dynamic>> getSystemCaches(String token) =>
       _systemRequest('GET', '/api/admin/system/caches', token);
 
@@ -1326,6 +1335,45 @@ class ApiClient {
   Future<int> clearSystemAudit(String token, {String? before}) async {
     final r = await _systemRequest('POST', '/api/admin/system/audit/clear', token,
         body: before == null ? null : {'before': before});
+    return (r['deleted'] as num?)?.toInt() ?? 0;
+  }
+
+  // Shared audit history (api level 6): MANAGE_SYSTEM sees everything, owners and
+  // VIEW_ORGANIZATION_AUDIT holders see their own organization.
+  Future<Map<String, dynamic>> getAudit(String token,
+      {int page = 0,
+      int size = 50,
+      String? scope,
+      String? type,
+      String? action,
+      String? actor,
+      int? organizationId,
+      String? from,
+      String? to}) {
+    final q = {
+      'page': '$page',
+      'size': '$size',
+      if (scope != null && scope.isNotEmpty) 'scope': scope,
+      if (type != null && type.isNotEmpty) 'type': type,
+      if (action != null && action.isNotEmpty) 'action': action,
+      if (actor != null && actor.isNotEmpty) 'actor': actor,
+      if (organizationId != null) 'organizationId': '$organizationId',
+      if (from != null) 'from': from,
+      if (to != null) 'to': to,
+    };
+    return _systemRequest('GET', '/api/admin/audit?${Uri(queryParameters: q).query}', token);
+  }
+
+  Future<int> deleteAuditRows(String token, List<int> ids) async {
+    final r = await _systemRequest('POST', '/api/admin/audit/delete', token, body: {'ids': ids});
+    return (r['deleted'] as num?)?.toInt() ?? 0;
+  }
+
+  Future<int> clearAudit(String token, {String? before, String? scope}) async {
+    final r = await _systemRequest('POST', '/api/admin/audit/clear', token, body: {
+      if (before != null) 'before': before,
+      if (scope != null) 'scope': scope,
+    });
     return (r['deleted'] as num?)?.toInt() ?? 0;
   }
 

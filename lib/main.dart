@@ -54,7 +54,7 @@ import 'screens/coupon_report_screen.dart';
 import 'screens/missing_products_screen.dart';
 import 'screens/organizations_screen.dart';
 import 'screens/stores_screen.dart';
-import 'screens/system_audit_screen.dart';
+import 'screens/audit_screen.dart';
 import 'screens/system_config_screen.dart';
 import 'state/auth_state.dart';
 import 'services/app_info.dart';
@@ -126,7 +126,7 @@ class WahaAdminApp extends StatelessWidget {
 
         case Routes.systemAudit:
           return MaterialPageRoute(
-              builder: (_) => const SystemAuditScreen(), settings: settings);
+              builder: (_) => const AuditScreen(), settings: settings);
 
         case Routes.deviceStatus:
           return MaterialPageRoute(

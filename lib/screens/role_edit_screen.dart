@@ -127,6 +127,7 @@ class _RoleEditScreenState extends State<RoleEditScreen> {
     'MANAGE_PAYMENT_METHODS': 'Switch payment methods per store',
     'MANAGE_INTEGRATIONS': 'Odoo and other integrations and their logs',
     'MANAGE_SETTINGS': 'Receipt info, organization info and properties',
+    'VIEW_ORGANIZATION_AUDIT': "View the organization's audit history",
   };
 
   Map<String, List<PermissionInfo>> _grouped() {

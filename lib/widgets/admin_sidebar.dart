@@ -455,9 +455,11 @@ class _AdminSidebarState extends State<AdminSidebar> {
                     current: currentRoute,
                     indent: true,
                   ),
+                ]),
+                if (auth.canViewAudit) _NavGroup('Audit', current: currentRoute, children: [
                   _NavItem(
                     icon: Icons.history_outlined,
-                    label: 'System Audit',
+                    label: 'Audit',
                     route: Routes.systemAudit,
                     current: currentRoute,
                     indent: true,

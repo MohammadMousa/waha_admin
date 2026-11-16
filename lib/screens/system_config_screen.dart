@@ -23,6 +23,8 @@ class _SystemConfigScreenState extends State<SystemConfigScreen> {
   List<Map<String, dynamic>> _settings = [];
   List<Map<String, dynamic>> _others = [];
   List<Map<String, dynamic>> _caches = [];
+  List<Map<String, dynamic>> _cleanup = [];
+  final Map<String, TextEditingController> _cleanupCtrls = {};
   final Map<String, TextEditingController> _ctrls = {};
   final Map<String, String> _saved = {}; // value last loaded from the server
   bool _loading = true;
@@ -40,6 +42,9 @@ class _SystemConfigScreenState extends State<SystemConfigScreen> {
   @override
   void dispose() {
     for (final c in _ctrls.values) {
+      c.dispose();
+    }
+    for (final c in _cleanupCtrls.values) {
       c.dispose();
     }
     super.dispose();
@@ -66,16 +71,67 @@ class _SystemConfigScreenState extends State<SystemConfigScreen> {
     }
   }
 
+  void _applyCleanup(Map<String, dynamic> data) {
+    _cleanup = (data['items'] as List? ?? []).cast<Map<String, dynamic>>();
+    for (final t in _cleanup) {
+      (_cleanupCtrls[t['key'].toString()] ??= TextEditingController()).text =
+          (t['days'] ?? 0).toString();
+    }
+  }
+
+  Future<void> _reloadCleanup(String token) async {
+    final data = await ApiClient().getSystemCleanup(token);
+    if (mounted) setState(() => _applyCleanup(data));
+  }
+
+  Future<void> _saveCleanupDays(Map<String, dynamic> t) async {
+    final text = _cleanupCtrls[t['key'].toString()]!.text.trim();
+    if (int.tryParse(text) == null) {
+      showErrorDialog(context, 'Days must be a whole number (0 turns the task off).');
+      return;
+    }
+    await _run((tok) async {
+      await ApiClient().putSystemProperties(tok, {t['setting'].toString(): text});
+      await _reloadCleanup(tok);
+      if (mounted) _toast('${t['label']} saved.');
+    });
+  }
+
+  Future<void> _runCleanup({Map<String, dynamic>? task}) async {
+    final what = task == null ? 'every task that is on' : '"${task['label']}"';
+    if (!await _confirm('Run cleanup now?',
+        'Removes old rows for $what. This cannot be undone and is recorded in the system audit.',
+        'Run now')) {
+      return;
+    }
+    await _run((tok) async {
+      final r = await ApiClient().runSystemCleanup(tok, table: task?['key']?.toString());
+      await _reloadCleanup(tok);
+      if (!mounted) return;
+      final failed = (r['items'] as List? ?? [])
+          .whereType<Map>()
+          .where((i) => (i['error'] ?? '').toString().isNotEmpty)
+          .length;
+      _toast('Removed ${fmtCount(r['removed'] ?? 0)} row(s)'
+          '${failed > 0 ? ', $failed task(s) failed' : ''}.');
+    });
+  }
+
   Future<void> _load() async {
     final token = _token;
     if (token == null) { _redirectLogin(); return; }
     setState(() { _loading = true; _error = null; });
     try {
+      final level = context.read<AuthState>().apiLevel;
       final settings = await ApiClient().getSystemProperties(token);
       final caches = await ApiClient().getSystemCaches(token);
+      final cleanup = level >= 5
+          ? await ApiClient().getSystemCleanup(token)
+          : null;
       if (!mounted) return;
       setState(() {
         _applySettings(settings);
+        if (cleanup != null) _applyCleanup(cleanup);
         _caches = (caches['items'] as List? ?? []).cast<Map<String, dynamic>>();
         _loading = false;
       });
@@ -224,7 +280,9 @@ class _SystemConfigScreenState extends State<SystemConfigScreen> {
                                     style: TextStyle(fontSize: 12, color: scheme.outline),
                                   ),
                                   const SizedBox(height: 8),
-                                  for (final s in _settings) _settingRow(s, scheme),
+                                  for (final s in _settings)
+                                    if (_cleanup.isEmpty || !s['key'].toString().startsWith('Cleanup_'))
+                                      _settingRow(s, scheme),
                                   if (_others.isNotEmpty)
                                     ExpansionTile(
                                       tilePadding: EdgeInsets.zero,
@@ -257,6 +315,10 @@ class _SystemConfigScreenState extends State<SystemConfigScreen> {
                                   const SizedBox(height: 8),
                                   for (final c in _caches) _cacheRow(c, scheme),
                                 ]),
+                                if (_cleanup.isNotEmpty) ...[
+                                  const SizedBox(height: 16),
+                                  _cleanupCard(scheme),
+                                ],
                                 const SizedBox(height: 16),
                                 _card('Login lockouts', scheme, [
                                   Text('Lifts every lockout. Not part of "Flush cache".',
@@ -381,6 +443,103 @@ class _SystemConfigScreenState extends State<SystemConfigScreen> {
           saveBtn,
           const SizedBox(width: 4),
           resetBtn,
+        ],
+      ),
+    );
+  }
+
+  Widget _cleanupCard(ColorScheme scheme) => _card('Data cleanup', scheme, [
+        Text(
+          'Old log and history rows are removed by themselves every night at 03:30. '
+          'Failed or pending sync rows are never touched, and orders and payments are never removed. '
+          'Days: 0 turns a task off; otherwise it must be at least the minimum shown.',
+          style: TextStyle(fontSize: 12, color: scheme.outline),
+        ),
+        const SizedBox(height: 8),
+        FilledButton.icon(
+          onPressed: _busy ? null : () => _runCleanup(),
+          icon: const Icon(Icons.delete_sweep_outlined, size: 18),
+          label: const Text('Run all'),
+        ),
+        const SizedBox(height: 4),
+        for (final t in _cleanup) _cleanupRow(t, scheme),
+      ]);
+
+  Widget _cleanupRow(Map<String, dynamic> t, ColorScheme scheme) {
+    final key = t['key'].toString();
+    final ctrl = _cleanupCtrls[key]!;
+    final enabled = t['enabled'] == true;
+    final changed = ctrl.text.trim() != (t['days'] ?? 0).toString();
+    final lastAt = t['lastRunAt'] != null
+        ? _dtFmt.format(DateTime.parse(t['lastRunAt'].toString()).toLocal())
+        : 'never';
+    final src = (t['lastSource'] ?? '').toString();
+    final err = (t['lastError'] ?? '').toString();
+    final info = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(t['label'].toString(), style: const TextStyle(fontWeight: FontWeight.w600)),
+        Text(t['description']?.toString() ?? '',
+            style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+        Text(
+          '${fmtCount(t['rows'] ?? 0)} rows  ·  ${fmtCount(t['eligible'] ?? 0)} ready to remove  ·  '
+          'last run: $lastAt${t['lastRunAt'] != null ? ' (${fmtCount(t['lastRemoved'] ?? 0)} removed'
+              '${src.isEmpty ? '' : ', ${src.toLowerCase()}'})' : ''}',
+          style: TextStyle(fontSize: 11, color: scheme.outline),
+        ),
+        if (err.isNotEmpty)
+          Text(err, style: TextStyle(fontSize: 12, color: scheme.error)),
+      ],
+    );
+    final field = SizedBox(
+      width: 150,
+      child: TextField(
+        controller: ctrl,
+        keyboardType: TextInputType.number,
+        decoration: InputDecoration(
+          border: const OutlineInputBorder(),
+          isDense: true,
+          labelText: 'Days (min ${t['minDays']})',
+          helperText: enabled ? null : 'Off',
+        ),
+        onChanged: (_) => setState(() {}),
+      ),
+    );
+    final saveBtn = FilledButton(
+      onPressed: _busy || !changed ? null : () => _saveCleanupDays(t),
+      child: const Text('Save'),
+    );
+    final runBtn = OutlinedButton(
+      onPressed: _busy || !enabled || changed ? null : () => _runCleanup(task: t),
+      child: const Text('Run now'),
+    );
+    if (MediaQuery.sizeOf(context).width < kNarrowWidth) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            info,
+            const SizedBox(height: 8),
+            field,
+            const SizedBox(height: 8),
+            Wrap(spacing: 8, children: [saveBtn, runBtn]),
+          ],
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: info),
+          const SizedBox(width: 16),
+          field,
+          const SizedBox(width: 8),
+          saveBtn,
+          const SizedBox(width: 4),
+          runBtn,
         ],
       ),
     );
