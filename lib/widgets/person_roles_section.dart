@@ -284,7 +284,7 @@ class _AddRoleDialogState extends State<_AddRoleDialog> {
             DropdownButtonFormField<int>(
               initialValue: _roleId,
               isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Role', border: OutlineInputBorder()),
+              decoration: const InputDecoration(labelText: 'Role'),
               items: [
                 for (final r in widget.roles)
                   DropdownMenuItem(value: r.id, child: Text(r.name)),
@@ -294,11 +294,12 @@ class _AddRoleDialogState extends State<_AddRoleDialog> {
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: _scopeType,
-              decoration: const InputDecoration(labelText: 'Scope', border: OutlineInputBorder()),
+              decoration: const InputDecoration(labelText: 'Scope'),
               items: [
                 if (widget.allowCompany)
                   const DropdownMenuItem(value: 'COMPANY', child: Text('Company')),
-                const DropdownMenuItem(value: 'BRANCH_GROUP', child: Text('Branch group')),
+                if (widget.groups.isNotEmpty)
+                  const DropdownMenuItem(value: 'BRANCH_GROUP', child: Text('Branch group')),
                 const DropdownMenuItem(value: 'BRANCH', child: Text('Branch')),
               ],
               onChanged: (v) => setState(() {
@@ -313,8 +314,7 @@ class _AddRoleDialogState extends State<_AddRoleDialog> {
                 initialValue: _targetId,
                 isExpanded: true,
                 decoration: InputDecoration(
-                    labelText: _scopeType == 'BRANCH' ? 'Branch' : 'Branch group',
-                    border: const OutlineInputBorder()),
+                    labelText: _scopeType == 'BRANCH' ? 'Branch' : 'Branch group',),
                 items: _scopeType == 'BRANCH'
                     ? [for (final s in widget.stores) DropdownMenuItem(value: s.id, child: Text(s.name))]
                     : [for (final g in widget.groups) DropdownMenuItem(value: g.id, child: Text(g.name))],

@@ -113,6 +113,8 @@ class _RoleEditScreenState extends State<RoleEditScreen> {
     'EXPORT_REPORTS': 'Reports',
     'VIEW_ALL_ORDERS': 'Reports',
     'VIEW_INVENTORY_REPORTS': 'Reports',
+    'VIEW_WASTES': 'Inventory',
+    'CREATE_WASTES': 'Inventory',
     'MANAGE_SETTINGS': 'Settings',
     'MANAGE_PAYMENT_METHODS': 'Settings',
     'MANAGE_INTEGRATIONS': 'Settings',
@@ -127,6 +129,8 @@ class _RoleEditScreenState extends State<RoleEditScreen> {
     'MANAGE_PAYMENT_METHODS': 'Switch payment methods per store',
     'MANAGE_INTEGRATIONS': 'Odoo and other integrations and their logs',
     'MANAGE_SETTINGS': 'Receipt info, organization info and properties',
+    'VIEW_WASTES': 'View, open and export inventory wastes',
+    'CREATE_WASTES': 'Record inventory wastes',
     'VIEW_ORGANIZATION_AUDIT': "View the organization's audit history",
   };
 
@@ -189,7 +193,6 @@ class _RoleEditScreenState extends State<RoleEditScreen> {
                             decoration: const InputDecoration(
                               labelText: 'Name *',
                               counterText: '',
-                              border: OutlineInputBorder(),
                               prefixIcon: Icon(Icons.admin_panel_settings_outlined),
                             ),
                           ),
@@ -201,7 +204,6 @@ class _RoleEditScreenState extends State<RoleEditScreen> {
                             decoration: const InputDecoration(
                               labelText: 'Description',
                               counterText: '',
-                              border: OutlineInputBorder(),
                             ),
                           ),
                           const Divider(height: 32),

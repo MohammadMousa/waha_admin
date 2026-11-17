@@ -378,7 +378,7 @@ class _SystemConfigScreenState extends State<SystemConfigScreen> {
     final field = isBool
         ? DropdownButtonFormField<String>(
             initialValue: ctrl.text.toLowerCase() == 'false' ? 'false' : 'true',
-            decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+            decoration: const InputDecoration(isDense: true),
             items: const [
               DropdownMenuItem(value: 'true', child: Text('true — Enabled')),
               DropdownMenuItem(value: 'false', child: Text('false — Disabled')),
@@ -388,7 +388,7 @@ class _SystemConfigScreenState extends State<SystemConfigScreen> {
         : TextField(
             controller: ctrl,
             keyboardType: type == 'integer' ? TextInputType.number : TextInputType.text,
-            decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+            decoration: const InputDecoration(isDense: true),
             onChanged: (_) => setState(() {}),
           );
     final info = Column(
@@ -497,7 +497,6 @@ class _SystemConfigScreenState extends State<SystemConfigScreen> {
         controller: ctrl,
         keyboardType: TextInputType.number,
         decoration: InputDecoration(
-          border: const OutlineInputBorder(),
           isDense: true,
           labelText: 'Days (min ${t['minDays']})',
           helperText: enabled ? null : 'Off',

@@ -169,13 +169,13 @@ class _CategoryEditScreenState extends State<CategoryEditScreen> {
                               controller: _nameArCtrl,
                               textDirection: TextDirection.rtl,
                               decoration: const InputDecoration(
-                                  labelText: 'Arabic', border: OutlineInputBorder()),
+                                  labelText: 'Arabic'),
                             ),
                             const SizedBox(height: 10),
                             TextField(
                               controller: _nameEnCtrl,
                               decoration: const InputDecoration(
-                                  labelText: 'English', border: OutlineInputBorder()),
+                                  labelText: 'English'),
                             ),
 
                             const SizedBox(height: 40),

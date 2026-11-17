@@ -131,7 +131,7 @@ class _LandingPagesScreenState extends State<LandingPagesScreen> {
           controller: ctrl,
           autofocus: true,
           decoration: const InputDecoration(
-              border: OutlineInputBorder(), labelText: 'Display name'),
+              labelText: 'Display name'),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),

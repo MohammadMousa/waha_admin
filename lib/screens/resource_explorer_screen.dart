@@ -1142,7 +1142,7 @@ Future<String?> _showNameDialog(BuildContext context,
       title: Text(title),
       content: TextField(
         controller: ctrl, autofocus: true,
-        decoration: InputDecoration(hintText: hint, border: const OutlineInputBorder()),
+        decoration: InputDecoration(hintText: hint),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),

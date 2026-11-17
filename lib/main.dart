@@ -32,6 +32,7 @@ import 'screens/integration_logs_screen.dart';
 import 'screens/inventory_operations_screen.dart';
 import 'screens/inventory_stock_screen.dart';
 import 'screens/inventory_visits_screen.dart';
+import 'screens/inventory_wastes_screen.dart';
 import 'screens/odoo_admin_screen.dart';
 import 'screens/organization_properties_screen.dart';
 import 'screens/profile_screen.dart';
@@ -217,6 +218,10 @@ class WahaAdminApp extends StatelessWidget {
                   ),
               settings: settings);
 
+        case Routes.inventoryWastes:
+          return MaterialPageRoute(
+              builder: (_) => const InventoryWastesScreen(), settings: settings);
+
         case Routes.inventoryStock:
           return MaterialPageRoute(
               builder: (_) => const InventoryStockScreen(), settings: settings);
@@ -370,10 +375,26 @@ class WahaAdminApp extends StatelessWidget {
         color: isDark ? const Color(0xFF1E1E2E) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-      ),
+      // One look for every text field and drop-down in the app.
+      inputDecorationTheme: () {
+        final scheme = ColorScheme.fromSeed(
+          seedColor: const Color(0xFF5C6BC0),
+          brightness: brightness,
+        );
+        OutlineInputBorder soft(Color c, [double w = 1]) => OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: c, width: w),
+            );
+        return InputDecorationTheme(
+          filled: true,
+          fillColor: scheme.surface,
+          border: soft(scheme.outlineVariant),
+          enabledBorder: soft(scheme.outlineVariant),
+          focusedBorder: soft(scheme.primary, 1.5),
+          errorBorder: soft(scheme.error),
+          focusedErrorBorder: soft(scheme.error, 1.5),
+        );
+      }(),
       fontFamily: 'Inter',
       // Inter has no Arabic glyphs at all — without an explicit fallback,
       // Arabic text (product/category names, etc.) renders as empty tofu

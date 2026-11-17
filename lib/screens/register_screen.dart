@@ -92,7 +92,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           decoration: const InputDecoration(
                             labelText: 'Username',
                             prefixIcon: Icon(Icons.person_outline),
-                            border: OutlineInputBorder(),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -104,7 +103,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           decoration: InputDecoration(
                             labelText: 'Password',
                             prefixIcon: const Icon(Icons.key_outlined),
-                            border: const OutlineInputBorder(),
                             suffixIcon: IconButton(
                               icon: Icon(_obscurePassword
                                   ? Icons.visibility_outlined

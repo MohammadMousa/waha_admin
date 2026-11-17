@@ -543,7 +543,6 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                                   DropdownButtonFormField<int?>(
                                     value: _categoryId,
                                     decoration: const InputDecoration(
-                                        border: OutlineInputBorder(),
                                         isDense: true),
                                     hint: const Text('No category'),
                                     items: [
@@ -574,7 +573,6 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                                             decimal: true),
                                     decoration: const InputDecoration(
                                       labelText: 'Price (SAR)',
-                                      border: OutlineInputBorder(),
                                       isDense: true,
                                     ),
                                   ),
@@ -590,15 +588,13 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                                     controller: _nameArCtrl,
                                     textDirection: TextDirection.rtl,
                                     decoration: const InputDecoration(
-                                        labelText: 'Arabic',
-                                        border: OutlineInputBorder()),
+                                        labelText: 'Arabic',),
                                   ),
                                   const SizedBox(height: 10),
                                   TextField(
                                     controller: _nameEnCtrl,
                                     decoration: const InputDecoration(
-                                        labelText: 'English',
-                                        border: OutlineInputBorder()),
+                                        labelText: 'English',),
                                   ),
                                   const SizedBox(height: 20),
 
@@ -614,7 +610,6 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                                     maxLines: 3,
                                     decoration: const InputDecoration(
                                         labelText: 'Arabic',
-                                        border: OutlineInputBorder(),
                                         alignLabelWithHint: true),
                                   ),
                                   const SizedBox(height: 10),
@@ -623,7 +618,6 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                                     maxLines: 3,
                                     decoration: const InputDecoration(
                                         labelText: 'English',
-                                        border: OutlineInputBorder(),
                                         alignLabelWithHint: true),
                                   ),
                                   const SizedBox(height: 20),
@@ -641,7 +635,6 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                                         onSubmitted: (_) => _addTag(),
                                         decoration: const InputDecoration(
                                             labelText: 'Add tag',
-                                            border: OutlineInputBorder(),
                                             isDense: true),
                                       ),
                                     ),
@@ -683,7 +676,6 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                                       controller: _primaryBarcodeCtrl,
                                       decoration: const InputDecoration(
                                           labelText: 'Primary Barcode *',
-                                          border: OutlineInputBorder(),
                                           isDense: true),
                                     ),
                                     const SizedBox(height: 16),
@@ -695,7 +687,6 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                                     const SizedBox(height: 4),
                                     InputDecorator(
                                       decoration: const InputDecoration(
-                                          border: OutlineInputBorder(),
                                           isDense: true,
                                           filled: true),
                                       child: Text(_primaryBarcode ?? '—'),
@@ -747,7 +738,6 @@ class _ProductEditScreenState extends State<ProductEditScreen> {
                                               onSubmitted: (_) => _addBarcode(),
                                               decoration: const InputDecoration(
                                                   labelText: 'Barcode',
-                                                  border: OutlineInputBorder(),
                                                   isDense: true),
                                             ),
                                           ),

@@ -246,15 +246,13 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
                                     controller: _nameArCtrl,
                                     textDirection: TextDirection.rtl,
                                     decoration: const InputDecoration(
-                                        labelText: 'Arabic (عربي)',
-                                        border: OutlineInputBorder()),
+                                        labelText: 'Arabic (عربي)',),
                                   ),
                                   const SizedBox(height: 10),
                                   TextField(
                                     controller: _nameEnCtrl,
                                     decoration: const InputDecoration(
-                                        labelText: 'English',
-                                        border: OutlineInputBorder()),
+                                        labelText: 'English',),
                                   ),
                                   const SizedBox(height: 20),
 
@@ -271,8 +269,7 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
                                   TextField(
                                     controller: _slugCtrl,
                                     decoration: const InputDecoration(
-                                        labelText: 'Slug (e.g. main-store)',
-                                        border: OutlineInputBorder()),
+                                        labelText: 'Slug (e.g. main-store)',),
                                   ),
                                   const SizedBox(height: 20),
 
@@ -297,7 +294,6 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
                                     decoration: InputDecoration(
                                       labelText: 'Short code (e.g. WH)',
                                       counterText: '',
-                                      border: const OutlineInputBorder(),
                                       suffixIcon: TextButton(
                                         onPressed: () => setState(
                                             () => _shortCodeCtrl.text = _suggestShortCode()),
@@ -316,7 +312,7 @@ class _StoreEditScreenState extends State<StoreEditScreen> {
                                     const SizedBox(height: 8),
                                     DropdownButtonFormField<int?>(
                                       value: _branchGroupId,
-                                      decoration: const InputDecoration(border: OutlineInputBorder()),
+                                      decoration: const InputDecoration(),
                                       items: [
                                         const DropdownMenuItem<int?>(value: null,
                                             child: Text('— No Group —')),

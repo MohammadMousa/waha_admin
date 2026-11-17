@@ -271,7 +271,6 @@ class _Field extends StatelessWidget {
         maxLines: maxLines,
         decoration: InputDecoration(
           labelText: label,
-          border: const OutlineInputBorder(),
           alignLabelWithHint: maxLines > 1,
         ),
       );

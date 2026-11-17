@@ -8,7 +8,7 @@ import '../models/role.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
-import '../widgets/adaptive_shell.dart';
+import '../widgets/form_page.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/person_roles_section.dart';
 import '../widgets/resource_picker_modal.dart';
@@ -287,30 +287,10 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
           Expanded(
             child: Column(
               children: [
-                Container(
-                  padding: EdgeInsets.fromLTRB(pagePad(context), 16, pagePad(context), 16),
-                  decoration: BoxDecoration(
-                    color: scheme.surface,
-                    border: Border(
-                      bottom: BorderSide(color: scheme.outlineVariant),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _isCreate ? 'New Employee' : 'Edit Employee',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      if (!_isCreate && (widget.employee?.isLocked ?? false)) ...[
-                        const SizedBox(width: 10),
-                        Container(
+                FormPageHeader(
+                  title: _isCreate ? 'New Employee' : 'Edit Employee',
+                  badge: (!_isCreate && (widget.employee?.isLocked ?? false))
+                      ? Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
                             color: Colors.red.withValues(alpha: 0.12),
@@ -321,79 +301,24 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
                             style: const TextStyle(
                                 fontSize: 11, color: Colors.red, fontWeight: FontWeight.w600),
                           ),
-                        ),
-                      ],
-                      const Spacer(),
-                      if (!_loadingStores)
-                        FilledButton(
-                          onPressed: _saving ? null : _save,
-                          child: _saving
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Text('Save'),
-                        ),
-                    ],
-                  ),
+                        )
+                      : null,
+                  showSave: !_loadingStores,
+                  saving: _saving,
+                  onSave: _save,
                 ),
                 Expanded(
                   child: _loadingStores
                       ? const Center(child: CircularProgressIndicator())
-                      : SingleChildScrollView(
-                          padding: const EdgeInsets.all(24),
-                          child: Center(
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 540),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  _Label('Avatar'),
-                                  const SizedBox(height: 12),
-                                  Center(
-                                    child: GestureDetector(
-                                      onTap: _pickAvatar,
-                                      child: Stack(
-                                        children: [
-                                          ClipRRect(
-                                            borderRadius: BorderRadius.circular(
-                                              48,
-                                            ),
-                                            child: Container(
-                                              width: 96,
-                                              height: 96,
-                                              color: scheme
-                                                  .surfaceContainerHighest,
-                                              child: Icon(
-                                                Icons.person_outline,
-                                                size: 40,
-                                                color: scheme.onSurfaceVariant,
-                                              ),
-                                            ),
-                                          ),
-                                          Positioned(
-                                            bottom: 0,
-                                            right: 0,
-                                            child: CircleAvatar(
-                                              radius: 14,
-                                              backgroundColor: scheme.primary,
-                                              child: Icon(
-                                                Icons.edit,
-                                                size: 14,
-                                                color: scheme.onPrimary,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
+                      : FormPageBody(
+                          children: [
+                                  PersonAvatar(
+                                    avatarId: _avatarResourceId,
+                                    onPick: _pickAvatar,
+                                    onRemove: () => setState(() => _avatarResourceId = null),
                                   ),
                                   const SizedBox(height: 24),
-                                  _Label('Credentials'),
+                                  FormSectionLabel('Credentials'),
                                   const SizedBox(height: 8),
                                   TextField(
                                     controller: _username,
@@ -401,7 +326,6 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
                                     autocorrect: false,
                                     decoration: const InputDecoration(
                                       labelText: 'Username *',
-                                      border: OutlineInputBorder(),
                                       prefixIcon: Icon(Icons.person_outline),
                                     ),
                                   ),
@@ -416,7 +340,6 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
                                           ? 'PIN code *'
                                           : 'New PIN (leave blank to keep)',
                                       counterText: '',
-                                      border: const OutlineInputBorder(),
                                       prefixIcon: const Icon(
                                         Icons.pin_outlined,
                                       ),
@@ -446,7 +369,7 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
                                         setState(() => _enabled = v),
                                   ),
                                   const Divider(height: 32),
-                                  _Label('Role & Branches'),
+                                  FormSectionLabel('Role & Branches'),
                                   const SizedBox(height: 12),
                                   if (_roleListMode)
                                     PersonRolesSection(
@@ -458,7 +381,6 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
                                     value: _role,
                                     decoration: const InputDecoration(
                                       labelText: 'Role',
-                                      border: OutlineInputBorder(),
                                       prefixIcon: Icon(Icons.badge_outlined),
                                     ),
                                     items: [
@@ -509,29 +431,28 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
                                     ],
                                   ),
                                   const Divider(height: 32),
-                                  _Label('Personal Info'),
+                                  FormSectionLabel('Personal Info'),
                                   const SizedBox(height: 12),
-                                  TextField(
-                                    controller: _firstName,
-                                    decoration: const InputDecoration(
-                                      labelText: 'First name',
-                                      border: OutlineInputBorder(),
+                                  Row(children: [
+                                    Expanded(
+                                      child: TextField(
+                                        controller: _firstName,
+                                        decoration: const InputDecoration(labelText: 'First name'),
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  TextField(
-                                    controller: _lastName,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Last name',
-                                      border: OutlineInputBorder(),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: TextField(
+                                        controller: _lastName,
+                                        decoration: const InputDecoration(labelText: 'Last name'),
+                                      ),
                                     ),
-                                  ),
+                                  ]),
                                   const SizedBox(height: 12),
                                   DropdownButtonFormField<String?>(
                                     value: _gender,
                                     decoration: const InputDecoration(
                                       labelText: 'Gender',
-                                      border: OutlineInputBorder(),
                                       prefixIcon: Icon(Icons.wc_outlined),
                                     ),
                                     items: [
@@ -563,7 +484,6 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
                                     keyboardType: TextInputType.emailAddress,
                                     decoration: const InputDecoration(
                                       labelText: 'Email',
-                                      border: OutlineInputBorder(),
                                       prefixIcon: Icon(Icons.email_outlined),
                                     ),
                                   ),
@@ -573,7 +493,6 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
                                     keyboardType: TextInputType.phone,
                                     decoration: const InputDecoration(
                                       labelText: 'Phone',
-                                      border: OutlineInputBorder(),
                                       prefixIcon: Icon(Icons.phone_outlined),
                                     ),
                                   ),
@@ -590,7 +509,6 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
                                     maxLines: 4,
                                     decoration: const InputDecoration(
                                       labelText: 'Address',
-                                      border: OutlineInputBorder(),
                                       prefixIcon: Icon(
                                         Icons.location_on_outlined,
                                       ),
@@ -603,16 +521,10 @@ class _EmployeeEditScreenState extends State<EmployeeEditScreen> {
                                     maxLines: 4,
                                     decoration: const InputDecoration(
                                       labelText: 'Notes',
-                                      border: OutlineInputBorder(),
                                       prefixIcon: Icon(Icons.notes_outlined),
                                     ),
                                   ),
-
-                                  const SizedBox(height: 40),
-                                ],
-                              ),
-                            ),
-                          ),
+                          ],
                         ),
                 ),
               ],
@@ -671,7 +583,6 @@ class _DateField extends StatelessWidget {
       child: InputDecorator(
         decoration: InputDecoration(
           labelText: label,
-          border: const OutlineInputBorder(),
           prefixIcon: const Icon(Icons.calendar_today_outlined),
         ),
         child: Text(value != null ? _fmt.format(value!) : 'Not set'),
@@ -680,16 +591,3 @@ class _DateField extends StatelessWidget {
   }
 }
 
-class _Label extends StatelessWidget {
-  final String text;
-  const _Label(this.text);
-  @override
-  Widget build(BuildContext context) => Text(
-    text,
-    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-      color: Theme.of(context).colorScheme.primary,
-      fontWeight: FontWeight.w700,
-      letterSpacing: 0.5,
-    ),
-  );
-}

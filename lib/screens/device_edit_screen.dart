@@ -324,7 +324,6 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
                             autocorrect: false,
                             decoration: const InputDecoration(
                               labelText: 'Username *',
-                              border: OutlineInputBorder(),
                               prefixIcon: Icon(Icons.person_outline),
                             ),
                           ),
@@ -339,7 +338,6 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
                                   ? 'PIN code *'
                                   : 'New PIN (leave blank to keep)',
                               counterText: '',
-                              border: const OutlineInputBorder(),
                               prefixIcon: const Icon(Icons.pin_outlined),
                               suffixIcon: IconButton(
                                 icon: Icon(
@@ -401,7 +399,6 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
                             value: _selectedStoreId,
                             decoration: const InputDecoration(
                               labelText: 'Store *',
-                              border: OutlineInputBorder(),
                               prefixIcon: Icon(Icons.store_outlined),
                             ),
                             items: [
@@ -423,7 +420,6 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
                             value: _deviceType,
                             decoration: const InputDecoration(
                               labelText: 'Device type',
-                              border: OutlineInputBorder(),
                               prefixIcon: Icon(Icons.devices_outlined),
                             ),
                             items: _kDeviceTypes
@@ -454,7 +450,6 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
                                   ? 'Leave empty to use the lowest free number in the store.'
                                   : 'Must be unique in the store. Moving the device to another store keeps the number only if it is free there.',
                               helperMaxLines: 3,
-                              border: const OutlineInputBorder(),
                               prefixIcon: const Icon(Icons.pin_outlined),
                             ),
                           ),
@@ -470,7 +465,6 @@ class _DeviceEditScreenState extends State<DeviceEditScreen> {
                             controller: _name,
                             decoration: const InputDecoration(
                               labelText: 'Display name',
-                              border: OutlineInputBorder(),
                               prefixIcon: Icon(Icons.label_outline),
                             ),
                           ),

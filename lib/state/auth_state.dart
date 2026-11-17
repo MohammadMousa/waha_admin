@@ -30,6 +30,21 @@ class AuthState extends ChangeNotifier {
   List<Organization> _organizations = const [];
   Organization? _acting;
 
+  // appName system property (from sign-in), shown where an organization cannot be picked.
+  String _appName = 'Waha';
+  String get appName => _appName;
+
+  // Own profile picture (api level 5); loaded once per sign-in.
+  int? _avatarResourceId;
+  bool _avatarLoaded = false;
+  int? get avatarResourceId => _avatarResourceId;
+  bool get avatarLoaded => _avatarLoaded;
+  void setAvatar(int? id) {
+    _avatarResourceId = id;
+    _avatarLoaded = true;
+    notifyListeners();
+  }
+
   bool get isSuperAdmin => hasPermission('MANAGE_SYSTEM');
 
   // Permissions split out of broader ones on newer servers. A server that
@@ -55,9 +70,12 @@ class AuthState extends ChangeNotifier {
       !_serverSplitsPermissions || hasPermission('MANAGE_INTEGRATIONS');
   bool get canManageSettings =>
       _serverSplitsPermissions ? hasPermission('MANAGE_SETTINGS') : hasPermission('MANAGE_STORES');
-  /// Audit menu: super admin, or VIEW_ORGANIZATION_AUDIT (api level 6).
+  /// Inventory wastes (api level 5).
+  bool get canViewWastes => _apiLevel >= 5 && (isSuperAdmin || hasPermission('VIEW_WASTES'));
+  bool get canCreateWastes => _apiLevel >= 5 && (isSuperAdmin || hasPermission('CREATE_WASTES'));
+  /// Audit menu: super admin, or VIEW_ORGANIZATION_AUDIT (api level 5).
   bool get canViewAudit =>
-      _apiLevel >= 6 ? (isSuperAdmin || hasPermission('VIEW_ORGANIZATION_AUDIT')) : (_apiLevel >= 3 && isSuperAdmin);
+      _apiLevel >= 5 ? (isSuperAdmin || hasPermission('VIEW_ORGANIZATION_AUDIT')) : (_apiLevel >= 3 && isSuperAdmin);
   List<Organization> get organizations => _organizations;
   Organization? get actingOrganization => _acting;
 
@@ -117,6 +135,7 @@ class AuthState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString('admin_token');
     _username = prefs.getString('admin_username');
+    _appName = prefs.getString('admin_app_name') ?? _appName;
     _roleName = prefs.getString('admin_role');
     _permissions = (prefs.getStringList('admin_permissions') ?? const []).toSet();
     await _loadApiLevel();
@@ -158,7 +177,12 @@ class AuthState extends ChangeNotifier {
     String username, {
     String? roleName,
     Set<String> permissions = const {},
+    String? appName,
   }) async {
+    if (appName != null && appName.isNotEmpty) {
+      _appName = appName;
+      (await SharedPreferences.getInstance()).setString('admin_app_name', appName);
+    }
     _token = token;
     _username = username;
     _roleName = roleName ?? _inferRoleName(permissions);
@@ -220,6 +244,8 @@ class AuthState extends ChangeNotifier {
     _roleName = null;
     _permissions = {};
     _organizations = const [];
+    _avatarResourceId = null;
+    _avatarLoaded = false;
     _clearActing();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('admin_token');

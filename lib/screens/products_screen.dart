@@ -157,6 +157,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
   List<Category> _categories = [];
   Category? _selectedCategory;
   bool? _activeFilter;
+  bool? _publicFilter;
+  int? _totalCount;
 
   List<Map<String, dynamic>> _products = [];
   int _page = 0;
@@ -209,12 +211,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       final results = await Future.wait([
         ApiClient().getCategories(storeId: _kRootStoreId, token: token)
             .catchError((_) => <Category>[]),
-        ApiClient().getProducts(
-          storeId: _kRootStoreId,
-          page: 0,
-          size: 24,
-          token: token,
-        ),
+        _fetch(token, 0),
         ApiClient().getStoresForPicker(token).catchError((_) => <Store>[]),
       ]);
       if (!mounted) return;
@@ -234,38 +231,66 @@ class _ProductsScreenState extends State<ProductsScreen> {
     }
   }
 
+  // The server's admin list searches name and barcodes; old servers fall back to
+  // the public list with local filtering of the loaded page.
+  bool _legacyList = false;
+
+  Future<Map<String, dynamic>> _fetch(String token, int page) async {
+    final q = _searchCtrl.text.trim();
+    if (!_legacyList) {
+      try {
+        return await ApiClient().getAdminProductList(token,
+            search: q, categoryId: _selectedCategory?.id, active: _activeFilter, publicListed: _publicFilter, page: page, size: 24);
+      } on ApiException catch (e) {
+        if (e.statusCode != 404 && e.statusCode != 405) rethrow;
+        _legacyList = true;
+      }
+    }
+    final data = await ApiClient().getProducts(
+        storeId: _kRootStoreId, categoryId: _selectedCategory?.id, page: page, size: 24, token: token);
+    var items = (data['products'] as List? ?? []).cast<Map<String, dynamic>>();
+    if (_activeFilter != null) items = items.where((p) => p['active'] == _activeFilter).toList();
+    if (q.isNotEmpty) {
+      final ql = q.toLowerCase();
+      items = items.where((p) =>
+          _flatName(p['name']).toLowerCase().contains(ql) ||
+          (p['barcode'] ?? '').toString().toLowerCase().contains(ql)).toList();
+    }
+    return {...data, 'products': items};
+  }
+
+  /// Enter in the search box (a scanner sends Enter): search now, no waiting for the pause.
+  Future<void> _submitSearch() async {
+    _searchTimer?.cancel();
+    await _loadPage(0);
+  }
+
+  bool get _hasFilters =>
+      _selectedCategory != null || _activeFilter != null || _publicFilter != null || _searchCtrl.text.trim().isNotEmpty;
+
+  void _clearFilters() {
+    _searchTimer?.cancel();
+    _searchCtrl.removeListener(_onSearchChanged);
+    _searchCtrl.clear();
+    _searchCtrl.addListener(_onSearchChanged);
+    setState(() { _selectedCategory = null; _activeFilter = null; _publicFilter = null; });
+    _loadPage(0);
+  }
+
   Future<void> _loadPage(int page) async {
     final token = context.read<AuthState>().token;
     if (token == null) return;
     setState(() { _loadingProducts = true; _error = null; });
     try {
-      final data = await ApiClient().getProducts(
-        storeId: _kRootStoreId,
-        categoryId: _selectedCategory?.id,
-        page: page,
-        size: 24,
-        token: token,
-      );
+      final data = await _fetch(token, page);
       if (!mounted) return;
-      var items = (data['products'] as List? ?? []).cast<Map<String, dynamic>>();
-
-      if (_activeFilter != null) {
-        items = items.where((p) => p['active'] == _activeFilter).toList();
-      }
-
-      final q = _searchCtrl.text.trim().toLowerCase();
-      if (q.isNotEmpty) {
-        items = items.where((p) {
-          final name = _flatName(p['name']).toLowerCase();
-          final barcode = (p['barcode'] ?? '').toString().toLowerCase();
-          return name.contains(q) || barcode.contains(q);
-        }).toList();
-      }
+      final items = (data['products'] as List? ?? []).cast<Map<String, dynamic>>();
 
       setState(() {
         _products = items;
         _page     = page;
         _hasMore  = data['hasMore'] == true;
+        _totalCount = (data['totalCount'] as num?)?.toInt();
         _loadingProducts = false;
       });
     } on ApiException catch (e) {
@@ -469,15 +494,42 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   _loadPage(0);
                 },
               ),
+              WahaFilterDropdown<bool?>(
+                value: _publicFilter,
+                hint: 'Select Visibility',
+                items: const [
+                  DropdownMenuItem(value: null, child: Text('Select Visibility')),
+                  DropdownMenuItem(value: true, child: Text('Public')),
+                  DropdownMenuItem(value: false, child: Text('Not public')),
+                ],
+                onChanged: (v) {
+                  setState(() => _publicFilter = v);
+                  _loadPage(0);
+                },
+              ),
               // Search
               WahaSearchField(
                 controller: _searchCtrl,
-                hintText: 'Search products…',
+                hintText: 'Search by name or scan a barcode',
+                width: 300,
+                icon: Icons.qr_code_scanner,
+                onSubmitted: _submitSearch,
                 onClear: () {
                   _searchTimer?.cancel();
                   _loadPage(0);
                 },
               ),
+              if (_hasFilters)
+                TextButton.icon(
+                  icon: const Icon(Icons.filter_alt_off_outlined, size: 16),
+                  label: const Text('Clear filters'),
+                  onPressed: _clearFilters,
+                ),
+              if (_totalCount != null)
+                Text(
+                  '${fmtCount(_totalCount)} product${_totalCount == 1 ? '' : 's'}${_hasFilters ? ' match' : ''}',
+                  style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
+                ),
             ],
           ),
           const SizedBox(height: 12),

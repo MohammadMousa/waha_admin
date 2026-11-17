@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -71,6 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
           username ?? _username.text.trim(),
           roleName: data['roleName'] as String?,
           permissions: (data['permissions'] as List?)?.cast<String>().toSet() ?? const {},
+          appName: _appNameFrom((data['properties'] as Map?)?['appName']),
         );
         nav.pushReplacementNamed(
             auth.needsOrganizationPick ? Routes.organizations : Routes.dashboard);
@@ -138,7 +140,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     decoration: const InputDecoration(
                       labelText: 'Username',
                       prefixIcon: Icon(Icons.person_outline),
-                      border: OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -151,7 +152,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     decoration: InputDecoration(
                       labelText: 'Password',
                       prefixIcon: const Icon(Icons.key_outlined),
-                      border: const OutlineInputBorder(),
                       suffixIcon: IconButton(
                         icon: Icon(_obscure
                             ? Icons.visibility_outlined
@@ -197,4 +197,15 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
+}
+
+/// appName is stored as {"en":"Waha","ar":"..."}; use the English name.
+String? _appNameFrom(Object? raw) {
+  if (raw == null) return null;
+  final text = raw.toString();
+  try {
+    final decoded = jsonDecode(text);
+    if (decoded is Map) return (decoded['en'] ?? decoded.values.firstOrNull)?.toString();
+  } catch (_) {}
+  return text;
 }

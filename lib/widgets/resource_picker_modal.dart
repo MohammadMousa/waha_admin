@@ -264,7 +264,6 @@ Future<PickedResource?> _showUploadDestinationDialog(
                         value: selectedDir,
                         isExpanded: true,
                         decoration: InputDecoration(
-                          border: const OutlineInputBorder(),
                           isDense: true,
                           hintText: dirs.isEmpty ? 'No directories yet' : null,
                         ),
@@ -292,7 +291,7 @@ Future<PickedResource?> _showUploadDestinationDialog(
                     enabled: !uploading,
                     autofocus: true,
                     decoration: const InputDecoration(
-                        labelText: 'New directory name', border: OutlineInputBorder(), isDense: true),
+                        labelText: 'New directory name', isDense: true),
                   ),
                 ],
                 const SizedBox(height: 12),
@@ -300,7 +299,7 @@ Future<PickedResource?> _showUploadDestinationDialog(
                   controller: nameCtrl,
                   enabled: !uploading,
                   decoration: const InputDecoration(
-                      labelText: 'Image name', border: OutlineInputBorder(), isDense: true),
+                      labelText: 'Image name', isDense: true),
                 ),
                 CheckboxListTile(
                   contentPadding: EdgeInsets.zero,
@@ -563,7 +562,7 @@ class _ResourcePickerModalState extends State<ResourcePickerModal> {
                     controller: nameCtrl,
                     enabled: !uploading,
                     decoration: const InputDecoration(
-                        labelText: 'Filename', border: OutlineInputBorder()),
+                        labelText: 'Filename'),
                     autofocus: true,
                   ),
                   if (uploadError != null) ...[

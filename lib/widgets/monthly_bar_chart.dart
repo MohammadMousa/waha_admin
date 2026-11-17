@@ -17,10 +17,41 @@ class MonthlyBarChart extends StatelessWidget {
         .fold(0.0, (a, b) => a > b ? a : b);
 
     final ticks = niceAxisTicks(maxVal);
+    final scheme = Theme.of(context).colorScheme;
+
+    // The month still in progress is drawn lighter and labelled "(to date)",
+    // so a partly finished month does not look like a drop in sales.
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final now = DateTime.now();
+    final thisMonth = '${months[now.month - 1]} ${now.year}';
+    final partial = series.isNotEmpty && series.last['label'] == thisMonth
+        ? series.length - 1
+        : -1;
+
+    String short(double v) {
+      if (v >= 1000) {
+        final k = v / 1000;
+        return '${k.toStringAsFixed(k >= 100 ? 0 : 1).replaceAll(RegExp(r'\.0$'), '')}k';
+      }
+      return v.toStringAsFixed(0);
+    }
 
     return BarChart(
       BarChartData(
         maxY: ticks.maxY,
+        // Values are always shown above the bars, so no hover is needed.
+        barTouchData: BarTouchData(
+          handleBuiltInTouches: false,
+          touchTooltipData: BarTouchTooltipData(
+            getTooltipColor: (_) => Colors.transparent,
+            tooltipPadding: EdgeInsets.zero,
+            tooltipMargin: 2,
+            getTooltipItem: (group, groupIndex, rod, rodIndex) => BarTooltipItem(
+              short(rod.toY),
+              TextStyle(fontSize: 10, color: scheme.onSurface, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
         gridData: FlGridData(
           show: true,
           drawVerticalLine: false,
@@ -62,6 +93,9 @@ class MonthlyBarChart extends StatelessWidget {
                 final i = v.toInt();
                 if (i < 0 || i >= series.length) return const SizedBox.shrink();
                 var label = series[i]['label'] as String? ?? '';
+                if (i == partial && !narrow) {
+                  label = '${label.split(' ').first} (to date)';
+                }
                 // Phones: "Jun 2026" becomes "Jun 26" and long ranges show
                 // only some months, so the labels never overlap.
                 if (narrow) {
@@ -91,12 +125,17 @@ class MonthlyBarChart extends StatelessWidget {
         ),
         barGroups: series.asMap().entries.map((e) {
           final v = (e.value['value'] as num?)?.toDouble() ?? 0;
+          final isPartial = e.key == partial;
           return BarChartGroupData(
             x: e.key,
+            showingTooltipIndicators: v > 0 ? [0] : const [],
             barRods: [
               BarChartRodData(
                 toY: v,
-                color: const Color(0xFF7C7CED),
+                color: const Color(0xFF7C7CED).withValues(alpha: isPartial ? 0.35 : 1),
+                borderSide: isPartial
+                    ? const BorderSide(color: Color(0xFF7C7CED), width: 1)
+                    : BorderSide.none,
                 width: 22,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
               ),

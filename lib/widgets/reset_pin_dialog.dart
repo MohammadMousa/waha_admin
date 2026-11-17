@@ -35,7 +35,6 @@ Future<String?> showResetPinDialog(BuildContext context, {required String name})
                 decoration: InputDecoration(
                   labelText: 'New PIN',
                   counterText: '',
-                  border: const OutlineInputBorder(),
                   prefixIcon: const Icon(Icons.pin_outlined),
                   suffixIcon: IconButton(
                     icon: Icon(obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),

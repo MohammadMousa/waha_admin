@@ -20,12 +20,21 @@ class WahaFilterDropdown<T> extends StatefulWidget {
   final List<DropdownMenuItem<T>> items;
   final ValueChanged<T?> onChanged;
 
+  /// Fill the width it is given (arrow at the far edge) instead of hugging the
+  /// text. Only use where the width is bounded, e.g. inside an Expanded.
+  final bool expand;
+
+  /// Box colour; defaults to the surface colour.
+  final Color? fillColor;
+
   const WahaFilterDropdown({
     super.key,
     required this.value,
     required this.hint,
     required this.items,
     required this.onChanged,
+    this.expand = false,
+    this.fillColor,
   });
 
   @override
@@ -34,6 +43,17 @@ class WahaFilterDropdown<T> extends StatefulWidget {
 
 class _WahaFilterDropdownState<T> extends State<WahaFilterDropdown<T>> {
   final _menuCtrl = MenuController();
+  double _width = 0;
+  final _boxKey = GlobalKey();
+
+  /// Keeps the list as wide as the box: measured after layout, so it is right
+  /// before the first tap and follows the box when its text changes.
+  void _measure() {
+    final box = _boxKey.currentContext?.findRenderObject();
+    if (box is RenderBox && box.hasSize && (box.size.width - _width).abs() > 0.5) {
+      setState(() => _width = box.size.width);
+    }
+  }
 
   String _label() {
     final match = widget.items.where((i) => i.value == widget.value).firstOrNull;
@@ -46,35 +66,60 @@ class _WahaFilterDropdownState<T> extends State<WahaFilterDropdown<T>> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final isPlaceholder = widget.value == null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _measure();
+    });
 
     return MenuAnchor(
       controller: _menuCtrl,
       alignmentOffset: const Offset(0, 4),
+      // The list is at least as wide as the box and drawn in the same colours.
+      style: MenuStyle(
+        padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(vertical: 4)),
+        backgroundColor: WidgetStatePropertyAll(scheme.surface),
+        surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+        shape: WidgetStatePropertyAll(RoundedRectangleBorder(
+          borderRadius: kWahaFilterControlRadius,
+          side: BorderSide(color: scheme.outlineVariant),
+        )),
+      ),
+      // Each row is at least as wide as the box, so the list never is narrower
+      // (MenuStyle.minimumSize alone does not widen it).
       menuChildren: widget.items
-          .map((item) => MenuItemButton(
-                onPressed: () => widget.onChanged(item.value),
-                child: item.child,
+          .map((item) => ConstrainedBox(
+                constraints: BoxConstraints(minWidth: _width),
+                child: MenuItemButton(
+                  onPressed: () => widget.onChanged(item.value),
+                  child: item.child,
+                ),
               ))
           .toList(),
       child: GestureDetector(
-        onTap: () => _menuCtrl.open(),
+        onTap: () {
+          _measure();
+          _menuCtrl.open();
+        },
         child: Container(
+          key: _boxKey,
           height: kWahaFilterControlHeight,
           padding: kWahaFilterControlPadding,
           decoration: BoxDecoration(
             border: Border.all(color: scheme.outline),
             borderRadius: kWahaFilterControlRadius,
-            color: scheme.surface,
+            color: widget.fillColor ?? scheme.surface,
           ),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: widget.expand ? MainAxisSize.max : MainAxisSize.min,
             children: [
-              Text(_label(),
+              (widget.expand ? (Widget w) => Expanded(child: w) : (Widget w) => Flexible(child: w))(Text(_label(),
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                       fontSize: kWahaFilterControlFontSize,
                       color: isPlaceholder
                           ? scheme.onSurfaceVariant
-                          : scheme.onSurface)),
+                          : scheme.onSurface))),
               const SizedBox(width: 4),
               Icon(Icons.arrow_drop_down, size: 18, color: scheme.outline),
             ],
@@ -102,6 +147,9 @@ class WahaSearchField extends StatelessWidget {
   /// Called on every keystroke, for filters that apply as the user types.
   final ValueChanged<String>? onChanged;
 
+  /// Leading icon (the magnifier by default).
+  final IconData icon;
+
   const WahaSearchField({
     super.key,
     required this.controller,
@@ -110,6 +158,7 @@ class WahaSearchField extends StatelessWidget {
     this.onSubmitted,
     this.onClear,
     this.onChanged,
+    this.icon = Icons.search,
   });
 
   @override
@@ -131,7 +180,7 @@ class WahaSearchField extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.search, size: 18, color: scheme.outline),
+          Icon(icon, size: 18, color: scheme.outline),
           const SizedBox(width: 8),
           Expanded(
             child: TextField(
@@ -143,7 +192,10 @@ class WahaSearchField extends StatelessWidget {
                   fontSize: kWahaFilterControlFontSize, color: scheme.onSurface),
               decoration: InputDecoration(
                 isCollapsed: true,
+                filled: false,
                 border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
                 hintText: hintText,
                 hintStyle: TextStyle(
                     fontSize: kWahaFilterControlFontSize,

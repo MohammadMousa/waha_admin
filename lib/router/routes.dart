@@ -46,6 +46,7 @@ class Routes {
   static const inventoryTransfers = '/reports/inventory-transfers';
   static const inventoryReturns   = '/reports/inventory-returns';
   static const inventoryStock     = '/reports/inventory-stock';
+  static const inventoryWastes    = '/reports/inventory-wastes';
 
   // Global admin
   static const paymentMethodsGlobal    = '/payment-methods/global';

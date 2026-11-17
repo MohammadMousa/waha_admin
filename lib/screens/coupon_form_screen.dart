@@ -403,7 +403,7 @@ class _CouponFormScreenState extends State<CouponFormScreen> {
           if (digits) FilteringTextInputFormatter.digitsOnly,
           if (money) FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
         ],
-        decoration: InputDecoration(labelText: label, helperText: helper, helperMaxLines: 3, border: const OutlineInputBorder()),
+        decoration: InputDecoration(labelText: label, helperText: helper, helperMaxLines: 3),
       );
 
   Widget _usageCard(ColorScheme scheme) => Container(
@@ -518,7 +518,7 @@ class _CouponFormScreenState extends State<CouponFormScreen> {
         _row([
           DropdownButtonFormField<String>(
             initialValue: _mode,
-            decoration: const InputDecoration(labelText: 'Discount type', border: OutlineInputBorder()),
+            decoration: const InputDecoration(labelText: 'Discount type'),
             items: const [
               DropdownMenuItem(value: 'PERCENTAGE', child: Text('Percentage')),
               DropdownMenuItem(value: 'AMOUNT', child: Text('Fixed amount')),
@@ -542,7 +542,6 @@ class _CouponFormScreenState extends State<CouponFormScreen> {
             decoration: InputDecoration(
               labelText: 'Applies to',
               helperText: _isEdit ? 'Cannot change after creation.' : null,
-              border: const OutlineInputBorder(),
             ),
             items: const [
               DropdownMenuItem(value: 'GLOBAL', child: Text('Whole order')),
@@ -552,7 +551,7 @@ class _CouponFormScreenState extends State<CouponFormScreen> {
           ),
           DropdownButtonFormField<String>(
             initialValue: _storeScope,
-            decoration: const InputDecoration(labelText: 'Branches', border: OutlineInputBorder()),
+            decoration: const InputDecoration(labelText: 'Branches'),
             items: const [
               DropdownMenuItem(value: 'ALL', child: Text('All branches')),
               DropdownMenuItem(value: 'SOME', child: Text('Selected branches')),
@@ -625,7 +624,6 @@ class _CouponFormScreenState extends State<CouponFormScreen> {
           decoration: InputDecoration(
             labelText: label,
             helperText: 'Empty = no ${start ? 'start' : 'end'} date',
-            border: const OutlineInputBorder(),
             suffixIcon: value == null
                 ? const Icon(Icons.calendar_today_outlined, size: 18)
                 : IconButton(
@@ -668,7 +666,7 @@ class _CouponFormScreenState extends State<CouponFormScreen> {
           initialValue: _employeeId,
           isExpanded: true,
           decoration: const InputDecoration(
-              labelText: 'Employee', helperText: 'Optional: credit the coupon to one employee in reports', border: OutlineInputBorder()),
+              labelText: 'Employee', helperText: 'Optional: credit the coupon to one employee in reports'),
           items: [
             const DropdownMenuItem<int?>(value: null, child: Text('None')),
             for (final e in _employees) DropdownMenuItem<int?>(value: e.id, child: Text(e.displayName)),

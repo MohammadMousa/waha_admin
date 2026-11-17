@@ -6,6 +6,8 @@ class AccountUser {
   final String? firstName;
   final String? lastName;
   final String? phone;
+  final String? email;
+  final int? avatarResourceId;
   final String? roleName;
   final int? storeId;
   final String? storeName;
@@ -20,6 +22,8 @@ class AccountUser {
     this.firstName,
     this.lastName,
     this.phone,
+    this.email,
+    this.avatarResourceId,
     this.roleName,
     this.storeId,
     this.storeName,
@@ -35,6 +39,8 @@ class AccountUser {
         firstName: j['firstName'] as String?,
         lastName: j['lastName'] as String?,
         phone: j['phone'] as String?,
+        email: j['email'] as String?,
+        avatarResourceId: (j['avatarResourceId'] as num?)?.toInt(),
         roleName: j['roleName'] as String?,
         storeId: j['storeId'] == null ? null : (j['storeId'] as num).toInt(),
         storeName: j['storeName'] as String?,

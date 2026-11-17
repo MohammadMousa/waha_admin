@@ -190,6 +190,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               // ── Revenue by months bar chart ──────────────
                               _ChartCard(
                                 title: 'Revenue by months',
+                                unit: 'SAR',
                                 periods: const ['6m', '1y', '2y'],
                                 selected: _monthlyPeriod,
                                 onPeriod: (p) {
@@ -473,6 +474,7 @@ class _OverviewRow extends StatelessWidget {
 
 class _ChartCard extends StatelessWidget {
   final String title;
+  final String? unit;
   final List<String> periods;
   final String selected;
   final ValueChanged<String> onPeriod;
@@ -480,6 +482,7 @@ class _ChartCard extends StatelessWidget {
 
   const _ChartCard({
     required this.title,
+    this.unit,
     required this.periods,
     required this.selected,
     required this.onPeriod,
@@ -507,6 +510,10 @@ class _ChartCard extends StatelessWidget {
                         .textTheme
                         .titleMedium
                         ?.copyWith(fontWeight: FontWeight.w700)),
+                if (unit != null) ...[
+                  const SizedBox(width: 8),
+                  Text(unit!, style: TextStyle(fontSize: 13, color: scheme.outline)),
+                ],
                 const Spacer(),
                 ...periods.map((p) => Padding(
                       padding: const EdgeInsets.only(left: 8),

@@ -178,6 +178,10 @@ class _AccountCard extends StatelessWidget {
             CircleAvatar(
               radius: 24,
               backgroundColor: scheme.primary.withValues(alpha: 0.15),
+              foregroundImage: u.avatarResourceId == null
+                  ? null
+                  : NetworkImage(ApiClient().resourceUrl(u.avatarResourceId!)),
+              onForegroundImageError: u.avatarResourceId == null ? null : (_, __) {},
               child: Text(u.initials, style: TextStyle(
                 color: scheme.primary,
                 fontWeight: FontWeight.w700, fontSize: 18,

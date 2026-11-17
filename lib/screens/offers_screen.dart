@@ -594,12 +594,12 @@ class _OfferFormDialogState extends State<_OfferFormDialog> {
         _row([
           TextField(
             controller: _nameCtrl,
-            decoration: const InputDecoration(labelText: 'Name', border: OutlineInputBorder()),
+            decoration: const InputDecoration(labelText: 'Name'),
           ),
           // The type is fixed once the offer exists.
           DropdownButtonFormField<String>(
             initialValue: _type,
-            decoration: const InputDecoration(labelText: 'Type', border: OutlineInputBorder()),
+            decoration: const InputDecoration(labelText: 'Type'),
             items: const [
               DropdownMenuItem(value: 'GLOBAL', child: Text('Global')),
               DropdownMenuItem(value: 'PRODUCT', child: Text('Product')),
@@ -611,7 +611,7 @@ class _OfferFormDialogState extends State<_OfferFormDialog> {
         _row([
           DropdownButtonFormField<String>(
             initialValue: _mode,
-            decoration: const InputDecoration(labelText: 'Amount / Percentage', border: OutlineInputBorder()),
+            decoration: const InputDecoration(labelText: 'Amount / Percentage'),
             items: const [
               DropdownMenuItem(value: 'AMOUNT', child: Text('Amount')),
               DropdownMenuItem(value: 'PERCENTAGE', child: Text('Percentage')),
@@ -623,7 +623,6 @@ class _OfferFormDialogState extends State<_OfferFormDialog> {
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(
               labelText: _mode == 'PERCENTAGE' ? 'Percentage' : 'Amount',
-              border: const OutlineInputBorder(),
             ),
           ),
         ]),
@@ -679,7 +678,7 @@ class _OfferFormDialogState extends State<_OfferFormDialog> {
           width: 300,
           child: DropdownButtonFormField<String>(
             initialValue: _storeScope,
-            decoration: const InputDecoration(labelText: 'All / some branches', border: OutlineInputBorder()),
+            decoration: const InputDecoration(labelText: 'All / some branches'),
             items: const [
               DropdownMenuItem(value: 'ALL', child: Text('All branches')),
               DropdownMenuItem(value: 'SOME', child: Text('Some branches')),
@@ -721,7 +720,6 @@ class _OfferFormDialogState extends State<_OfferFormDialog> {
         child: InputDecorator(
           decoration: InputDecoration(
             labelText: label,
-            border: const OutlineInputBorder(),
             suffixIcon: const Icon(Icons.calendar_today_outlined, size: 18),
           ),
           child: Text(value == null ? '' : _dateFmt.format(value)),

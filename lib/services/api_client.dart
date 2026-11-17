@@ -461,6 +461,76 @@ class ApiClient {
           branchId: branchId, productId: productId, employeeId: employeeId,
           from: from, to: to, page: page, size: size);
 
+  // ---- Inventory wastes (api level 5) ----
+
+  Map<String, String> _wasteQuery({
+    int? branchId, String? reason, int? employeeId, int? productId,
+    String? search, String? from, String? to,
+  }) => {
+        if (branchId != null) 'branchId': '$branchId',
+        if (reason != null) 'reason': reason,
+        if (employeeId != null) 'employeeId': '$employeeId',
+        if (productId != null) 'productId': '$productId',
+        if (search != null && search.isNotEmpty) 'search': search,
+        if (from != null) 'from': from,
+        if (to != null) 'to': to,
+      };
+
+  Future<List<Map<String, dynamic>>> getWasteReasons(String token) async {
+    final resp = await _http.get(_uri('/api/admin/inventory/wastes/reasons'), headers: _headers(token: token));
+    if (resp.statusCode == 200) {
+      return (jsonDecode(utf8.decode(resp.bodyBytes)) as List).cast<Map<String, dynamic>>();
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<Map<String, dynamic>> getWastes(
+    String token, {
+    int? branchId, String? reason, int? employeeId, int? productId,
+    String? search, String? from, String? to, int page = 0, int size = 20,
+  }) async {
+    final uri = _uri('/api/admin/inventory/wastes').replace(queryParameters: {
+      ..._wasteQuery(branchId: branchId, reason: reason, employeeId: employeeId,
+          productId: productId, search: search, from: from, to: to),
+      'page': '$page',
+      'size': '$size',
+    });
+    final resp = await _http.get(uri, headers: _headers(token: token));
+    if (resp.statusCode == 200) return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<Map<String, dynamic>> getWaste(String token, int id) async {
+    final resp = await _http.get(_uri('/api/admin/inventory/wastes/$id'), headers: _headers(token: token));
+    if (resp.statusCode == 200) return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  /// [clientRef] makes a retry safe: the same ref again returns the first waste.
+  Future<Map<String, dynamic>> createWaste(String token, Map<String, dynamic> body) async {
+    final resp = await _http.post(_uri('/api/admin/inventory/wastes'),
+        headers: _headers(token: token), body: jsonEncode(body));
+    if (resp.statusCode == 200 || resp.statusCode == 201) {
+      return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<Uint8List> exportWastes(
+    String token, String format, {
+    int? branchId, String? reason, int? employeeId, int? productId,
+    String? search, String? from, String? to,
+  }) async {
+    final uri = _uri('/api/admin/inventory/wastes/export').replace(queryParameters: {
+      ..._wasteQuery(branchId: branchId, reason: reason, employeeId: employeeId,
+          productId: productId, search: search, from: from, to: to),
+      'format': format,
+    });
+    final resp = await _http.get(uri, headers: authHeaders(token));
+    if (resp.statusCode == 200) return resp.bodyBytes;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
   Future<Map<String, dynamic>> getInventoryStock(
     String token, {
     String scope = 'BRANCHES',
@@ -609,6 +679,30 @@ class ApiClient {
   }
 
   // ── Products ──────────────────────────────────────────────────────────────
+
+  /// Admin product list with server-side search (name or any barcode), category and
+  /// active filters; answers {products, page, size, totalCount, hasMore}.
+  Future<Map<String, dynamic>> getAdminProductList(
+    String token, {
+    String? search,
+    int? categoryId,
+    bool? active,
+    bool? publicListed,
+    int page = 0,
+    int size = 24,
+  }) async {
+    final uri = _uri('/api/admin/products').replace(queryParameters: {
+      if (search != null && search.isNotEmpty) 'search': search,
+      if (categoryId != null) 'categoryId': '$categoryId',
+      if (active != null) 'active': '$active',
+      if (publicListed != null) 'publicListed': '$publicListed',
+      'page': '$page',
+      'size': '$size',
+    });
+    final resp = await _http.get(uri, headers: _headers(token: token));
+    if (resp.statusCode == 200) return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
 
   Future<Map<String, dynamic>> getProducts({
     required int storeId,
@@ -1338,7 +1432,7 @@ class ApiClient {
     return (r['deleted'] as num?)?.toInt() ?? 0;
   }
 
-  // Shared audit history (api level 6): MANAGE_SYSTEM sees everything, owners and
+  // Shared audit history (api level 5): MANAGE_SYSTEM sees everything, owners and
   // VIEW_ORGANIZATION_AUDIT holders see their own organization.
   Future<Map<String, dynamic>> getAudit(String token,
       {int page = 0,
@@ -1376,6 +1470,59 @@ class ApiClient {
     });
     return (r['deleted'] as num?)?.toInt() ?? 0;
   }
+
+  // ── Own personal profile (api level 5) ──
+
+  Future<Map<String, dynamic>> getProfile(String token) =>
+      _systemRequest('GET', '/api/profile', token);
+
+  /// Only the fields given are changed; an empty string clears one.
+  Future<Map<String, dynamic>> updateProfile(String token, Map<String, dynamic> fields) =>
+      _systemRequest('PUT', '/api/profile', token, body: fields);
+
+  Future<Map<String, dynamic>> uploadProfileAvatar(
+          String token, Uint8List bytes, String filename) =>
+      _uploadAvatar('/api/profile/avatar', token, bytes, filename);
+
+  // Another account's profile and picture (MANAGE_USERS, api level 5).
+  Future<Map<String, dynamic>> getAdminProfile(String token, int id) =>
+      _systemRequest('GET', '/api/admin/users/$id/profile', token);
+
+  Future<Map<String, dynamic>> updateAdminProfile(
+          String token, int id, Map<String, dynamic> fields) =>
+      _systemRequest('PUT', '/api/admin/users/$id/profile', token, body: fields);
+
+  Future<Map<String, dynamic>> uploadAdminAvatar(
+          String token, int id, Uint8List bytes, String filename) =>
+      _uploadAvatar('/api/admin/users/$id/avatar', token, bytes, filename);
+
+  Future<Map<String, dynamic>> deleteAdminAvatar(String token, int id) =>
+      _systemRequest('DELETE', '/api/admin/users/$id/avatar', token);
+
+  Future<Map<String, dynamic>> _uploadAvatar(
+      String path, String token, Uint8List bytes, String filename) async {
+    final isPng = filename.toLowerCase().endsWith('.png');
+    final request = http.MultipartRequest('PUT', _uri(path))
+      ..headers.addAll(authHeaders(token))
+      ..files.add(http.MultipartFile.fromBytes('file', bytes,
+          filename: filename,
+          contentType: http.MediaType.parse(isPng ? 'image/png' : 'image/jpeg')));
+    final streamed = await _http.send(request);
+    final resp = await http.Response.fromStream(streamed);
+    if (resp.statusCode == 200) {
+      return jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    }
+    if (resp.statusCode == 413) {
+      throw ApiException(413, 'The picture is too large (5 MB at most).');
+    }
+    throw ApiException(resp.statusCode, _extractMessage(resp));
+  }
+
+  Future<Map<String, dynamic>> deleteProfileAvatar(String token) =>
+      _systemRequest('DELETE', '/api/profile/avatar', token);
+
+  /// Picture of a resource, public by id.
+  String resourceUrl(int id) => '${AppConfig.apiBaseUrl}/api/resources/$id';
 
   // ── Payment methods ───────────────────────────────────────────────────────
 

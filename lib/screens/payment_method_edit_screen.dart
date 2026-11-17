@@ -228,26 +228,26 @@ class _PaymentMethodEditScreenState extends State<PaymentMethodEditScreen> {
                               initialValue: _m.key,
                               enabled: false,
                               decoration: const InputDecoration(
-                                  labelText: 'Key (cannot be changed)', border: OutlineInputBorder()),
+                                  labelText: 'Key (cannot be changed)'),
                             ),
                             const SizedBox(height: 16),
                             TextField(
                               controller: _nameEn,
                               decoration: const InputDecoration(
-                                  labelText: 'Name (English)', border: OutlineInputBorder()),
+                                  labelText: 'Name (English)'),
                             ),
                             const SizedBox(height: 16),
                             TextField(
                               controller: _nameAr,
                               textDirection: TextDirection.rtl,
                               decoration: const InputDecoration(
-                                  labelText: 'Name (Arabic)', border: OutlineInputBorder()),
+                                  labelText: 'Name (Arabic)'),
                             ),
                             const SizedBox(height: 16),
                             DropdownButtonFormField<String>(
                               initialValue: _provider,
                               decoration: const InputDecoration(
-                                  labelText: 'Provider', border: OutlineInputBorder()),
+                                  labelText: 'Provider'),
                               items: [
                                 for (final p in _providers) DropdownMenuItem(value: p, child: Text(p)),
                               ],
@@ -259,8 +259,7 @@ class _PaymentMethodEditScreenState extends State<PaymentMethodEditScreen> {
                                 controller: _url,
                                 keyboardType: TextInputType.url,
                                 decoration: const InputDecoration(
-                                    labelText: 'Payment URL (https://…)',
-                                    border: OutlineInputBorder()),
+                                    labelText: 'Payment URL (https://…)',),
                               ),
                             ],
                             const SizedBox(height: 16),
@@ -281,7 +280,7 @@ class _PaymentMethodEditScreenState extends State<PaymentMethodEditScreen> {
                               controller: _sort,
                               keyboardType: TextInputType.number,
                               decoration: const InputDecoration(
-                                  labelText: 'Sort order', border: OutlineInputBorder()),
+                                  labelText: 'Sort order'),
                             ),
                             const SizedBox(height: 8),
                             SwitchListTile(

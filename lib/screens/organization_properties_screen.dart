@@ -586,7 +586,6 @@ Future<dynamic> showOrgFieldEditorDialog(
                   decoration: InputDecoration(
                     labelText: _orgFieldLabels[field] ?? field,
                     suffixText: isVat ? '%' : null,
-                    border: const OutlineInputBorder(),
                     isDense: true,
                     errorText: error,
                   ),
@@ -776,7 +775,6 @@ class _PropertyEditorDialogState extends State<_PropertyEditorDialog> {
             labelText: 'Key',
             hintText: 'Search keys, e.g. sync or offline',
             prefixIcon: Icon(Icons.search, size: 18),
-            border: OutlineInputBorder(),
             isDense: true,
           ),
         ),
@@ -832,7 +830,7 @@ class _PropertyEditorDialogState extends State<_PropertyEditorDialog> {
     if (key == 'default_language') {
       return DropdownButtonFormField<String>(
         value: _dropdownValues['default_language'],
-        decoration: const InputDecoration(labelText: 'Value', border: OutlineInputBorder(), isDense: true),
+        decoration: const InputDecoration(labelText: 'Value', isDense: true),
         items: const [
           DropdownMenuItem(value: 'ar', child: Text('ar — Arabic')),
           DropdownMenuItem(value: 'en', child: Text('en — English')),
@@ -843,7 +841,7 @@ class _PropertyEditorDialogState extends State<_PropertyEditorDialog> {
     if (key == 'offline_mode') {
       return DropdownButtonFormField<String>(
         value: _dropdownValues['offline_mode'],
-        decoration: const InputDecoration(labelText: 'Value', border: OutlineInputBorder(), isDense: true),
+        decoration: const InputDecoration(labelText: 'Value', isDense: true),
         items: const [
           DropdownMenuItem(value: 'off', child: Text('off — online only (default)')),
           DropdownMenuItem(value: 'caching', child: Text('caching')),
@@ -855,7 +853,7 @@ class _PropertyEditorDialogState extends State<_PropertyEditorDialog> {
     if (key == 'Log_Level') {
       return DropdownButtonFormField<String>(
         value: _dropdownValues['Log_Level'],
-        decoration: const InputDecoration(labelText: 'Value', border: OutlineInputBorder(), isDense: true),
+        decoration: const InputDecoration(labelText: 'Value', isDense: true),
         items: const [
           DropdownMenuItem(value: 'Info', child: Text('Info — everything')),
           DropdownMenuItem(value: 'Warn', child: Text('Warn — warnings and errors (default)')),
@@ -867,7 +865,7 @@ class _PropertyEditorDialogState extends State<_PropertyEditorDialog> {
     if (key != null && _isBoolKey(key)) {
       return DropdownButtonFormField<String>(
         value: _dropdownValues[key] ?? 'false',
-        decoration: const InputDecoration(labelText: 'Value', border: OutlineInputBorder(), isDense: true),
+        decoration: const InputDecoration(labelText: 'Value', isDense: true),
         items: const [
           DropdownMenuItem(value: 'true', child: Text('true — Enabled')),
           DropdownMenuItem(value: 'false', child: Text('false — Disabled')),
@@ -882,7 +880,6 @@ class _PropertyEditorDialogState extends State<_PropertyEditorDialog> {
         decoration: InputDecoration(
           labelText: 'Value',
           hintText: _intHints[key],
-          border: const OutlineInputBorder(),
           isDense: true,
         ),
       );
@@ -894,14 +891,13 @@ class _PropertyEditorDialogState extends State<_PropertyEditorDialog> {
         decoration: InputDecoration(
           labelText: 'Value',
           hintText: _decimalHints[key],
-          border: const OutlineInputBorder(),
           isDense: true,
         ),
       );
     }
     return TextField(
       controller: _valueCtrl,
-      decoration: const InputDecoration(labelText: 'Value', border: OutlineInputBorder(), isDense: true),
+      decoration: const InputDecoration(labelText: 'Value', isDense: true),
     );
   }
 
@@ -948,7 +944,7 @@ class _PropertyEditorDialogState extends State<_PropertyEditorDialog> {
             if (_isEditing)
               InputDecorator(
                 decoration: const InputDecoration(
-                    labelText: 'Key', border: OutlineInputBorder(), isDense: true, filled: true),
+                    labelText: 'Key', isDense: true, filled: true),
                 child: Text(widget.editing!['key'].toString()),
               )
             else ...[
@@ -958,7 +954,7 @@ class _PropertyEditorDialogState extends State<_PropertyEditorDialog> {
                 TextField(
                   controller: _customKeyCtrl,
                   decoration: const InputDecoration(
-                      labelText: 'Key', border: OutlineInputBorder(), isDense: true),
+                      labelText: 'Key', isDense: true),
                 ),
               const SizedBox(height: 6),
               Align(

@@ -16,7 +16,7 @@ import '../widgets/waha_filter_controls.dart';
 import '../widgets/waha_pagination_bar.dart';
 
 /// Shared audit history: system actions, offers, coupons and roles.
-/// Backed by /api/admin/audit (api level 6); older servers fall back to
+/// Backed by /api/admin/audit (api level 5); older servers fall back to
 /// /api/admin/system/audit (system rows only, super admin).
 class AuditScreen extends StatefulWidget {
   const AuditScreen({super.key});
@@ -44,7 +44,21 @@ const _actions = <String, String>{
   'ROLE_DELETED': 'Role deleted',
   'ROLE_ASSIGNED': 'Role assigned',
   'ROLE_UNASSIGNED': 'Role unassigned',
+  'CLEANUP_RUN': 'Cleanup run',
+  'PROFILE_UPDATED': 'Profile updated',
+  'AVATAR_UPDATED': 'Photo changed',
+  'AVATAR_REMOVED': 'Photo removed',
 };
+
+/// Known actions get a readable name; unknown ones are tidied (CLEANUP_RUN -> Cleanup run).
+String _actionLabel(Object? a) {
+  final key = a?.toString() ?? '';
+  if (key.isEmpty) return '—';
+  final known = _actions[key];
+  if (known != null) return known;
+  final t = key.replaceAll('_', ' ').toLowerCase();
+  return t[0].toUpperCase() + t.substring(1);
+}
 
 const _systemOnlyActions = {
   'SETTING_CHANGED',
@@ -56,12 +70,14 @@ const _systemOnlyActions = {
   'AUDIT_ROWS_DELETED',
 };
 
-const _defaultTypes = ['SYSTEM', 'OFFER', 'COUPON', 'ROLE'];
+const _defaultTypes = ['SYSTEM', 'OFFER', 'COUPON', 'ROLE', 'USER'];
 const _typeLabels = {
   'SYSTEM': 'System',
   'OFFER': 'Offers',
   'COUPON': 'Coupons',
   'ROLE': 'Roles',
+  'USER': 'Accounts',
+  'WASTE': 'Wastes',
 };
 
 class _AuditScreenState extends State<AuditScreen> {
@@ -98,7 +114,7 @@ class _AuditScreenState extends State<AuditScreen> {
     super.dispose();
   }
 
-  bool get _shared => context.read<AuthState>().apiLevel >= 6;
+  bool get _shared => context.read<AuthState>().apiLevel >= 5;
   bool get _isSuper => context.read<AuthState>().isSuperAdmin;
 
   void _redirectLogin() {
@@ -229,7 +245,7 @@ class _AuditScreenState extends State<AuditScreen> {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(_actions[r['action']] ?? r['action']?.toString() ?? 'Audit entry'),
+        title: Text(_actionLabel(r['action'])),
         content: SizedBox(
           width: 560,
           child: SingleChildScrollView(
@@ -524,7 +540,7 @@ class _AuditScreenState extends State<AuditScreen> {
                                   if (_shared)
                                     DataCell(Text(_typeLabels[r['entityType']] ?? r['entityType']?.toString() ?? '—')),
                                   DataCell(Text(r['actorName']?.toString() ?? '—')),
-                                  DataCell(Text(_actions[r['action']] ?? r['action']?.toString() ?? '—')),
+                                  DataCell(Text(_actionLabel(r['action']))),
                                   DataCell(Text(r['target']?.toString() ?? '—')),
                                   DataCell(_clip(r['oldValue'])),
                                   DataCell(_clip(r['newValue'])),

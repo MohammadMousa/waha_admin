@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -7,9 +10,10 @@ import '../models/role.dart';
 import '../router/routes.dart';
 import '../services/api_client.dart';
 import '../state/auth_state.dart';
-import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
 import '../widgets/person_roles_section.dart';
+import '../widgets/personal_details_form.dart';
+import '../widgets/form_page.dart';
 import '../widgets/error_dialog.dart';
 
 // Accounts (the `users` table) is platform/organization level only now —
@@ -45,6 +49,15 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
   final _lastName = TextEditingController();
   final _phone = TextEditingController();
 
+  // Full personal profile (api level 5): name, phone, email, gender, birth
+  // date, language and picture. Older servers keep the three fields above.
+  final _pd = PersonalDetailsController();
+  int? _avatarId;
+  Uint8List? _pendingAvatar; // chosen for a new account, uploaded after creating it
+  String _pendingAvatarName = 'photo.jpg';
+  bool _avatarBusy = false;
+  bool get _hasProfile => context.read<AuthState>().apiLevel >= 5;
+
   // null = a regular account with no role (can sign in, can do nothing yet)
   String? _role;
   bool _enabled = true;
@@ -68,7 +81,85 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
       _role = u.roleName;
       _enabled = u.enabled;
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadOrganizations());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadOrganizations();
+      _loadProfile();
+    });
+  }
+
+  Future<void> _loadProfile() async {
+    final token = context.read<AuthState>().token;
+    if (token == null || !_hasProfile || _isCreate) return;
+    try {
+      final p = await ApiClient().getAdminProfile(token, widget.account!.id);
+      if (!mounted) return;
+      setState(() {
+        _pd.apply(p);
+        _avatarId = (p['avatarResourceId'] as num?)?.toInt();
+      });
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    }
+  }
+
+  Future<void> _pickAvatar() async {
+    final token = context.read<AuthState>().token;
+    if (token == null) return;
+    final res = await FilePicker.platform
+        .pickFiles(type: FileType.custom, allowedExtensions: ['jpg', 'jpeg', 'png'], withData: true);
+    final file = res?.files.single;
+    if (file == null || file.bytes == null || !mounted) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showErrorDialog(context, 'The picture is too large (5 MB at most).');
+      return;
+    }
+    if (_isCreate) {
+      // The account does not exist yet: keep the picture until it is created.
+      setState(() {
+        _pendingAvatar = file.bytes;
+        _pendingAvatarName = file.name;
+      });
+      return;
+    }
+    setState(() => _avatarBusy = true);
+    try {
+      final p = await ApiClient().uploadAdminAvatar(token, widget.account!.id, file.bytes!, file.name);
+      if (mounted) {
+        setState(() {
+          _avatarId = (p['avatarResourceId'] as num?)?.toInt();
+          _avatarBusy = false;
+        });
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() => _avatarBusy = false);
+        showErrorDialog(context, e.message);
+      }
+    }
+  }
+
+  Future<void> _removeAvatar() async {
+    if (_isCreate) {
+      setState(() => _pendingAvatar = null);
+      return;
+    }
+    final token = context.read<AuthState>().token;
+    if (token == null) return;
+    setState(() => _avatarBusy = true);
+    try {
+      await ApiClient().deleteAdminAvatar(token, widget.account!.id);
+      if (mounted) {
+        setState(() {
+          _avatarId = null;
+          _avatarBusy = false;
+        });
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() => _avatarBusy = false);
+        showErrorDialog(context, e.message);
+      }
+    }
   }
 
   @override
@@ -78,6 +169,7 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
     _firstName.dispose();
     _lastName.dispose();
     _phone.dispose();
+    _pd.dispose();
     super.dispose();
   }
 
@@ -137,11 +229,11 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
           'username': username,
           'password': _password.text.trim(),
           'enabled': _enabled,
-          if (_firstName.text.trim().isNotEmpty)
-            'firstName': _firstName.text.trim(),
-          if (_lastName.text.trim().isNotEmpty)
-            'lastName': _lastName.text.trim(),
-          if (_phone.text.trim().isNotEmpty) 'phone': _phone.text.trim(),
+          if (!_hasProfile) ...{
+            if (_firstName.text.trim().isNotEmpty) 'firstName': _firstName.text.trim(),
+            if (_lastName.text.trim().isNotEmpty) 'lastName': _lastName.text.trim(),
+            if (_phone.text.trim().isNotEmpty) 'phone': _phone.text.trim(),
+          },
           if (_role != null) 'role': _role,
           // Super admins are system-wide; everyone else belongs to the chosen
           // organization (the server uses its default one when none is sent).
@@ -152,21 +244,40 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
           final problem = await givePendingRoles('users', newId, _pendingRoles, token);
           if (problem != null && mounted) await showErrorDialog(context, problem);
         }
+        if (_hasProfile) {
+          // The account exists now; a failure here must not lose it.
+          try {
+            final fields = _pd.filled();
+            if (fields.isNotEmpty) await api.updateAdminProfile(token, newId, fields);
+            if (_pendingAvatar != null) {
+              await api.uploadAdminAvatar(token, newId, _pendingAvatar!, _pendingAvatarName);
+            }
+          } on ApiException catch (e) {
+            if (mounted) {
+              await showErrorDialog(context,
+                  'The account was created, but its personal details were not saved: ${e.message}');
+            }
+          }
+        }
       } else {
         await api.patchAdminAccount(widget.account!.id, {
           'enabled': _enabled,
-          'firstName': _firstName.text.trim().isNotEmpty
-              ? _firstName.text.trim()
-              : null,
-          'lastName': _lastName.text.trim().isNotEmpty
-              ? _lastName.text.trim()
-              : null,
-          'phone': _phone.text.trim().isNotEmpty ? _phone.text.trim() : null,
+          if (!_hasProfile) ...{
+            'firstName': _firstName.text.trim().isNotEmpty ? _firstName.text.trim() : null,
+            'lastName': _lastName.text.trim().isNotEmpty ? _lastName.text.trim() : null,
+            'phone': _phone.text.trim().isNotEmpty ? _phone.text.trim() : null,
+          },
           if (_password.text.trim().isNotEmpty)
             'password': _password.text.trim(),
           // Only when it changed; the server can switch a role but not remove it.
           if (_role != null && _role != widget.account!.roleName) 'role': _role,
         }, token: token);
+        if (_hasProfile) {
+          final changed = _pd.changed();
+          if (changed.isNotEmpty) {
+            await api.updateAdminProfile(token, widget.account!.id, changed);
+          }
+        }
       }
       if (mounted) Navigator.of(context).pop(true);
     } on ApiException catch (e) {
@@ -203,59 +314,29 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
           Expanded(
             child: Column(
               children: [
-                // Header bar
-                Container(
-                  padding: EdgeInsets.fromLTRB(pagePad(context), 16, pagePad(context), 16),
-                  decoration: BoxDecoration(
-                    color: scheme.surface,
-                    border: Border(
-                      bottom: BorderSide(color: scheme.outlineVariant),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _isCreate ? 'New Account' : 'Edit Account',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const Spacer(),
-                      if (!_loadingOrgs)
-                        FilledButton(
-                          onPressed: _saving ? null : _save,
-                          child: _saving
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Text('Save'),
-                        ),
-                    ],
-                  ),
+                FormPageHeader(
+                  title: _isCreate ? 'New Account' : 'Edit Account',
+                  showSave: !_loadingOrgs,
+                  saving: _saving,
+                  onSave: _save,
                 ),
                 // Form body
                 Expanded(
                   child: _loadingOrgs
                       ? const Center(child: CircularProgressIndicator())
-                      : SingleChildScrollView(
-                          padding: const EdgeInsets.all(24),
-                          child: Center(
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 540),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  _Label('Credentials'),
+                      : FormPageBody(
+                          children: [
+                                  if (_hasProfile) ...[
+                                  PersonAvatar(
+                                    avatarId: _avatarId,
+                                    pendingBytes: _pendingAvatar,
+                                    busy: _avatarBusy,
+                                    onPick: _pickAvatar,
+                                    onRemove: _removeAvatar,
+                                  ),
+                                  const SizedBox(height: 24),
+                                  ],
+                                  FormSectionLabel('Credentials'),
                                   const SizedBox(height: 8),
                                   TextField(
                                     controller: _username,
@@ -263,7 +344,6 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
                                     autocorrect: false,
                                     decoration: const InputDecoration(
                                       labelText: 'Username *',
-                                      border: OutlineInputBorder(),
                                       prefixIcon: Icon(Icons.person_outline),
                                     ),
                                   ),
@@ -275,7 +355,6 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
                                       labelText: _isCreate
                                           ? 'Password *'
                                           : 'New password (leave blank to keep)',
-                                      border: const OutlineInputBorder(),
                                       prefixIcon: const Icon(
                                         Icons.key_outlined,
                                       ),
@@ -305,14 +384,13 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
                                         setState(() => _enabled = v),
                                   ),
                                   const Divider(height: 32),
-                                  _Label('Account level & Organization'),
+                                  FormSectionLabel('Account level & Organization'),
                                   const SizedBox(height: 12),
                                   if (!_roleListMode || _hasBuiltInTopRole)
                                   DropdownButtonFormField<String?>(
                                     value: roles.contains(_role) ? _role : null,
                                     decoration: const InputDecoration(
                                       labelText: 'Account level',
-                                      border: OutlineInputBorder(),
                                       prefixIcon: Icon(Icons.badge_outlined),
                                     ),
                                     items: [
@@ -345,7 +423,6 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
                                           : (!_isCreate
                                               ? 'The organization of an existing account cannot be changed'
                                               : null),
-                                      border: const OutlineInputBorder(),
                                       prefixIcon: const Icon(Icons.apartment_outlined),
                                     ),
                                     items: [
@@ -368,7 +445,7 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
                                   ),
                                   if (_roleListMode || (_isCreate && _canAssignRoles)) ...[
                                     const SizedBox(height: 16),
-                                    _Label('Additional roles'),
+                                    FormSectionLabel('Additional roles'),
                                     const SizedBox(height: 8),
                                     PersonRolesSection(
                                       kind: 'users',
@@ -382,39 +459,35 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
                                     ),
                                   ],
                                   const Divider(height: 32),
-                                  _Label('Personal Info'),
+                                  FormSectionLabel('Personal Info'),
                                   const SizedBox(height: 12),
-                                  TextField(
-                                    controller: _firstName,
-                                    decoration: const InputDecoration(
-                                      labelText: 'First name',
-                                      border: OutlineInputBorder(),
+                                  if (_hasProfile) ...[
+                                    PersonalDetailsFields(controller: _pd),
+                                  ] else ...[
+                                    TextField(
+                                      controller: _firstName,
+                                      decoration: const InputDecoration(
+                                        labelText: 'First name',
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  TextField(
-                                    controller: _lastName,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Last name',
-                                      border: OutlineInputBorder(),
+                                    const SizedBox(height: 12),
+                                    TextField(
+                                      controller: _lastName,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Last name',
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  TextField(
-                                    controller: _phone,
-                                    keyboardType: TextInputType.phone,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Phone',
-                                      border: OutlineInputBorder(),
-                                      prefixIcon: Icon(Icons.phone_outlined),
+                                    const SizedBox(height: 12),
+                                    TextField(
+                                      controller: _phone,
+                                      keyboardType: TextInputType.phone,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Phone',
+                                        prefixIcon: Icon(Icons.phone_outlined),
+                                      ),
                                     ),
-                                  ),
-
-                                  const SizedBox(height: 40),
-                                ],
-                              ),
-                            ),
-                          ),
+                                  ],
+                          ],
                         ),
                 ),
               ],
@@ -424,18 +497,4 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
       ),
     );
   }
-}
-
-class _Label extends StatelessWidget {
-  final String text;
-  const _Label(this.text);
-  @override
-  Widget build(BuildContext context) => Text(
-    text,
-    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-      color: Theme.of(context).colorScheme.primary,
-      fontWeight: FontWeight.w700,
-      letterSpacing: 0.5,
-    ),
-  );
 }
