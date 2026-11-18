@@ -72,6 +72,7 @@ class AuthState extends ChangeNotifier {
       _serverSplitsPermissions ? hasPermission('MANAGE_SETTINGS') : hasPermission('MANAGE_STORES');
   /// Inventory wastes (api level 5).
   bool get canViewWastes => _apiLevel >= 5 && (isSuperAdmin || hasPermission('VIEW_WASTES'));
+  bool get canDeleteUnpaidOrders => _apiLevel >= 6 && (isSuperAdmin || hasPermission('DELETE_UNPAID_ORDERS'));
   bool get canCreateWastes => _apiLevel >= 5 && (isSuperAdmin || hasPermission('CREATE_WASTES'));
   /// Audit menu: super admin, or VIEW_ORGANIZATION_AUDIT (api level 5).
   bool get canViewAudit =>

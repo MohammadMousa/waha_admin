@@ -41,6 +41,7 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
   String? _successMsg;
 
   String _pushTarget = 'SALES';
+  bool _createMissing = false;
 
   @override
   void initState() {
@@ -79,6 +80,7 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
         _lastProdSync     = status['lastProductSyncAt']  as String?;
         _queue            = status['queue']  as Map<String, dynamic>?;
         _pushTarget       = status['pushTarget'] as String? ?? 'SALES';
+        _createMissing    = status['createMissingProducts'] as bool? ?? false;
         if (_baseUrl          != null && _baseUrl!.isNotEmpty)          _urlCtrl.text      = _baseUrl!;
         if (_username         != null && _username!.isNotEmpty)         _userCtrl.text     = _username!;
         if (_customerOverride != null && _customerOverride!.isNotEmpty) _overrideCtrl.text = _customerOverride!;
@@ -115,6 +117,8 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
     }
   }
 
+  bool get _showCreateMissing => (_token != null) && context.read<AuthState>().apiLevel >= 6;
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     final token = _token;
@@ -128,6 +132,7 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
         _userCtrl.text.trim(),
         customerOverride: _overrideCtrl.text.trim(),
         storeId: 1,
+        createMissingProducts: _showCreateMissing ? _createMissing : null,
       );
       _keyCtrl.clear();
       _userCtrl.clear();
@@ -484,6 +489,15 @@ class _OdooAdminScreenState extends State<OdooAdminScreen> {
                               helperText: 'All orders use this Odoo customer instead of device/user identity.',
                             ),
                           ),
+                          if (_showCreateMissing)
+                            SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Create missing products in Odoo'),
+                              subtitle: const Text(
+                                  'When an order has a product Odoo does not know, create it (barcode, price without VAT, category "waha_products").'),
+                              value: _createMissing,
+                              onChanged: _loading ? null : (v) => setState(() => _createMissing = v),
+                            ),
                           const SizedBox(height: 16),
                           SizedBox(
                             width: double.infinity,

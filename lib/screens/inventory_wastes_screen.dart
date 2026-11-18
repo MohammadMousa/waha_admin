@@ -247,6 +247,8 @@ class _InventoryWastesScreenState extends State<InventoryWastesScreen> {
     }
   }
 
+  bool _showFilters = false;
+
   // ---- build ----
   @override
   Widget build(BuildContext context) {
@@ -269,10 +271,17 @@ class _InventoryWastesScreenState extends State<InventoryWastesScreen> {
                       ]))
                     : LayoutBuilder(builder: (context, c) {
                         final narrow = MediaQuery.sizeOf(context).width < kNarrowWidth;
+                        if (narrow) {
+                          return ListView(children: [
+                            _header(scheme, narrow: true),
+                            _summaryCards(scheme),
+                            _filterToggle(scheme),
+                            if (_showFilters) _filters(scheme),
+                            _cards(scheme),
+                          ]);
+                        }
                         final head = [_header(scheme), _summaryCards(scheme), _filters(scheme)];
-                        return narrow
-                            ? ListView(children: [...head, SizedBox(height: 560, child: _table(scheme))])
-                            : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                 ...head,
                                 Expanded(child: _table(scheme)),
                               ]);
@@ -283,14 +292,11 @@ class _InventoryWastesScreenState extends State<InventoryWastesScreen> {
     );
   }
 
-  Widget _header(ColorScheme scheme) {
+  Widget _header(ColorScheme scheme, {bool narrow = false}) {
     final auth = context.watch<AuthState>();
-    return Padding(
-      padding: EdgeInsets.fromLTRB(pagePad(context), 20, pagePad(context), 0),
-      child: adaptiveRow(context, children: [
-        Text('Inventory Wastes',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
-        const Spacer(),
+    final title = Text('Inventory Wastes',
+        style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700));
+    final actions = <Widget>[
         if (_loading)
           const Padding(
             padding: EdgeInsets.only(right: 12),
@@ -319,6 +325,108 @@ class _InventoryWastesScreenState extends State<InventoryWastesScreen> {
           const SizedBox(width: 8),
         ],
         IconButton(icon: const Icon(Icons.refresh_outlined), tooltip: 'Refresh', onPressed: _load),
+    ];
+    return Padding(
+      padding: EdgeInsets.fromLTRB(pagePad(context), 20, pagePad(context), 0),
+      child: narrow
+          ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              title,
+              const SizedBox(height: 6),
+              Row(children: actions),
+            ])
+          : Row(children: [title, const Spacer(), ...actions]),
+    );
+  }
+
+  Widget _filterToggle(ColorScheme scheme) {
+    final active = [_branchId, _reason, _employeeId, _range, _productId].where((e) => e != null).length +
+        (_searchCtrl.text.trim().isEmpty ? 0 : 1);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(pagePad(context), 12, pagePad(context), 0),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: OutlinedButton.icon(
+          icon: Icon(_showFilters ? Icons.expand_less : Icons.filter_list, size: 16),
+          label: Text(active > 0 ? 'Filters ($active)' : 'Filters'),
+          onPressed: () => setState(() => _showFilters = !_showFilters),
+        ),
+      ),
+    );
+  }
+
+  Widget _footer(ColorScheme scheme) {
+    final from = _page * _pageSize + 1;
+    final to = ((_page + 1) * _pageSize).clamp(0, _total);
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: pagePad(context) - 4, vertical: 10),
+      child: adaptiveRow(context, children: [
+        Text(
+          _total == 0 ? 'No entries' : 'Showing ${fmtCount(from)}–${fmtCount(to)} of ${fmtCount(_total)} entries',
+          style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
+        ),
+        const Spacer(),
+        WahaPaginationBar(
+          page: _page,
+          totalCount: _total,
+          pageSize: _pageSize,
+          onPage: (p) { setState(() => _page = p); _load(); },
+        ),
+      ]),
+    );
+  }
+
+  Widget _cards(ColorScheme scheme) {
+    Widget kv(String k, String v) => Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            SizedBox(width: 78, child: Text(k, style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant))),
+            Expanded(child: Text(v, style: const TextStyle(fontSize: 13))),
+          ]),
+        );
+    return Padding(
+      padding: EdgeInsets.fromLTRB(pagePad(context), 12, pagePad(context), 0),
+      child: Column(children: [
+        if (_loading) const LinearProgressIndicator(),
+        if (_items.isEmpty && !_loading)
+          const Padding(padding: EdgeInsets.all(32), child: Text('No wastes.')),
+        for (final r in _items)
+          Card(
+            margin: const EdgeInsets.only(bottom: 10),
+            elevation: 0,
+            color: scheme.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: BorderSide(color: scheme.outlineVariant),
+            ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: () => _openDetail(r),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 10, 8, 6),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Text('#${r['id']}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(_dateOf(r['occurredAt']),
+                        style: TextStyle(color: scheme.onSurfaceVariant))),
+                    TextButton.icon(
+                      icon: const Icon(Icons.visibility_outlined, size: 16),
+                      label: const Text('View'),
+                      onPressed: () => _openDetail(r),
+                    ),
+                  ]),
+                  kv('Branch', '${r['branchName'] ?? '—'}'),
+                  kv('Reason', _reasonLabel(r['reason']?.toString())),
+                  kv('Employee', '${r['employeeName'] ?? '—'}'),
+                  kv('Lines', fmtCount(r['itemCount'])),
+                  kv('Quantity', fmtCount(r['quantity'])),
+                  const SizedBox(height: 4),
+                ]),
+              ),
+            ),
+          ),
+        _footer(scheme),
+        const SizedBox(height: 12),
       ]),
     );
   }

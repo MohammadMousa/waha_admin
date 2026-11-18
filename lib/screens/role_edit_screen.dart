@@ -115,6 +115,7 @@ class _RoleEditScreenState extends State<RoleEditScreen> {
     'VIEW_INVENTORY_REPORTS': 'Reports',
     'VIEW_WASTES': 'Inventory',
     'CREATE_WASTES': 'Inventory',
+    'DELETE_UNPAID_ORDERS': 'Reports',
     'MANAGE_SETTINGS': 'Settings',
     'MANAGE_PAYMENT_METHODS': 'Settings',
     'MANAGE_INTEGRATIONS': 'Settings',
@@ -131,6 +132,7 @@ class _RoleEditScreenState extends State<RoleEditScreen> {
     'MANAGE_SETTINGS': 'Receipt info, organization info and properties',
     'VIEW_WASTES': 'View, open and export inventory wastes',
     'CREATE_WASTES': 'Record inventory wastes',
+    'DELETE_UNPAID_ORDERS': 'Delete unpaid orders (paid orders are never deleted)',
     'VIEW_ORGANIZATION_AUDIT': "View the organization's audit history",
   };
 

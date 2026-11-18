@@ -1634,6 +1634,31 @@ class ApiClient {
     throw ApiException(resp.statusCode, _extractMessage(resp));
   }
 
+  // ── Unpaid orders cleanup (level 6, DELETE_UNPAID_ORDERS) ─────────────────
+  Future<int> countUnpaidOrders(String token, {required int olderThanDays, int? branchId}) async {
+    final uri = _uri('/api/admin/orders/unpaid/count').replace(queryParameters: {
+      'olderThanDays': '$olderThanDays',
+      if (branchId != null) 'branchId': '$branchId',
+    });
+    final resp = await _http.get(uri, headers: _headers(token: token));
+    if (resp.statusCode != 200) throw ApiException(resp.statusCode, _extractMessage(resp));
+    return ((jsonDecode(resp.body) as Map)['count'] as num?)?.toInt() ?? 0;
+  }
+
+  /// Returns {deleted, skipped}.
+  Future<Map<String, dynamic>> deleteUnpaidOrders(String token,
+      {List<int>? ids, int? olderThanDays, int? branchId}) async {
+    final resp = await _http.post(_uri('/api/admin/orders/unpaid/delete'),
+        headers: _headers(token: token),
+        body: jsonEncode({
+          if (ids != null) 'ids': ids,
+          if (ids == null && olderThanDays != null) 'olderThanDays': olderThanDays,
+          if (ids == null && branchId != null) 'branchId': branchId,
+        }));
+    if (resp.statusCode != 200) throw ApiException(resp.statusCode, _extractMessage(resp));
+    return jsonDecode(resp.body) as Map<String, dynamic>;
+  }
+
   // ── Odoo ──────────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> odooStatus(String token, {int? storeId}) async {
@@ -1645,7 +1670,7 @@ class ApiClient {
   }
 
   Future<void> oodooConfigure(String token, String baseUrl, String apiKey,
-      String username, {String? customerOverride, int? storeId, String? pushTarget}) async {
+      String username, {String? customerOverride, int? storeId, String? pushTarget, bool? createMissingProducts}) async {
     final uri = _uri('/api/admin/odoo/configure')
         .replace(queryParameters: storeId != null ? {'storeId': '$storeId'} : null);
     final resp = await _http.post(uri,
@@ -1657,6 +1682,7 @@ class ApiClient {
           if (customerOverride != null && customerOverride.isNotEmpty)
             'customerOverride': customerOverride,
           if (pushTarget != null) 'pushTarget': pushTarget,
+          if (createMissingProducts != null) 'createMissingProducts': createMissingProducts,
         }));
     if (resp.statusCode != 200) throw ApiException(resp.statusCode, _extractMessage(resp));
   }

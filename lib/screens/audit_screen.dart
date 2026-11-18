@@ -78,6 +78,7 @@ const _typeLabels = {
   'ROLE': 'Roles',
   'USER': 'Accounts',
   'WASTE': 'Wastes',
+  'ORDER': 'Orders',
 };
 
 class _AuditScreenState extends State<AuditScreen> {

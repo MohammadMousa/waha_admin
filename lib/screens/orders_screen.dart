@@ -15,6 +15,7 @@ import '../services/api_client.dart';
 import '../state/auth_state.dart';
 import '../widgets/adaptive_shell.dart';
 import '../widgets/admin_sidebar.dart';
+import '../widgets/delete_unpaid_orders_dialog.dart';
 import '../widgets/error_dialog.dart';
 import '../widgets/waha_date_picker.dart';
 import '../widgets/waha_filter_controls.dart';
@@ -202,6 +203,20 @@ class _OrdersScreenState extends State<OrdersScreen> {
       } catch (_) {}
     }
     return row['branch_name']?.toString() ?? '—';
+  }
+
+  Future<void> _deleteUnpaid() async {
+    final token = context.read<AuthState>().token;
+    if (token == null) return;
+    final branches = [
+      for (final s in _stores)
+        (id: (s['id'] as num).toInt(), label: _branchLabel(s)),
+    ];
+    final changed = await showDialog<bool>(
+      context: context,
+      builder: (_) => DeleteUnpaidOrdersDialog(token: token, branches: branches),
+    );
+    if (changed == true && mounted) _load();
   }
 
   Future<void> _pickDateRange() async {
@@ -472,6 +487,12 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
                 onPressed: _exporting ? null : _exportPdf,
                 style: exportStyle,
               ),
+              if (context.read<AuthState>().canDeleteUnpaidOrders)
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.delete_sweep_outlined, size: 16),
+                  label: const Text('Delete unpaid'),
+                  onPressed: _deleteUnpaid,
+                ),
             ],
           ),
         ],
@@ -515,6 +536,14 @@ th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f0f0f0}</style></head
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               ),
             ),
+            if (context.read<AuthState>().canDeleteUnpaidOrders) ...[
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.delete_sweep_outlined, size: 16),
+                label: const Text('Delete unpaid'),
+                onPressed: _deleteUnpaid,
+              ),
+            ],
             const SizedBox(width: 8),
             IconButton(
               icon: const Icon(Icons.view_column_outlined),
